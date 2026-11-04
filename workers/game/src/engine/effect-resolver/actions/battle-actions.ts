@@ -4,6 +4,7 @@
 
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
+import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
 import {
   computeAllValidTargets,
@@ -12,8 +13,6 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../effect-damage.js";
-import { lifeToHandDestination } from "../../life-destination.js";
-import { transitionCard } from "../../zone-transition.js";
 import { resolveAmount } from "../action-utils.js";
 
 // ─── REDIRECT_ATTACK ─────────────────────────────────────────────────────────
@@ -47,7 +46,13 @@ export function executeRedirectAttack(
     needsPlayerTargetSelection(action.target, allValidIds)
   ) {
     return buildSelectTargetPrompt(
-      state,
+      {
+        ...state,
+        turn: {
+          ...state.turn,
+          battle: { ...state.turn.battle, redirectWindow: true },
+        },
+      },
       action,
       allValidIds,
       sourceCardInstanceId,
@@ -57,10 +62,26 @@ export function executeRedirectAttack(
     );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
-  if (targetIds.length === 0) return { state, events, succeeded: false };
+  if (targetIds.length === 0)
+    return {
+      state: {
+        ...state,
+        turn: {
+          ...state.turn,
+          battle: { ...state.turn.battle, redirectWindow: false },
+        },
+      },
+      events,
+      succeeded: false,
+    };
 
   const newTarget = targetIds[0];
-  const newBattle = { ...state.turn.battle, targetInstanceId: newTarget };
+  const newBattle = {
+    ...state.turn.battle,
+    targetInstanceId: newTarget,
+    redirectWindow: false,
+    targetLocked: true,
+  };
   const newTurn = { ...state.turn, battle: newBattle };
 
   events.push({
@@ -92,7 +113,9 @@ export function executeDealDamage(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>
+  resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: EffectResolverServices
 ): ActionResult {
   const params = action.params ?? {};
   const amount = resolveAmount(
@@ -103,7 +126,6 @@ export function executeDealDamage(
     cardDb
   );
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
-  const startingLife = state.players[opp].life.length;
 
   const cont = continueEffectDamageSequence(
     state,
@@ -111,19 +133,24 @@ export function executeDealDamage(
     opp,
     amount,
     sourceCardInstanceId,
-    controller
+    controller,
+    true,
+    undefined,
+    services?.publishCommittedEvents
   );
 
-  const dealtSoFar = Math.max(
-    0,
-    startingLife - cont.state.players[opp].life.length
-  );
-
+  // A [Trigger] window pauses the instruction on its EFFECT_DAMAGE frame
+  // (OPT-963); the chain parks below it and learns the final count when the
+  // frame completes (completeEffectDamageFrame).
   return {
     state: cont.state,
     events: cont.events,
-    succeeded: dealtSoFar > 0 || !!cont.state.turn.pendingTriggerFromEffect,
-    result: { targetInstanceIds: [], count: dealtSoFar },
+    succeeded: cont.dealt > 0 || cont.lethalDamagePlayerIndex !== undefined,
+    result: { targetInstanceIds: [], count: cont.dealt },
+    ...(cont.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex }
+      : {}),
+    ...(cont.pendingPrompt ? { pendingPrompt: cont.pendingPrompt } : {}),
   };
 }
 
@@ -132,12 +159,13 @@ export function executeDealDamage(
 export function executeSelfTakeDamage(
   state: GameState,
   action: ActionOf<"SELF_TAKE_DAMAGE">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>
+  resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: EffectResolverServices
 ): ActionResult {
-  const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const amount = resolveAmount(
     params.amount ?? 1,
@@ -147,35 +175,20 @@ export function executeSelfTakeDamage(
     cardDb
   );
 
-  let nextState = state;
-  let dealt = 0;
-  for (let i = 0; i < amount; i++) {
-    const player = nextState.players[controller];
-    if (player.life.length === 0) break;
-
-    const lifeCard = player.life[0];
-    const destination = lifeToHandDestination(nextState, controller, lifeCard, cardDb);
-    const moved = transitionCard(nextState, lifeCard.instanceId,
-      destination === "DECK_BOTTOM" ? "DECK" : destination,
-      { position: destination === "TRASH" ? "TOP" : "BOTTOM" });
-    if (!moved) break;
-    nextState = moved.state;
-    dealt++;
-
-    events.push({
-      type: "CARD_REMOVED_FROM_LIFE",
-      playerIndex: controller,
-      payload: {
-        cardInstanceId: lifeCard.instanceId,
-        newCardInstanceId: moved.fact.newInstanceId,
-      },
-    });
-  }
-
+  // Self-inflicted damage uses the same per-point Life/Trigger continuation;
+  // controller and damaged player are independently represented by the frame.
+  const cont = continueEffectDamageSequence(
+    state, cardDb, controller, amount, sourceCardInstanceId, controller, true,
+    undefined, services?.publishCommittedEvents
+  );
   return {
-    state: nextState,
-    events,
-    succeeded: dealt > 0,
-    result: { targetInstanceIds: [], count: dealt },
+    state: cont.state,
+    events: cont.events,
+    succeeded: cont.dealt > 0 || cont.lethalDamagePlayerIndex !== undefined,
+    result: { targetInstanceIds: [], count: cont.dealt },
+    ...(cont.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex }
+      : {}),
+    ...(cont.pendingPrompt ? { pendingPrompt: cont.pendingPrompt } : {}),
   };
 }

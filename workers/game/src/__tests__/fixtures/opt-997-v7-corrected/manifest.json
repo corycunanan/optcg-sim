@@ -1,0 +1,219 @@
+{
+  "producer": "5e6b33e5e5a58b8958d80929b5c5660ae9aabcb6",
+  "producerPatchBase": "b4ed42582fc601a90bf4ebce00b478af65939886",
+  "producerPatchSha256": "8037b183b8449683a69e6db952179695fca84e399a6fac38be556b5ac96d062d",
+  "readerAssessedBase": "553a29551b16022aca64c002af7968e33c8cce31",
+  "correctsReader": "d523e5f960067c1ef910de9a1ce16393069389c5",
+  "sourceVersion": 7,
+  "ordinaryReaderWriterVersion": 6,
+  "generator": "OPT997_REGENERATE=../../../opt997-v7-corrected-regenerated pnpm --dir workers/game exec vitest run src/__tests__/opt-997-producer-corpus.test.ts",
+  "files": [
+    {
+      "file": "compound-arrange-prefix.json",
+      "sha256": "50770c5157e68b8649c8cc96fdae9c294e7a4a5d79f2552dc8a6b925103d71d7",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "compound-arrange.json",
+      "sha256": "04cdc6ba1a6fa3104aca83871bf43fe1d2fc14cfa7c4f8e76b982bb4787e4025",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "compound-select-prefix.json",
+      "sha256": "946fd649aa676c6cd3857625ad05dabc2cc6305d7ae019aee7da6c50a7e64a51",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "compound-select.json",
+      "sha256": "f8993976f8be0667d6e50dbe0ee00d9ae6dd9848c7c58b0dd3e536f272f941ae",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "fixed-accept-prefix.json",
+      "sha256": "a7622354679514ccc196b2e07e90b16d8c3e695cc418290821fff16e52d3fca3",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "fixed-accept.json",
+      "sha256": "e8b4affebe16bb20e6c3c2fd4a2167f1bd6ae2e1203f28e8017e777e76e17e65",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "fixed-decline.json",
+      "sha256": "6fd3c913bda8cf05f3381db9d9ed8700d12f980bc08cc8167c9fa5b930435d28",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "fixed-mandatory-prefix.json",
+      "sha256": "037c61df64a20bff5b094128cdb22626291debe0fcdb9a963d4631a776e6394c",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "fixed-mandatory.json",
+      "sha256": "5fee4178968add84becc4cbd571165ba215066c2c3db217301dfab3ebae184f1",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "later-cost-replacement.json",
+      "sha256": "feb23eab68db90fee4e2cef0ca9290519448e87b2ab80ce44c7f49c2cfbc73f9",
+      "pauses": 4,
+      "replayStarts": 16,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "legacy-accepted6-unknown.json",
+      "sha256": "2abe0bde646e4215b49a4c9ae4d2e6117085f35b8b6d0f977a6a1935137bb657",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "legacy-unknown-diagnostic"
+    },
+    {
+      "file": "nested-replacement.json",
+      "sha256": "f6ef66bd153f5379f83b4f0dce7a5ceb95ca1f5aaf523a581e7953aaec175f5a",
+      "pauses": 5,
+      "replayStarts": 20,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "opponent-life-prefix.json",
+      "sha256": "edb3d7a5cd008d8335a1be7d93eff6cf41ca5b5d3b4c9c4d4adf168bf647b7c0",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "opponent-life.json",
+      "sha256": "1a0e5db8c3b8928836ab5850ec97f3dd5d1de6f4b805e47e610bb98ce68d1c5a",
+      "pauses": 4,
+      "replayStarts": 16,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-action.json",
+      "sha256": "c3394d33817dcf7ad3abade297ededd3737c7b46e925eda2bfa17d5a57e441af",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-duplicate-hosts.json",
+      "sha256": "8ee030fd7103f20827cec15ba565f430d1d24582c3091139810b8207710813f7",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-fixed.json",
+      "sha256": "904da482ccd899172b17f80d32b54c82cedc28b51c51c7fc1884843b7f7c0ab5",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-hold-durations.json",
+      "sha256": "34f484ac003f143493a5220030aa4eba0a9855e423a02c3cbee85de9e6065244",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-replacement.json",
+      "sha256": "190107aa6d4533657a6bd296275b73e7f1b24f922061288b5d4c206a42bb9ce9",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "picker-variable.json",
+      "sha256": "32aba65c0792b1825d16df67d5280a53e51ac4778162adb6b124d442ba284d9f",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "selected-accept-prefix.json",
+      "sha256": "307e200f40591aa91f6d1fd31212ad2905fc9635c8b9c2dab31c88c07d58483e",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "selected-accept.json",
+      "sha256": "14dc28bfd5db27a3d5f9ef85a6ca328af2630af14738485ff34f05e9729ac0f9",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "selected-mandatory-prefix.json",
+      "sha256": "a2e4a0defb723645b4eea728a8ac0131a8db35f76776db1e2992b2cdae17d1e6",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "selected-mandatory.json",
+      "sha256": "0a995cdc70410285aa1cad7e8948723fe6fbd73ad2afa3b17f1fabd5b4905058",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "terminal-after-child-prefix.json",
+      "sha256": "8e45cc2a6d040aa04731fb9919b11ee87ad1fc3518c43ed5d45cc8fa792a5865",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "terminal-after-child.json",
+      "sha256": "f60ca0513d8630ac0a45e2579099277f8f7a646468d5548539f377a096a96a56",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "terminal-immediate.json",
+      "sha256": "db95107a58660736eb2044aa97e61897d2453e05ce4fbbeb4f47afdb75f34645",
+      "pauses": 1,
+      "replayStarts": 4,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "two-child-result-ref.json",
+      "sha256": "9e28c18f5a413c0d669443bfbcb1048b9d6055a3160eab3ddd360660c61c9c8d",
+      "pauses": 3,
+      "replayStarts": 12,
+      "disposition": "supported-completion"
+    },
+    {
+      "file": "upgrade-pending6.json",
+      "sha256": "249a2e4bd28c9152e1be6a0a4f70157c5f56743fa9b149446252c69f5ccd6551",
+      "pauses": 2,
+      "replayStarts": 8,
+      "disposition": "supported-completion"
+    }
+  ],
+  "supportedFamilies": 28,
+  "diagnosticFamilies": 1,
+  "pauseCount": 62,
+  "replayStarts": 248
+}

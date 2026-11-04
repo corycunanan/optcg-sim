@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import type { CardDb, GameAction, PromptSourceCard } from "@shared/game-types";
+import type { CardDb, GameAction, PlayerChoicePrompt, PromptSourceCard } from "@shared/game-types";
+import { DonIdentityReturnPicker } from "./don-identity-return-picker";
 import { Minus, Plus } from "lucide-react";
 import { GameButton } from "./game-button";
 import { EffectPromptDialog } from "./effect-prompt-dialog";
@@ -12,6 +13,7 @@ interface PlayerChoiceModalProps {
   sourceCard?: PromptSourceCard;
   actionLabel?: string;
   choices: { id: string; label: string; disabled?: boolean }[];
+  donIdentityReturn?: PlayerChoicePrompt["donIdentityReturn"];
   donReturn?: {
     count: number;
     sources: Array<{
@@ -40,6 +42,7 @@ export function PlayerChoiceModal({
   actionLabel,
   choices,
   donReturn,
+  donIdentityReturn,
   confirmOrSkip = false,
   cardDb,
   isHidden,
@@ -120,6 +123,22 @@ export function PlayerChoiceModal({
   const note = sourceEffectDescription ? (
     <p className="text-gb-text-dim text-sm">{sourceEffectDescription}</p>
   ) : undefined;
+
+  if (donIdentityReturn) {
+    return <DonIdentityReturnPicker
+      key={JSON.stringify([choices, donIdentityReturn])}
+      picker={donIdentityReturn}
+      choices={choices}
+      effectDescription={effectDescription}
+      sourceCard={sourceCard}
+      actionLabel={actionLabel}
+      cardDb={cardDb}
+      isHidden={isHidden}
+      onHide={onHide}
+      note={note}
+      onAction={onAction}
+    />;
+  }
 
   if (donReturn) {
     return (

@@ -1,0 +1,346 @@
+{
+  "synthetic": true,
+  "writerProducer": "71c2a9abe9695f18b9f725a806ed936f1be976fb",
+  "readerRollbackFloor": "4e082e56fa65f2c7c92aca145bc3ba0977ed193f",
+  "sha256": "52bf4da00f2f80268511a54f498d74b6b1b517a496690fb7f10b551462ed68bf",
+  "families": 66,
+  "scenarioCount": 66,
+  "behaviorScenarioCount": 18,
+  "migrationVariantCount": 48,
+  "legacyStartingInputs": 12,
+  "startPauses": 123,
+  "suffixReplies": 196,
+  "provenance": "Actual session writer outputs, authoritative save-returned runtime before migration first reply; no identity rewriting. Synthetic-only exception approved for OPT-968; no production capture.",
+  "familyCounts": [
+    {
+      "name": "behavior/-recheck-policy-assumed-no-official-ruling-the-non-turn-player-chooses-among-its-candidates-then-accepts-the-selected-replacement-separately-0.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "behavior/OP15-009-pays-a-single-Leader-reduction-for-both-simultaneous-removals-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/OP16-014-non-once-substitute-raises-the-same-removal-event-without-re-entering-its-opponent-only-replacement-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/OP17-015-non-once-substitute-raises-the-same-removal-event-without-re-entering-its-opponent-only-replacement-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/OPT-922-competing-resource-recheck-after-earlier-substitute-0.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "behavior/OPT-922-competing-resource-recheck-at-accepted-reply-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/OPT-968-per-action-replacement-feasibility-Morley-offers-only-feasible-branches-and-cannot-save-himself-with-an-empty-field-payment-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/OPT-968-per-action-replacement-feasibility-Morley-s-choice-prompt-excludes-rest-two-field-with-only-one-active-field-card-0.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "behavior/OPT-968-per-action-replacement-feasibility-OP10-074-2-active-DON-are-both-paid-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/Pica-can-rest-another-member-of-the-simultaneous-K-O-batch-before-that-member-leaves-0.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "behavior/Sabo-saves-both-simultaneous-K-O-targets-with-one-replacement-application-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/a-resource-changing-prefix-enables-a-later-substitute-choice-at-actual-choice-time-0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/battle-decline-next-followed-by-a-nested-hand-payment-resumes-once-after-load-0.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "behavior/field-to-Life-replacement-preserves-real-destination-choice-and-owner-arrangement-through-reload-0.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "behavior/olicy-assumed-no-official-ruling-the-affected-card-s-own-replacement-precedes-its-controller-s-Leader-replacement-regardless-of-registration-0.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "behavior/sequential-DON-substitutes-use-actual-returned-cost-area-state-1-returned--0.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "behavior/simultaneous-own-replacements-never-let-one-player-order-the-other-player-s-candidates-0.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "behavior/t-scan-and-recheck-policy-assumed-no-official-ruling-rescans-after-a-nested-hand-payment-makes-a-previously-ineligible-replacement-available-0.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-don-declined-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-don-declined-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/KO-don-declined-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-don-declined-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/KO-don-first-live-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-don-first-live-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-don-first-undo-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-don-first-undo-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-don-prefix-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-don-prefix-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/KO-don-prefix-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-don-prefix-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/KO-nested-declined-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-declined-live-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-declined-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-declined-undo-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-first-live-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-nested-first-live-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-nested-first-undo-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-nested-first-undo-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/KO-nested-prefix-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-prefix-live-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-prefix-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/KO-nested-prefix-undo-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-declined-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-declined-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-declined-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-declined-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-first-live-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-first-live-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-first-undo-false.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-first-undo-true.json",
+      "pauses": 3,
+      "suffixReplies": 6
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-prefix-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-prefix-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-prefix-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/RETURN_TO_HAND-don-prefix-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-declined-live-false.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-declined-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-declined-undo-false.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-declined-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-first-live-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/SET_REST-don-first-live-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/SET_REST-don-first-undo-false.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/SET_REST-don-first-undo-true.json",
+      "pauses": 2,
+      "suffixReplies": 3
+    },
+    {
+      "name": "migration/SET_REST-don-prefix-live-false.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-prefix-live-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-prefix-undo-false.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    },
+    {
+      "name": "migration/SET_REST-don-prefix-undo-true.json",
+      "pauses": 1,
+      "suffixReplies": 1
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "producer": "05d02e88a9b90cf44f774e507d845a700749b659",
+  "source": "opt-963-5b-written-states.json nested-batch-below-substitute-prompt plus valid causingSource identity, no historical fixture edits",
+  "method": "Restored original producer persisted-game-state.ts from git show HEAD on main before running this capture; restored strict schema after capture. Writer and all other source at05d02e88. Complete JSON bytes frozen before strict validation.",
+  "command": "OPT998_BASELINE_OUT=<absolute-fixture-path> pnpm --filter optcg-game exec vitest run src/__tests__/opt-998-causing-source.test.ts -t 'valid EffectSourceIdentity'",
+  "sha256": "49801c7387968892382840d0165ca30f877aea154db358a4e187f43327fe0b9f"
+}

@@ -1,0 +1,62 @@
+{
+  "writerProducer": "0a12a127c3e5ca38a954eca81b7c86dec249dea0",
+  "deployedReader": "41d1c6f264bce3c9f5b04537d5ce0444b1c7023d",
+  "provenance": "synthetic actual pipeline; not production capture",
+  "compressedSha256": "ea977b60ec55723a56eb1bfbbe6c2d492850474b7be20f47bc7680eccd01ac8c",
+  "scenarios": {
+    "opt966-battle-debt-writer-corpus.json": {
+      "pauses": 3
+    },
+    "opt966-battle-immediate-writer-corpus.json": {
+      "pauses": 2
+    },
+    "opt966-battle-rest-writer-corpus.json": {
+      "pauses": 5
+    },
+    "opt966-battle-terminal-writer-corpus.json": {
+      "pauses": 3
+    },
+    "opt966-counter-prefix-writer-corpus.json": {
+      "pauses": 3
+    },
+    "opt966-endphase.json": {
+      "pauses": 5
+    },
+    "opt966-event-prefix-writer-corpus.json": {
+      "pauses": 1
+    },
+    "opt966-handoff-writer-corpus.json": {
+      "pauses": 2
+    },
+    "opt966-legacy-absent-writer-corpus.json": {
+      "pauses": 3
+    },
+    "opt966-legacy-explicit-writer-corpus.json": {
+      "pauses": 3
+    },
+    "opt966-life-immediate-writer-corpus.json": {
+      "pauses": 2
+    },
+    "opt966-life-writer-corpus.json": {
+      "pauses": 2
+    },
+    "opt966-order-cost-AWAITING_COST_SELECTION.json": {
+      "pauses": 3
+    },
+    "opt966-order-cost-AWAITING_TARGET_SELECTION.json": {
+      "pauses": 1
+    },
+    "opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json": {
+      "pauses": 2
+    },
+    "opt966-replacement-prefix-writer-corpus.json": {
+      "pauses": 1
+    },
+    "opt966-replacement-writer-corpus.json": {
+      "pauses": 1
+    },
+    "opt966-scheduled-watcher-writer-corpus.json": {
+      "pauses": 2
+    }
+  }
+}

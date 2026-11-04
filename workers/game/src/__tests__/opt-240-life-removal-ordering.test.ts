@@ -34,6 +34,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 function findEvents<T extends GameEventType>(
   state: GameState,
@@ -221,12 +222,7 @@ describe("OPT-240 D2: CARD_REMOVED_FROM_LIFE ordering vs [Trigger]", () => {
 
     // Decline the trigger through the pipeline so trigger scanning runs.
     const handBefore = result.state.players[0].hand.length;
-    const afterDecline = runPipeline(
-      result.state,
-      { type: "REVEAL_TRIGGER", reveal: false },
-      cardDb,
-      1, // defender sends the REVEAL_TRIGGER action
-    );
+    const afterDecline = revealTrigger(result.state, false, cardDb);
     expect(afterDecline.valid).toBe(true);
 
     // CARD_REMOVED_FROM_LIFE was emitted AFTER CARD_ADDED_TO_HAND_FROM_LIFE.

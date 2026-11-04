@@ -1,3 +1,4 @@
+import { log } from "../lib/log.js";
 import { meetsAttachedDonRequirement } from "./attached-don.js";
 import type { EffectAvailability } from "../../../../shared/game-types.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
@@ -19,6 +20,7 @@ import {
   areEffectCostsPayable,
   getActivateEffectTimingError,
 } from "./validation.js";
+import { activationProhibitionVeto } from "./prohibitions.js";
 
 const RESOLUTION_CONTEXT_TARGETS = new Set<Target["type"]>([
   "SELECTED_CARDS",
@@ -216,6 +218,9 @@ function availabilityForBlock(
   }
 
   if (!isActivateMain(block)) return null;
+  if (isCardNegated(card, state, cardDb)) {
+    return { effectId: block.id, status: "blocked", reason: "CONDITION" };
+  }
 
   if (
     getActivateEffectTimingError(state) !== null ||
@@ -235,17 +240,45 @@ function availabilityForBlock(
     return { effectId: block.id, status: "blocked", reason: "CONDITION" };
   }
 
+  // OPT-864 (Decision 11, rule 1-3-3): the same activation-time veto that
+  // validation applies, so availability never offers what execution rejects.
   if (
-    block.costs?.length &&
-    !areEffectCostsPayable(
+    activationProhibitionVeto(
       state,
-      block.costs,
-      controller,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: card.instanceId, effectId: block.id },
       cardDb,
-      card.instanceId
-    )
+      controller
+    ) !== null
   ) {
-    return { effectId: block.id, status: "blocked", reason: "COST" };
+    return { effectId: block.id, status: "blocked", reason: "PROHIBITED" };
+  }
+
+  // OPT-864: sequential feasibility (rules 8-3-1-1, 8-3-1-3).
+  const costs = block.costs;
+  if (costs?.length) {
+    let payable: boolean;
+    try {
+      payable = areEffectCostsPayable(
+        state,
+        costs,
+        controller,
+        cardDb,
+        card.instanceId
+      );
+    } catch (error) {
+      log("[EFFECT_AVAILABILITY] evaluation failed", {
+        gameId: state.id,
+        cardId: card.cardId,
+        instanceId: card.instanceId,
+        effectId: block.id,
+        stage: "cost",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { effectId: block.id, status: "blocked", reason: "COST" };
+    }
+    if (!payable) {
+      return { effectId: block.id, status: "blocked", reason: "COST" };
+    }
   }
 
   if (
@@ -264,6 +297,34 @@ function availabilityForBlock(
   return { effectId: block.id, status: "usable" };
 }
 
+/**
+ * Availability is presentation, computed on every state broadcast. Contain
+ * failures per block so other effects still reach both players. Only the
+ * cost-feasibility boundary above classifies errors as COST; other failures
+ * have an unknown cause and omit the optional reason. Logs identify the public
+ * field card and block with the error message, but omit raw errors and stacks.
+ */
+function containedAvailabilityForBlock(
+  state: GameState,
+  block: EffectBlock,
+  card: CardInstance,
+  cardDb: Map<string, CardData>
+): EffectAvailability | null {
+  try {
+    return availabilityForBlock(state, block, card, cardDb);
+  } catch (error) {
+    log("[EFFECT_AVAILABILITY] evaluation failed", {
+      gameId: state.id,
+      cardId: card.cardId,
+      instanceId: card.instanceId,
+      effectId: block.id,
+      stage: "availability",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { effectId: block.id, status: "blocked" };
+  }
+}
+
 /** Compute public effect presentation state for leaders, Characters, and Stages. */
 export function computeEffectAvailability(
   state: GameState,
@@ -276,7 +337,7 @@ export function computeEffectAvailability(
     if (!schema) continue;
 
     const entries = schema.effects
-      .map((block) => availabilityForBlock(state, block, card, cardDb))
+      .map((block) => containedAvailabilityForBlock(state, block, card, cardDb))
       .filter((entry): entry is EffectAvailability => entry !== null);
     if (entries.length > 0) availability[card.instanceId] = entries;
   }

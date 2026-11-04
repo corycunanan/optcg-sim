@@ -7,7 +7,7 @@ argument-hint: "OPT-XXX"
 
 # Work a Linear ticket
 
-A dispatched implementer works from its coordinator's brief, which is its complete policy: do not read `docs/project/ORCHESTRATION-CHARTER.md` or the run ledger unless the brief points at a section. Deliver the implementation, validation evidence at a stated rung, a pushed PR and a handoff; never merge or write Linear. A standalone ticket with no coordinator is a one-issue run: read the charter for lifecycle, authority, preflight, review and readiness gates, and declare the ticket's tier. A coordinating agent may merge only under an explicit issue-scoped grant and the full charter gate. Codex and Claude coordinators may update issues and create relevant tickets. Document every update in a comment on that issue; document implementation-discovered tickets in a linked explanatory comment on the original ticket. Follow the charter for audit recovery and scope boundaries.
+A dispatched implementer works from its coordinator's brief, which is its complete policy: do not read `docs/project/ORCHESTRATION-CHARTER.md` or the run record unless the brief points at a section. Deliver the implementation, validation evidence at a stated rung, and a pushed PR with its handoff; never merge or write Linear. A standalone ticket with no coordinator is a one-issue run: follow the charter for authority, tier, review and readiness.
 
 Use `orchestrate` for multi-issue scheduling. Do not block isolated work because unrelated PRs or dirty files exist. Inspect matching in-flight branches/PRs before creating duplicates. Fetch the real issue and necessary context; missing consequential requirements block that issue, not independent work.
 
@@ -18,12 +18,14 @@ Use `orchestrate` for multi-issue scheduling. Do not block isolated work because
 - Preserve behavior outside acceptance criteria. Put deferred findings in the PR body's **Follow-ups** section; unsafe changes cannot be excused as follow-ups.
 - Measure a baseline, demonstrate the regression before fixing a bug, and run relevant checks plus the current required repository gate. Validation commands come from package scripts/CI, not stale examples.
 - Push implementation commits before opening the PR. Describe the concrete problem and resulting behavior, link the issue, record validation baselines/results and limitations, and list follow-ups. Use a file or structured argument for multiline PR bodies.
-- Include the next-ticket handoff in the same PR before final readiness assessment. Any subsequent commit renews review/readiness under the charter.
+- Write the handoff in the PR body (see Handoffs), not in a committed file. Editing the PR body does not change the head, so it does not renew review; any new commit still does.
 
 ## Handoffs
 
-Read `docs/project/handoffs/<project-slug>.md` when relevant. Reverify stale claims against current code and history. The coordinator owns any shared action-plan edits when parallel tickets would conflict; individual implementers supply their entries for serialized integration before final review.
+Put the handoff in the PR body under a **Handoff** heading: the system-level change, files to read first, constraints/gotchas, unresolved work, and the next runnable ticket with its prerequisites. Keep it short; the diff already records file-by-file changes. Distinguish implementation, merge-ready and merged states; a dependent is blocked until its prerequisite merges unless stacking was enabled.
 
-A handoff contains the system-level change, files to read first, constraints/gotchas, unresolved work, and a PR/commit pointer. Keep it short; the diff already records file-by-file changes. Distinguish implementation, merge-ready and merged states. Report the next runnable ticket and explicit prerequisites; a dependent is blocked until its prerequisite merges unless stacking was enabled.
+Linear is the plan: roll-up parent issues set PR boundaries, `blockedBy` sets order, and issue comments carry context between sessions. When a later ticket depends on a handoff, the coordinator copies the relevant points into a comment on that issue or its parent, because implementers do not write Linear. Lessons that outlive one ticket go into GOTCHAS.md, CLAUDE.md/AGENTS.md or the engine docs through the PR.
+
+Do not create or edit files under `docs/project/handoffs/`; it is a read-only archive. Older entries there, and engine docs that link to them, can still be useful context: reverify their claims against current code before relying on them.
 
 PR opening is an intermediate deliverable. A coordinator continues through independent review, findings correction, validation, and the readiness receipt. Merge execution and post-merge close-out follow the charter, including scope-matching permission and exact reviewed-head checks. Do not mark Linear status changes as performed unless an authorized actor actually performed them.

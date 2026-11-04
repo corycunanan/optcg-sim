@@ -250,18 +250,53 @@ export function modifierAppliesToCard(
 }
 
 /**
- * OPT-253: Is this Character currently effect-negated?
+ * Is this card currently effect-negated by a resolved flag or permanent aura?
  *
  * True when any activeEffect carries a NEGATE_EFFECTS_FLAG modifier that lists
  * the card in its appliesTo set and whose duration condition (if any) currently
- * holds. The flag is source-independent: we deliberately skip the normal
+ * holds, or a live permanent NEGATE_EFFECTS modifier targets it. Permanent
+ * auras honor block/modifier gates and pause when their source is negated.
+ * The resolved flag is source-independent: we deliberately skip the normal
  * `isEffectConditionMet` path on the negation effect itself to avoid recursion
  * (and to prevent an attacker mutually-negating their way out of a negation).
  */
+// Synchronous query scopes include keyword/filter/condition and effective-stat
+// callbacks, not just direct aura-source traversal. Only explicitly identified
+// internal SET_POWER views share their parent's root; even independent shallow
+// state snapshots and different databases retain their own guard.
+const negationEvaluationRoots = new WeakMap<GameState, GameState>();
+interface NegationQueryContext {
+  state: GameState;
+  cardDb: Map<string, CardDataType> | undefined;
+  visiting: Set<string>;
+}
+const negationQueryContexts: NegationQueryContext[] = [];
+
 export function isCardNegated(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>
+): boolean {
+  const queryState = negationEvaluationRoots.get(state) ?? state;
+  const active = negationQueryContexts.find(context =>
+    context.state === queryState && context.cardDb === cardDb);
+  if (active) return isCardNegatedWithGuard(card, state, cardDb, active.visiting);
+  const context: NegationQueryContext = {
+    state: queryState, cardDb, visiting: new Set(),
+  };
+  negationQueryContexts.push(context);
+  try {
+    return isCardNegatedWithGuard(card, state, cardDb, context.visiting);
+  } finally {
+    negationQueryContexts.pop();
+  }
+}
+
+function isCardNegatedWithGuard(
+  card: CardInstance,
+  state: GameState,
+  cardDb: Map<string, CardDataType> | undefined,
+  visiting: Set<string>,
 ): boolean {
   const effects = state.activeEffects;
   for (const effect of effects) {
@@ -281,22 +316,58 @@ export function isCardNegated(
     }
     return true;
   }
-  return false;
+  // Accepted OPT-1008 apply-once policy: an in-progress card still exposes its
+  // pre-negation effects to the condition that is deciding that negation. This
+  // matches OPT-242 self-falsifying cost thresholds; it is not a general ordered
+  // solver for mutually dependent multi-source permanent effects.
+  if (!cardDb || visiting.has(card.instanceId)) return false;
+  visiting.add(card.instanceId);
+  try {
+    for (const effect of effects) {
+      if (effect.category !== "permanent") continue;
+      const source = findCardInstance(state, effect.sourceCardInstanceId);
+      if (!source) continue;
+      for (const modifier of effect.modifiers ?? []) {
+        if (modifier.type !== "NEGATE_EFFECTS") continue;
+        if (!modifierAppliesToCard(effect, modifier, card, state, cardDb)) continue;
+        if (!isModifierGateMet(effect, modifier, state, {
+          sourceCardInstanceId: effect.sourceCardInstanceId,
+          controller: effect.controller,
+          cardDb,
+        })) continue;
+        // Unlike a resolved flag, a permanent aura stops when its source is
+        // negated. Share the traversal guard so cyclic auras terminate.
+        if (isCardNegatedWithGuard(source, state, cardDb, visiting)) continue;
+        return true;
+      }
+    }
+    return false;
+  } finally {
+    visiting.delete(card.instanceId);
+  }
 }
 
 /**
- * OPT-253: Is this effect's source Character currently negated?
- * If so, its non-negation modifiers should be treated as inactive.
+ * Ongoing effects depend on a live effective source; resolved action output
+ * is independent of later source negation.
  */
 function isEffectSourceNegated(
   effect: RuntimeActiveEffect,
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
+  // Current action handlers persist already-resolved output with this exact
+  // signature. Later source negation cannot undo it (rule 8-2-3). Ongoing and
+  // unproven historical rows retain the source gate; no provenance is inferred.
+  if (effect.category === "auto" && effect.sourceEffectBlockId === "") return false;
   if (!effect.sourceCardInstanceId) return false;
-  const source = findCardInstance(state, effect.sourceCardInstanceId);
+  // SET_POWER excludes its own output only to test setter eligibility. Source
+  // negation still observes the real query root, including that output as a
+  // pre-negation witness under the apply-once contract.
+  const sourceState = negationEvaluationRoots.get(state) ?? state;
+  const source = findCardInstance(sourceState, effect.sourceCardInstanceId);
   if (!source) return false;
-  return isCardNegated(source, state, cardDb);
+  return isCardNegated(source, sourceState, cardDb);
 }
 
 /**
@@ -350,9 +421,9 @@ function isModifierGateMet(
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
  *
- * OPT-253: also returns false if the effect's source Character is currently
- * effect-negated, except for the negation flag itself (which must stay active
- * regardless of who negated whom, to avoid recursion and mutual-negation cycles).
+ * Ongoing and unproven effects pause when their source is negated. Current
+ * resolved action output remains effective under rule 8-2-3. The existing
+ * negation-flag exception stays independent of both provenance and source.
  */
 export function isEffectConditionMet(
   effect: RuntimeActiveEffect,
@@ -361,7 +432,7 @@ export function isEffectConditionMet(
 ): boolean {
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
-  // OPT-253: suppress effects whose source Character is negated. The
+  // Suppress ongoing/unproven effects whose source is negated. The
   // NEGATE_EFFECTS_FLAG modifier itself is exempt to keep the negation
   // itself resolvable even if the negator is later negated.
   const isNegationFlag = effect.modifiers?.some(
@@ -477,6 +548,10 @@ export function getEffectiveBasePower(
           ) };
         }),
       };
+      // This fresh eligibility-only view belongs to its parent's query. A
+      // WeakMap alias keeps unrelated shallow snapshots isolated and does not
+      // retain the temporary view after evaluation.
+      negationEvaluationRoots.set(evaluationState, negationEvaluationRoots.get(state) ?? state);
       if (!modifierAppliesToCard(effect, mod, card, evaluationState, cardDb)) continue;
       if (!isModifierConditionMet(effect, mod, evaluationState, cardDb)) continue;
       const value = permanentModifierParam(

@@ -1,3 +1,4 @@
+import type { LifeTriggerStagingWork } from "../life-trigger-staging.js";
 /**
  * Shared types for the effect-resolver module.
  */
@@ -52,6 +53,7 @@ export interface EffectResolverServices {
     state: GameState;
     events: PendingEvent[];
     pendingPrompt?: PendingPromptState;
+    bodyExecuted?: boolean;
   };
 
   executeEffectAction(
@@ -72,6 +74,7 @@ export interface EffectResolverServices {
     cardDb: Map<string, CardData>,
     triggeringCardInstanceId?: string | null,
     triggeringEvent?: PendingEvent,
+    sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot
   ): EffectResolverResult;
 
   continueSimultaneousGroup(
@@ -84,22 +87,27 @@ export interface EffectResolverServices {
     state: GameState;
     events: PendingEvent[];
     pendingPrompt?: PendingPromptState;
+    bodyExecuted?: boolean;
   };
-  processRemainingTriggers(
+  reportTriggers(
     state: GameState,
     pendingTriggers: QueuedTrigger[],
     cardDb: Map<string, CardData>,
     priorEvents?: PendingEvent[],
     triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
-  ): EffectResolverResult;
-  reenterBatchResume(
+  ): HandlerResult;
+  continueHandler(
     state: GameState,
     cardDb: Map<string, CardData>,
     priorEvents?: PendingEvent[]
-  ): EffectResolverResult;
+  ): HandlerResult;
 }
 
-export interface EffectResolverResult {
+/** Resume handlers report state-owned progress; only the dispatcher advances. */
+export type HandlerProgress = "completed" | "waiting" | "queued" | "continued" | "terminal";
+export type HandlerResult = EffectResolverResult & { kind: HandlerProgress; /** Body abandoned; retained payment events may still publish. Internal, never persisted. */ resumeBodyAbandoned?: true };
+
+export interface EffectResolverResult extends LifeTriggerStagingWork {
   state: GameState;
   events: PendingEvent[];
   resolved: boolean;
@@ -125,8 +133,16 @@ export interface ActionResult {
   state: GameState;
   events: PendingEvent[];
   succeeded: boolean;
+  /** Handler-owned full-instruction result for replacement substitutes; normal effects may resolve partially. */
+  fullyExecuted?: boolean;
   result?: EffectResult;
   pendingPrompt?: PendingPromptState;
+  /**
+   * OPT-925: the player whose Leader took damage that the rules determined
+   * lethal (taken while at 0 Life, 9-2-1-1). `executeEffectAction` hands it
+   * to the rule-processing checkpoint. Nonlethal damage never sets it.
+   */
+  lethalDamagePlayerIndex?: 0 | 1;
   // OPT-172: multi-target handlers set this when a frame's events queue
   // triggers that must resolve before the next frame (rule 6-2). The handler
   // bails out of its loop and returns the scanned triggers + a resume marker

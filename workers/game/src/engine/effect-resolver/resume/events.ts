@@ -1,3 +1,4 @@
+import { isPendingBattleStepTransition } from "../../battle-step-boundary.js";
 import {
   generateFrameId,
   pushFrame,
@@ -43,6 +44,32 @@ export function retainEventsOnFrame(
       ...pendingPropagationEvents(frame.accumulatedEvents),
     ]),
   ].filter((event) => !nestedEvents.has(event));
+  // An Event or K.O. replacement's committed parent prefix precedes child output. Give
+  // the nearest publication owner that debt while keeping the future Event
+  // activation notification on its separate completion frame. Battle damage
+  // remains the owner when it lies between the scope and this continuation.
+  const hasNestedPublication = frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
+    frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH" || frame.pausedAction?.type === "KO";
+  let publicationIndex = -1;
+  if (hasNestedPublication) {
+    for (let index = frameIndex - 1; index >= 0; index--) {
+      const candidate = state.effectStack[index];
+      if (candidate.triggerExecution ||
+        (candidate.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+          candidate.battleDamage.battleId === state.turn.battle?.battleId)) {
+        publicationIndex = index;
+        break;
+      }
+    }
+  }
+  if (publicationIndex >= 0) return {
+    ...state,
+    effectStack: state.effectStack.map((existing, index) =>
+      index === publicationIndex ? { ...existing,
+        accumulatedEvents: [...new Set([...existing.accumulatedEvents, ...accumulatedEvents])],
+      } : index === frameIndex ? { ...existing, accumulatedEvents: [] } : existing
+    ),
+  };
   return {
     ...state,
     effectStack: state.effectStack.map((existing, index) =>
@@ -58,9 +85,17 @@ export function takeInterruptedEvents(state: GameState): {
 } {
   const events: PendingEvent[] = [];
   const effectStack = state.effectStack.map((frame) => {
-    if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") return frame;
-    events.push(...pendingPropagationEvents(frame.accumulatedEvents));
-    return { ...frame, accumulatedEvents: [] };
+    // Battle substitute debt belongs to damage completion,
+    // not to an unrelated child publication boundary (OPT-965 reader-first).
+    if (frame.phase !== "INTERRUPTED_BY_TRIGGERS" || frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT") return frame;
+    events.push(...pendingPropagationEvents(frame.accumulatedEvents.filter(
+          (event) => !isPendingBattleStepTransition(event)
+        )
+      ));
+    return { ...frame, accumulatedEvents: frame.accumulatedEvents.filter(
+        isPendingBattleStepTransition
+      ),
+    };
   });
   return { state: events.length ? { ...state, effectStack } : state, events };
 }
@@ -72,7 +107,9 @@ export function publishCommittedEvents(
 ): GameState {
   for (let index = 0; index < events.length; index++) {
     const event = events[index];
-    if (event.propagation?.eventLogEmitted) continue;
+    if (event.propagation?.eventLogEmitted ||
+      isPendingBattleStepTransition(event)
+    ) continue;
     state = emitPendingEvent(state, event, state.turn.activePlayerIndex);
     events[index] = withEventLogEmitted(event);
   }
@@ -89,8 +126,21 @@ export function retainPropagationBeforePrompt(
 ): GameState {
   const pending = pendingPropagationEvents(events);
   if (pending.length === 0) return state;
-  const ownerIndex = state.effectStack.findIndex(
-    (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS"
+  // Completion-only boundaries cannot carry executable publication debt.
+  // Prefer the nearest ordinary owner or its live battle boundary.
+  let ownerIndex = -1;
+  for (let index = state.effectStack.length - 1; index >= 0; index--) {
+    const frame = state.effectStack[index];
+    if (frame.triggerExecution ||
+      (frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        frame.battleDamage.battleId === state.turn.battle?.battleId)) {
+      ownerIndex = index;
+      break;
+    }
+  }
+  if (ownerIndex < 0) ownerIndex = state.effectStack.findIndex(
+      (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
+      !frame.eventActivation && !frame.eventActivationCompletion && !frame.phaseBoundaryContinuation
   );
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
   const child = state.effectStack.at(-1);

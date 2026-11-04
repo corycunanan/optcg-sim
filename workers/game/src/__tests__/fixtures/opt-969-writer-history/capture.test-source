@@ -1,0 +1,60 @@
+/** Synthetic fixture acquisition using the actual merged reader; no production capture. */
+import { it, expect } from "vitest";
+import { writeFileSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { rig } from "./opt-960-rig.js";
+import { createTestPayload, CARDS } from "./helpers.js";
+import { buildInitialState } from "../engine/setup.js";
+import { runtime, memory, save } from "./native7-producer-support.js";
+it("captures immutable historical cardDb fixtures from the merged reader", async () => {
+  const out = process.env.OPT969_WRITER_PREFLIGHT_OUT!;
+  expect(out).toBeTruthy();
+  const root = process.cwd().replace(/\/workers\/game$/, "");
+  const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  expect(sha).toBe("e14af35bad3a7189a40294f5d4ab3db5b5602f0e");
+  const rt = await runtime();
+  const files: Record<string,string> = {};
+  const emit = (name: string, value: unknown) => {
+    const bytes = JSON.stringify(value, null, 2) + "\n";
+    writeFileSync(`${out}/${name}`, bytes);
+    files[name] = createHash("sha256").update(bytes).digest("hex");
+  };
+  const ids = ["EB02-061", "OP12-070", "OP15-069"];
+  const payload = createTestPayload();
+  payload.gameId = "opt969-reader-floor-historical-definitions";
+  for (const id of ids) payload.player1.deck.push({ cardId: id, quantity: 1, cardData: { ...CARDS.VANILLA, id, name: id } });
+  emit("actual-default7-init-input.json", payload);
+  const initial = buildInitialState(payload);
+  expect(initial.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+  emit("actual-default7-setup-output.json", await save(rt, initial.state, initial.cardDb));
+  for (const mode of [6, 7] as const) {
+    const r = rig();
+    for (const id of ids) r.put(id, 0, "CHARACTER");
+    r.state.id = `opt969-synthetic-recorded-mode${mode}`;
+    r.state.costSemanticsVersion = mode;
+    expect(r.db.get("EB02-061")!.effectSchema!.effects.flatMap(e => e.costs ?? []).find(c => c.type === "DON_MINUS")!.filter?.is_active).toBeUndefined();
+    for (const id of ids.slice(1)) expect(r.db.get(id)!.effectSchema!.effects.flatMap(e => e.replacement_actions ?? [])[0].target?.type).toBe("DON_IN_COST_AREA");
+    emit(`synthetic-mode${mode}-raw-seed.json`, { state: r.state, cardDb: Object.fromEntries(r.db) });
+    const stored = await save(rt, r.state, r.db);
+    for (const embedded of [false, true]) {
+      const bytes = structuredClone(stored);
+      if (embedded) { (bytes.session as Record<string, unknown>).cardDb = bytes["session:card-db"]; delete bytes["session:card-db"]; }
+      const loaded = (await memory(rt, bytes).repo.load())!;
+      expect(loaded.state.costSemanticsVersion).toBe(mode);
+      for (const id of ids) expect(loaded.cardDb.get(id)).toEqual(r.db.get(id));
+      emit(`synthetic-recorded-mode${mode}-${embedded ? "embedded" : "separate"}.json`, bytes);
+    }
+  }
+  emit("historical-authored-definitions.json", Object.fromEntries(ids.map(id => [id, initial.cardDb.get(id)])));
+  const generator = readFileSync(import.meta.filename);
+  emit("manifest.json", {
+    sourceHead: sha,
+    sourceTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim(),
+    generatorSha256: createHash("sha256").update(generator).digest("hex"),
+    lockSha256: createHash("sha256").update(readFileSync(`${root}/pnpm-lock.yaml`)).digest("hex"),
+    versions: { node: process.versions.node, pnpm: execFileSync("pnpm", ["--version"], { encoding: "utf8" }).trim() },
+    files,
+    provenance: "Synthetic inputs only. actual-default7 is untouched buildInitialState output; mode6 and stable mode7 gameplay fixtures are explicitly seeded recorded inputs, not production captures or an actual new-default6 game. All definitions saved by actual merged reader runtime before future writer changes."
+  });
+});

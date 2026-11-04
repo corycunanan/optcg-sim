@@ -1,3 +1,6 @@
+import { costRootMatches } from "../engine/effect-resolver/cost/transaction.js";
+import { scriptedDonPayment } from "./scripted-don-payment.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
@@ -81,7 +84,10 @@ function fixture(seed = "opt-838") {
     return card;
   }
   function act(action: GameAction, player = state.turn.activePlayerIndex) {
+    const before = structuredClone(state);
     const result = runPipeline(state, action, db, player);
+    expect(state).toEqual(before);
+    for (const frame of result.state.effectStack) if (frame.costExpectedRoot) expect(costRootMatches(result.state, frame.costExpectedRoot)).toBe(true);
     expect(result.valid, result.error).toBe(true);
     state = result.state;
   }
@@ -125,7 +131,7 @@ function fixture(seed = "opt-838") {
     persist() {
       state = parseStoredSession(
         JSON.parse(
-          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+          JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
         )
       ).state;
     },
@@ -160,6 +166,7 @@ function playDrake(owner: 0 | 1, count: number, seed?: string) {
   });
   f.act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
   acceptOptionalIfPrompted(f);
+  f.state = scriptedDonPayment(f.state, f.db, owner, 2);
   return { f, opponent, drake, own, hand };
 }
 
@@ -428,7 +435,7 @@ describe("OPT-838 blind reply authorization and persistence", () => {
   it("stored prompts keep the mapping server-side only", () => {
     const { f, opponent, hand } = playDrake(0, 3);
     const stored = JSON.parse(
-      JSON.stringify({ state: f.state, cardDb: Object.fromEntries(f.db), mode: "PVP" })
+      JSON.stringify({ state: toPersistedGameState(f.state), cardDb: Object.fromEntries(f.db), mode: "PVP" })
     );
     const restored = parseStoredSession(stored).state;
     expect(restored.pendingPrompt?.blindSlots).toEqual(f.state.pendingPrompt?.blindSlots);

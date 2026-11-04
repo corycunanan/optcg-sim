@@ -1,9 +1,15 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+import { buildDonIdentityPlans } from "../don-identity-plans.js";
+import { decodeDonReturnIds } from "../actions/don.js";
+import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
+import { insertFrameAt } from "../../damage-frames.js";
 /** Iterative cost payment orchestration and suspension. */
 import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
-import { isEngineTerminated } from "../../engine-limits.js";
-import { checkReplacementForRemoval } from "../../replacements.js";
+import { isGameTerminated } from "../../terminal.js";
+import { runRuleProcessingAfterMove } from "../../defeat.js";
+import { checkReplacementForRemoval, materializeReplacementOffer, type ReplacementOffer } from "../../replacements.js";
 import type { CostSelectionResult } from "../types.js";
 import { costResultToEntries } from "../types.js";
 import type { EffectResolverServices } from "../services.js";
@@ -14,6 +20,7 @@ import { isCostSequencePayable } from "./feasibility.js";
 import {
   applyCostTransactionState,
   captureCostTransactionState,
+  captureCostExpectedRoot,
   type CostTransactionState,
 } from "./transaction.js";
 import { computeCostTargets, costSelectionCount, getCostCards, resolveAmount } from "./targets.js";
@@ -63,27 +70,66 @@ export function payCostsWithSelection(
   const events: PendingEvent[] = [...priorEvents];
   let nextState = state;
   const baseline = transactionBaseline ?? captureCostTransactionState(state);
-  const cannotPay = (): CostSelectionResult => ({
-    state: applyCostTransactionState(nextState, baseline),
-    events: [],
-    cannotPay: true,
-  });
+  // OPT-862: a terminal checkpoint during payment ends the game with the
+  // paid costs standing. Never roll back to the IN_PROGRESS baseline: the
+  // rollback would restore the deck that decided the defeat.
+  const terminated = (): CostSelectionResult => ({ state: nextState, events, costResult });
+  const cannotPay = (): CostSelectionResult => {
+    if (isGameTerminated(nextState)) return terminated();
+    return {
+      state: applyCostTransactionState(nextState, baseline),
+      events: [],
+      cannotPay: true,
+    };
+  };
+  /** Rule-processing checkpoint after a committed payment (9-1-2). */
+  const ruleProcessingAfterPayment = (before: Pick<GameState, "players">): boolean => {
+    nextState = runRuleProcessingAfterMove(before, nextState, {}, cardDb);
+    return isGameTerminated(nextState);
+  };
+  let suspendedCostOwnerId: string | undefined;
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
+    ownerIndex?: number,
   ): void => {
-    nextState = pushFrame(nextState, {
+    suspendedCostOwnerId = frame.id;
+    const owned = {
       ...frame,
       effectDescription,
       accumulatedEvents: [...events],
       costTransactionState: captureCostTransactionState(stagedState),
-    });
+    };
+    nextState = ownerIndex === undefined ? pushFrame(nextState, owned) : insertFrameAt(nextState, ownerIndex, owned);
   };
-  const suspend = (pendingPrompt: PendingPromptState): CostSelectionResult => ({
-    state: applyCostTransactionState(nextState, baseline),
-    events: [],
-    pendingPrompt,
-  });
+  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer, committedReplacement = false): CostSelectionResult => {
+    if (isGameTerminated(nextState)) return terminated();
+    // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
+    // frame on top of the cost frame pushed just before.
+    // Accepted mandatory substitutes already execute on the root baseline.
+    // Their prefix and use marker are committed; staged payment stays on COST.
+    const offered = materializeReplacementOffer(
+      hasNativeCostSemantics(nextState) && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
+      pendingPrompt,
+      offer,
+    );
+    if (hasNativeCostSemantics(offered.state)) {
+      const expected = captureCostExpectedRoot(offered.state);
+      offered.state = {
+        ...offered.state,
+        effectStack: offered.state.effectStack.map((frame) =>
+          frame.id === suspendedCostOwnerId
+            ? { ...frame, costExpectedRoot: expected }
+            : frame
+        ),
+      };
+    }
+    return {
+      state: offered.state,
+      events: [],
+      pendingPrompt: offered.pendingPrompt,
+    };
+  };
   const costResult: CostResult = {
     donRestedCount: 0,
     cardsTrashedCount: 0,
@@ -102,6 +148,9 @@ export function payCostsWithSelection(
   // the whole suffix before prompting for the first selection so a player is
   // never asked to pick a payment that must then be rolled back (e.g.
   // OP04-055: an [Ice Oni] in hand but no cost ≤4 Character on either field).
+  // A selection resumed into this call may already have emptied a deck.
+  if (ruleProcessingAfterPayment(baseline)) return terminated();
+
   if (!isCostSequencePayable(
     state,
     costs.slice(startIndex),
@@ -171,7 +220,7 @@ export function payCostsWithSelection(
         costTransactionState: captureCostTransactionState(nextState),
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) {
+      if (isGameTerminated(nextState)) {
         return cannotPay();
       }
 
@@ -244,7 +293,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -308,7 +357,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -365,7 +414,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend({
             options: {
               promptType: "PLAYER_CHOICE",
@@ -408,7 +457,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend(buildTrashToDeckArrangePrompt(
             nextState, validTargets, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
@@ -467,7 +516,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         const pendingPrompt: PendingPromptState = {
           options: {
             promptType: "SELECT_TARGET",
@@ -511,7 +560,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend(buildTrashToDeckArrangePrompt(
             nextState, group, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
@@ -519,14 +568,19 @@ export function payCostsWithSelection(
       }
 
       // Block shuffles afterward — order is moot, pay in default order.
+      const beforePayment = nextState;
       const applied = applyCostSelection(nextState, cost, group, controller, cardDb);
       nextState = applied.state;
       events.push(...applied.events);
       costResult.cardsPlacedToDeckCount += group.length;
+      if (ruleProcessingAfterPayment(beforePayment)) return terminated();
       continue;
     }
 
-    if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
+    const nativeDonSelection = hasNativeCostSemantics(nextState) &&
+      (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+      !(typeof cost.amount === "number" && cost.amount <= 0);
+    if (!autoPayTrashToDeck && (costNeedsPlayerSelection(cost) || nativeDonSelection)) {
       // Special handling for life costs with TOP_OR_BOTTOM — use PLAYER_CHOICE
       if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
           cost.position === "TOP_OR_BOTTOM") {
@@ -557,7 +611,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
 
         const pendingPrompt: PendingPromptState = {
           options: {
@@ -585,6 +639,23 @@ export function payCostsWithSelection(
         return cannotPay();
       }
 
+      // Positive native7 DON payments offer exact identity plans. Numeric zero
+      // stays on the no-action fixed path and never emits positive-bound metadata.
+      const donPlan = nativeDonSelection ? buildDonIdentityPlans(nextState, controller, validTargets, amount,
+        cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined ? validTargets.length : amount, cardDb) : null;
+      const donChoices = donPlan?.choices ?? [];
+      if (donChoices.length === 1) {
+        // The grouped planner proved a single semantic payment. Execute that
+        // exact plan; equivalent donor multiplicity alone is not a choice.
+        const beforePayment = nextState;
+        const ids = decodeDonReturnIds(donChoices[0].id)!;
+        const applied = applyCostSelection(nextState, cost, ids, controller, cardDb, sourceCardInstanceId);
+        if (applied.events.length === 0) return cannotPay();
+        nextState = applied.state;
+        events.push(...applied.events);
+        if (ruleProcessingAfterPayment(beforePayment)) return terminated();
+        continue;
+      }
       // Push stack frame for cost selection
       const frameId = generateFrameId(nextState);
       nextState = frameId.state;
@@ -597,7 +668,7 @@ export function payCostsWithSelection(
         pausedAction: null,
         remainingActions: effectBlock.actions ?? [],
         resultRefs: [],
-        validTargets,
+        validTargets: [...validTargets, ...donChoices.map(choice => choice.id)],
         costs: workingCosts,
         currentCostIndex: i,
         costsPaid: false,
@@ -608,11 +679,11 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
-        options: {
+        options: donPlan ? { promptType: "PLAYER_CHOICE", effectDescription: "Choose which DON!! to return", ...donPlan } : {
           promptType: "SELECT_TARGET",
           validTargets,
           countMin: amount,
@@ -630,16 +701,11 @@ export function payCostsWithSelection(
     // Fixed-source field exits have no selection prompt, but replacement
     // effects may still suspend their payment (Rule 8-3-1-7). Park the same
     // cost frame used by selectable payments so decline can resume exactly.
-    const fixedExitTarget = (() => {
-      if (["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"].includes(cost.type)) {
-        return sourceCardInstanceId;
-      }
-      if (["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"].includes(cost.type)) {
-        return nextState.players[controller].stage?.instanceId;
-      }
-      return undefined;
-    })();
+    const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
     if (fixedExitTarget) {
+      const replay = hasNativeCostSemantics(nextState) ? canonicalCostReplacementReplay({
+        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId, effectBlock,
+      }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, baseline),
@@ -660,12 +726,13 @@ export function payCostsWithSelection(
           costs: workingCosts, currentCostIndex: i, costsPaid: false,
           oncePerTurnMarked: false, costResultRefs: [...costResultToEntries(costResult)],
           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
-          costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+          costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         };
-        pushCostFrame(frame, stagedBeforeReplacement);
-        if (isEngineTerminated(nextState)) return cannotPay();
-        return suspend(replacement.pendingPrompt);
+        pushCostFrame(frame, stagedBeforeReplacement, hasNativeCostSemantics(nextState) ? stagedBeforeReplacement.effectStack.length : undefined);
+        if (isGameTerminated(nextState)) return cannotPay();
+        return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
       }
       if (replacement.replaced) {
         return { state: nextState, events: replacement.events, cannotPay: true };
@@ -674,6 +741,7 @@ export function payCostsWithSelection(
     }
 
     // Auto-payable cost — use existing payCosts for this single cost
+    const beforePayment = nextState;
     const singleResult = payCosts(nextState, [cost], controller, cardDb, sourceCardInstanceId);
     if (!singleResult) {
       return cannotPay();
@@ -693,6 +761,9 @@ export function payCostsWithSelection(
     costResult.charactersKoInstanceIds.push(...singleResult.costResult.charactersKoInstanceIds);
     costResult.donGivenCount += singleResult.costResult.donGivenCount;
     costResult.donGivenInstanceIds.push(...singleResult.costResult.donGivenInstanceIds);
+    // OPT-862: a MILL (or any deck-emptying) cost ends play before the next
+    // cost is paid, so no later cost, action or prompt runs.
+    if (ruleProcessingAfterPayment(beforePayment)) return terminated();
   }
 
   return { state: nextState, events, costResult };

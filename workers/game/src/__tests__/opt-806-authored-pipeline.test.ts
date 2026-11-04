@@ -1,3 +1,5 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
@@ -100,11 +102,12 @@ function fixture() {
     accept,
     targets,
     persist() {
-      state = parseStoredSession(JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
+      state = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
     },
     get state() {
       return state;
     },
+    set state(next: typeof state) { state = next; },
   };
 }
 
@@ -328,6 +331,7 @@ describe("OPT-806 authored card pipeline", () => {
       const bystander = f.put(CARDS.VANILLA.id, owner);
       f.act({ type: "PLAY_CARD", cardInstanceId: kaido.instanceId });
       f.choice({ type: "PLAYER_CHOICE", choiceId: "activate" });
+      f.state = scriptedDonPayment(f.state, f.db, 0, 6);
       if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
         f.select(
           f.state.players[0].donCostArea.slice(0, 6).map((d) => d.instanceId)

@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import { parseStoredSession } from "../session/persistence.js";
 import { visibleStateForPlayer } from "../session/visibility.js";
@@ -74,7 +75,7 @@ function fixture() {
   function persist() {
     state = parseStoredSession(
       JSON.parse(
-        JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+        JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
       )
     ).state;
   }

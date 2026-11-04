@@ -178,12 +178,16 @@ function collectEventAnchorIds(state: GameState): Set<string> {
     for (const trigger of [
       ...(frame.pendingTriggers ?? []),
       ...(frame.simultaneousTriggers ?? []),
+      ...(frame.triggerExecution?.generations.flatMap(generation => [
+        ...generation.triggers,
+        ...(generation.orderingGroup?.triggers ?? []),
+      ]) ?? []),
+      ...(frame.triggerExecution?.selectedTrigger ? [frame.triggerExecution.selectedTrigger] : []),
     ]) {
       ids.add(trigger.sourceCardInstanceId);
     }
   }
   addSourceInstanceId(ids, state.pendingPrompt?.resumeContext);
-  addSourceInstanceId(ids, state.turn.pendingTriggerFromEffect);
   for (const collection of [
     state.activeEffects,
     state.prohibitions,

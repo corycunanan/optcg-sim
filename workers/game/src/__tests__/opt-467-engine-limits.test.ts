@@ -92,7 +92,8 @@ describe("OPT-467 bounded engine resolution", () => {
       pendingPrompt: null,
       effectStack: [],
       engineOutcome: {
-        type: "INFINITE_LOOP_DRAW",
+        // Decision 5 (OPT-960): budget exhaustion is an engine limit, not a rules draw.
+        type: "ENGINE_LIMIT",
         diagnostic: {
           kind: "ACTION_BUDGET",
           limit: MAX_RESOLUTION_ACTIONS,

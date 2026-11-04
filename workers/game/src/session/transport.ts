@@ -510,33 +510,8 @@ export class SessionTransport {
       return;
     }
 
-    if (
-      battleSubPhase !== "DAMAGE_STEP" ||
-      !battle ||
-      !("pendingTriggerLifeCard" in battle)
-    ) {
-      return;
-    }
-    const triggerLifeCard = battle.pendingTriggerLifeCard;
-    const cardData = triggerLifeCard
-      ? cardDb.get(triggerLifeCard.cardId)
-      : undefined;
-    const cards = triggerLifeCard
-      ? [lifeCardForPrompt(triggerLifeCard, inactivePlayer)]
-      : [];
-    this.send(ws, {
-      type: "game:prompt",
-      options: {
-        promptType: "REVEAL_TRIGGER",
-        cards,
-        effectDescription:
-          cardData?.triggerText ??
-          cardData?.effectText ??
-          "You may reveal this Trigger card to activate its effect",
-        optional: false,
-        timeoutMs: 30_000,
-      },
-    });
+    // A Trigger window is a damage frame that owns its REVEAL_TRIGGER prompt
+    // (OPT-963); it is always on state.pendingPrompt and was sent above.
   }
 
   private closeStaleSockets(
