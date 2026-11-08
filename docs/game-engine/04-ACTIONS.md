@@ -115,6 +115,7 @@ type ActionType =
   | "SET_REST"
   | "APPLY_PROHIBITION"
   | "REMOVE_PROHIBITION"
+  | "APPLY_REPLACEMENT"
 
   // Meta / Flow
   | "PLAYER_CHOICE"
@@ -1645,6 +1646,45 @@ type ProhibitionType =
   "target": { "controller": "OPPONENT" },
   "params": { "prohibition_type": "CANNOT_ACTIVATE_BLOCKER" },
   "duration": { "type": "THIS_BATTLE" }
+}
+```
+
+---
+
+### APPLY_REPLACEMENT
+
+Grant a replacement effect from a resolving effect, for the action's duration. Used for text like "If any of your Characters would be K.O.'d in battle during this turn, you may trash 1 card from your hand instead." `replaces` and `replacement_actions` read exactly like a `category: "replacement"` block's fields, and the registered replacement goes through the same shared scan (`replacements.ts`).
+
+```typescript
+interface ApplyReplacementParams {
+  replaces: ReplacementTrigger; // { event, cause_filter?, target_filter } — target_filter is required
+  replacement_actions: Action[];
+  optional?: boolean;
+  once_per_turn?: boolean;
+}
+```
+
+| Field | Value |
+|-------|-------|
+| **Target** | None. The protected cards are the field cards (Leader, Characters, Stage) matching `replaces.target_filter` (controller relative to the effect's controller) when the action resolves. That membership is fixed: cards that enter the field later are not protected (qa_eb02 EB02-030), and a protected card that later stops matching a mutable filter (power, cost) stays protected. Only the filter's `card_type` is re-read at each event. |
+| **Duration** | `duration` on the action; defaults to `THIS_TURN`. Source negation or the source changing zones does not end it (rule 8-2-3). |
+| **Failure mode** | With no matching card on the field, nothing is registered. |
+| **Fired events** | None |
+| **Example cards** | EB02-030 |
+
+```json
+{
+  "type": "APPLY_REPLACEMENT",
+  "params": {
+    "replaces": {
+      "event": "WOULD_BE_KO",
+      "cause_filter": { "by": "BATTLE" },
+      "target_filter": { "controller": "SELF", "card_type": "CHARACTER" }
+    },
+    "replacement_actions": [{ "type": "TRASH_FROM_HAND", "params": { "amount": 1 } }],
+    "optional": true
+  },
+  "duration": { "type": "THIS_TURN" }
 }
 ```
 
