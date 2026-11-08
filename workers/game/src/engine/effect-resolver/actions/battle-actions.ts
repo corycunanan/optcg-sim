@@ -13,6 +13,7 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../effect-damage.js";
+import { checkReplacementForDamage, materializeReplacementOffer } from "../../replacements.js";
 import { resolveAmount } from "../action-utils.js";
 
 // ─── REDIRECT_ATTACK ─────────────────────────────────────────────────────────
@@ -98,6 +99,38 @@ export function executeRedirectAttack(
   };
 }
 
+// ─── Damage replacement (OPT-1032) ───────────────────────────────────────────
+
+/**
+ * "If you would take damage, ... instead" (EB05-052 Gloriosa) replaces the
+ * whole instruction before its first point (qa_eb05.md: an [On K.O.] that
+ * deals damage, EB03-055). Returns the handler's result when the damage was
+ * replaced or an optional offer pauses the instruction, or null to deal it.
+ *
+ * An offer's REPLACEMENT frame is handler-owned: the chain parks below it
+ * with this action as `pausedAction`, and the prompt lifecycle deals the
+ * damage from that action when the offer is declined
+ * (`dealDamageAfterDeclinedReplacement`).
+ */
+function replaceEffectDamage(
+  state: GameState,
+  damagedPlayerIndex: 0 | 1,
+  amount: number,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services?: EffectResolverServices
+): ActionResult | null {
+  if (!services || amount <= 0) return null;
+  const replacement = checkReplacementForDamage(state, damagedPlayerIndex, "effect", controller, cardDb, services);
+  const notDealt = { succeeded: false, result: { targetInstanceIds: [], count: 0 } };
+  if (replacement.pendingPrompt) {
+    const offered = materializeReplacementOffer(replacement.state, replacement.pendingPrompt, replacement.offer);
+    return { state: offered.state, events: replacement.events, ...notDealt, pendingPrompt: offered.pendingPrompt };
+  }
+  if (!replacement.replaced) return null;
+  return { state: replacement.state, events: replacement.events, ...notDealt };
+}
+
 // ─── DEAL_DAMAGE ─────────────────────────────────────────────────────────────
 
 /**
@@ -126,6 +159,8 @@ export function executeDealDamage(
     cardDb
   );
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
+  const replaced = replaceEffectDamage(state, opp, amount, controller, cardDb, services);
+  if (replaced) return replaced;
 
   const cont = continueEffectDamageSequence(
     state,
@@ -174,6 +209,9 @@ export function executeSelfTakeDamage(
     controller,
     cardDb
   );
+
+  const replaced = replaceEffectDamage(state, controller, amount, controller, cardDb, services);
+  if (replaced) return replaced;
 
   // Self-inflicted damage uses the same per-point Life/Trigger continuation;
   // controller and damaged player are independently represented by the frame.

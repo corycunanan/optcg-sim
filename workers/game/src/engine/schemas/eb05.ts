@@ -10,9 +10,6 @@
  *   Wisdom attribute and without [Blocker] is K.O.'d" auto effect needs a
  *   negation-aware "without [Blocker]" filter read from last-known
  *   information. Only the [Activate: Main] effect is encoded.
- * - EB05-052 Gloriosa: "If you would take damage, you may trash this
- *   Character instead" needs a damage replacement event. Only the [Trigger]
- *   is encoded.
  */
 import type { Action, Condition, EffectSchema } from "../effect-types.js";
 
@@ -1564,8 +1561,22 @@ export const EB05_052_GLORIOSA: EffectSchema = {
   card_id: "EB05-052",
   card_name: "Gloriosa",
   card_type: "Character",
-  // Partial: the "If you would take damage" replacement is deferred (header).
-  effects: [TRIGGER_DRAW_2_TRASH_1],
+  effects: [
+    {
+      // OPT-1032: one replacement covers the whole damage instance, battle or
+      // effect, including both points of a [Double Attack] and the loss at
+      // 0 Life (qa_eb05.md).
+      id: "would_take_damage_trash_self",
+      category: "replacement",
+      replaces: {
+        event: "WOULD_TAKE_DAMAGE",
+        target_filter: { controller: "SELF", card_type: "LEADER" },
+      },
+      replacement_actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+      flags: { optional: true },
+    },
+    TRIGGER_DRAW_2_TRASH_1,
+  ],
 };
 
 export const EB05_053_CHARLOTTE_PRALINE: EffectSchema = {

@@ -61,6 +61,7 @@ export type ReplacementEvent =
   | "WOULD_LEAVE_FIELD"
   | "WOULD_BE_RESTED"
   | "WOULD_LOSE_GAME"
+  | "WOULD_TAKE_DAMAGE"
   | "LIFE_ADDED_TO_HAND";
 
 export interface ReplacementResult {
@@ -113,6 +114,7 @@ const REPLACEMENT_EVENTS = new Set<string>([
   "WOULD_LEAVE_FIELD",
   "WOULD_BE_RESTED",
   "WOULD_LOSE_GAME",
+  "WOULD_TAKE_DAMAGE",
   "LIFE_ADDED_TO_HAND",
 ]);
 const REPLACEMENT_ACTION_TYPES = new Set<string>(ALL_ACTION_TYPES);
@@ -258,6 +260,37 @@ export function checkReplacementForRemoval(
   );
 }
 
+/**
+ * OPT-1032: check whether the damage a player's Leader would take is replaced
+ * ("If you would take damage, ... instead", EB05-052 Gloriosa). The event is
+ * the whole damage instance: callers check once, before the first point, so
+ * one replacement prevents every point of a [Double Attack] or a "deal N
+ * damage" instruction, and the 0-Life defeat that damage would cause
+ * (qa_eb05.md). The subject of the event is the damaged player's Leader.
+ *
+ * @param cause - "battle" from the Damage Step, "effect" from DEAL_DAMAGE /
+ *   SELF_TAKE_DAMAGE
+ * @param causingController - the attacking player, or the effect's controller
+ */
+export function checkReplacementForDamage(
+  state: GameState,
+  damagedPlayerIndex: 0 | 1,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices
+): ReplacementCheckResult {
+  return checkReplacementForEvent(
+    state,
+    state.players[damagedPlayerIndex].leader.instanceId,
+    "WOULD_TAKE_DAMAGE",
+    cause,
+    causingController,
+    cardDb,
+    services,
+  );
+}
+
 // ─── Core Matching Logic ─────────────────────────────────────────────────────
 
 /**
@@ -297,6 +330,10 @@ function replacementMatchesTarget(
     const zone = findCardInstance(state, targetInstanceId)?.zone;
     if (zone !== "CHARACTER" && zone !== "STAGE") return false;
   }
+
+  // Only a Leader takes damage (rules 4-6-2); the event's subject is the
+  // damaged player's Leader.
+  if (event === "WOULD_TAKE_DAMAGE" && targetCard?.zone !== "LEADER") return false;
 
   // appliesTo: non-empty = instance whitelist; empty = wildcard.
   if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
@@ -1062,6 +1099,8 @@ function describeReplacementEvent(event: ReplacementEvent): string {
       return "This character would leave the field. Activate replacement effect?";
     case "WOULD_BE_RESTED":
       return "This character would be rested. Activate replacement effect?";
+    case "WOULD_TAKE_DAMAGE":
+      return "You would take damage. Activate replacement effect?";
     default:
       return "Activate replacement effect?";
   }

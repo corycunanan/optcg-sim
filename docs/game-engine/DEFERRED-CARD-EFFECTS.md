@@ -10,8 +10,9 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 3** (EB05-010, EB05-052, ST33-004 — partially
-encoded 2026-11-08, see below). No playable-format exclusion is active.
+**Remaining deferred cards: 2** (EB05-010, ST33-004 — partially
+encoded 2026-11-08, see below). EB05-052 Gloriosa is fully encoded since
+OPT-1032 (`WOULD_TAKE_DAMAGE` replacement). No playable-format exclusion is active.
 
 ---
 
@@ -394,7 +395,7 @@ to process player card selections.
 
 `ADD_TO_LIFE` (EB02-057) was a false positive — the schema correctly uses `ADD_TO_LIFE_FROM_FIELD`.
 
-## EB-05 and ST-33 Deferred Effects (3 cards, partially encoded) — 2026-11-08
+## EB-05 and ST-33 Deferred Effects (2 cards, partially encoded) — 2026-11-08
 
 These cards ship with every expressible block authored. The clause below is
 **not encoded and not approximated**: in play the card behaves as if that
@@ -408,17 +409,6 @@ clause were absent. Each needs engine vocabulary first.
 **Blocker:** `keywords` only requires a keyword, and `lacks_effect_type` reads printed keywords. The FAQ (`docs/FAQs/qa_eb05.md`) needs the runtime `hasKeyword` split from `keywords.ts`: a negated printed or self-granted [Blocker] counts as absent, a [Blocker] granted by a [Trigger] effect still counts. It must be read from last-known information at K.O. time. Needs a negative keyword filter (for example `keywords_not`) on the `ANY_CHARACTER_KO` watcher.
 
 **Encoded:** the [Activate: Main] set-active effect.
-
----
-
-### EB05-052 Gloriosa — PARTIAL
-**Tags:** `DAMAGE_REPLACEMENT`
-
-> If you would take damage, you may trash this Character instead.
-
-**Blocker:** no `ReplacementEvent` covers taking damage. The FAQ requires one replacement to prevent both points of a [Double Attack], to prevent the loss at 0 Life, and to apply to effect damage (EB03-055 [On K.O.]). The work spans battle damage (`battle.ts`), effect damage (`effect-damage.ts`) and ordering against the ST13-003 Life replacement (`life-destination.ts`).
-
-**Encoded:** the [Trigger] (draw 2, trash 1).
 
 ---
 
@@ -459,7 +449,8 @@ output rather than the stale `~80` estimate:
 
 All 51 findings have a checked-in disposition. The 2026-11-08 EB-05 and
 ST-31 to ST-36 authoring added three partial cards (EB05-010, EB05-052,
-ST33-004) listed above; they are playable without the deferred clause.
+ST33-004); EB05-052 has been fully encoded since OPT-1032. The other two are
+listed above and are playable without the deferred clause.
 Its other detector findings are in
 [SCHEMA-QA-DISPOSITIONS.md](SCHEMA-QA-DISPOSITIONS.md).
 
@@ -471,5 +462,5 @@ Its other detector findings are in
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
-| EB-05 / ST-33 partial encodings (2026-11-08) | 3 cards | 3 | 0 |
-| **Tracked cards still needing disposition** | — | **3** | **0** |
+| EB-05 / ST-33 partial encodings (2026-11-08) | 2 cards | 2 | 0 |
+| **Tracked cards still needing disposition** | — | **2** | **0** |
