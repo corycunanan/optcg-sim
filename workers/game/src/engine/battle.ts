@@ -58,6 +58,7 @@ import {
   moveLifeCardToHand as moveLifeCardToHandQuery,
   popLifeForDamage as popLifeForDamageQuery,
 } from "./effect-damage.js";
+import { findBlockByKeyword, triggerHasKeyword } from "./trigger-keywords.js";
 
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
@@ -426,8 +427,7 @@ export function executeUseCounterEvent(
   });
   nextState = publishCommittedEvents(nextState, events);
   const counterBlock = cardData.effectSchema?.effects.find(
-    (block) => block.category === "auto" && block.trigger &&
-      "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT"
+    (block) => block.category === "auto" && triggerHasKeyword(block.trigger, "COUNTER_EVENT")
   );
   if (counterBlock) {
     const result = resolveEffectWork(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
@@ -514,9 +514,7 @@ export function resumeBattleDamageFrame(
       });
     }
     const schema = triggerCardData?.effectSchema;
-    const triggerBlock = schema?.effects?.find(
-      (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
-    );
+    const triggerBlock = findBlockByKeyword(schema?.effects, "TRIGGER");
     if (triggerBlock) {
       const resolved = resolveEffectWork(
         nextState,

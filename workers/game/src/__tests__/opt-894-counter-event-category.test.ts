@@ -863,16 +863,14 @@ describe("OPT-894 — Life / deck / bounce Counters", () => {
   });
 });
 
-// ─── Known gap: compound [Main]/[Counter] blocks (follow-up) ────────────────
+// ─── Compound [Main]/[Counter] blocks (OPT-911) ─────────────────────────────
 
-describe("OPT-894 — compound [Main]/[Counter] triggers (known gap, follow-up)", () => {
-  // GAP: 11 cards author `[Main]/[Counter]` as ONE block with
-  // trigger { any_of: [MAIN_EVENT, COUNTER_EVENT] }. battle.ts
-  // (executeUseCounterEvent) and execute.ts (PLAY_CARD) both select with
-  // `"keyword" in trigger`, so the compound block is never selected and the
-  // card resolves neither effect. Ratchet: drop `.fails` (and the id from
-  // KNOWN_COMPOUND_COUNTER_EVENT_GAP) when fixed.
-  it.fails("OP08-019 (GAP): [Counter] -3000 to an opposing Character, then +3000 to your Character", () => {
+describe("OPT-894 — compound [Main]/[Counter] triggers (fixed in OPT-911)", () => {
+  // 11 cards author `[Main]/[Counter]` as ONE auto block with
+  // trigger { any_of: [MAIN_EVENT, COUNTER_EVENT] }. Both consumers now select
+  // it through trigger-keywords.ts; full coverage of all 11 lives in
+  // opt-911-913-compound-and-reuse.test.ts.
+  it("OP08-019: [Counter] -3000 to an opposing Character, then +3000 to your Character", () => {
     const f = fixture();
     const { ally, foe } = board(f);
     f.counter("OP08-019", [ids(foe), ids(ally)]);
@@ -880,13 +878,12 @@ describe("OPT-894 — compound [Main]/[Counter] triggers (known gap, follow-up)"
     expect(f.power(ally)).toBe(7000);
   });
 
-  it.fails("OP08-019 (GAP): [Main] resolves from PLAY_CARD", () => {
+  it("OP08-019: [Main] resolves from PLAY_CARD", () => {
     const f = fixture();
-    const { foe } = board(f);
+    board(f);
     const ev = f.put("OP08-019", 0, "HAND", { type: "Event", cost: 1, power: null, counter: null, effectText: canonicalText("OP08-019") });
     f.act({ type: "PLAY_CARD", cardInstanceId: ev.instanceId }, 0);
-    expect(f.state.pendingPrompt).not.toBeNull();
-    void foe;
+    expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   });
 });
 

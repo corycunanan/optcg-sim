@@ -1018,17 +1018,17 @@ The `[Trigger]` keyword trigger can instruct the player to activate a different 
 ```typescript
 interface ReuseEffectAction {
   type: "REUSE_EFFECT";
-  target_effect: KeywordTriggerType;
+  target_effect: string; // a block id, or a KeywordTriggerType
 }
 ```
 
-The `target_effect` field identifies which EffectBlock to activate by its trigger keyword. The engine locates the matching EffectBlock on the same card and resolves it.
+The `target_effect` field names the EffectBlock to activate, either by its block `id` or by a trigger keyword the block carries. A keyword nested in an `any_of` compound counts, so `MAIN_EVENT` finds a `[Main]/[Counter]` block (OPT-913). The value must resolve to exactly one other block on the same card; schema validation (`pnpm schema:check`) rejects zero matches, several matches, or the block that contains the `REUSE_EFFECT`. There is no keyword alias: a `[Counter]` Event's block is `COUNTER_EVENT`, never `COUNTER`. The lookup lives in `findReuseTargetBlocks` (`workers/game/src/engine/trigger-keywords.ts`).
 
 ### Observed Patterns
 
 | Text Pattern | Target Effect | Example Cards |
 |-------------|---------------|---------------|
-| "[Trigger] Activate this card's [Counter] effect." | `COUNTER` | ST03-016, OP01-028, OP01-030 |
+| "[Trigger] Activate this card's [Counter] effect." | `COUNTER_EVENT` | ST03-016, OP01-028, OP01-030 |
 | "[Trigger] Activate this card's [Main] effect." | `MAIN_EVENT` | ST21-017, EB01-020, EB01-051, EB04-049 |
 | "[Trigger] Activate this card's [On Play] effect." | `ON_PLAY` | OP13-113, OP14-108 |
 
@@ -1040,7 +1040,7 @@ Example — ST03-016 (Trigger activates Counter):
   "category": "auto",
   "trigger": { "keyword": "TRIGGER" },
   "actions": [
-    { "type": "REUSE_EFFECT", "target_effect": "COUNTER" }
+    { "type": "REUSE_EFFECT", "target_effect": "COUNTER_EVENT" }
   ]
 }
 ```
@@ -1061,7 +1061,7 @@ Example — OP13-113 (Trigger activates On Play):
 ### Engine Behavior
 
 1. The `[Trigger]` effect fires when the card is revealed from Life.
-2. The engine resolves `REUSE_EFFECT` by finding the EffectBlock on the same card whose trigger keyword matches `target_effect`.
+2. The engine resolves `REUSE_EFFECT` by finding the one EffectBlock on the same card whose `id` or trigger keyword (including `any_of` members) matches `target_effect`.
 3. The referenced EffectBlock's conditions are evaluated and its actions are resolved as though that trigger had fired.
 4. Costs on the referenced EffectBlock are paid normally.
 
