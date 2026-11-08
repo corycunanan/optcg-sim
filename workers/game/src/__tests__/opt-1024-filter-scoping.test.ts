@@ -264,6 +264,24 @@ describe("OPT-882 schema lint — exclude_self inside conditions", () => {
     expect(violations[0]).toContain("HAND_COUNT ignores exclude_self");
   });
 
+  it("rejects it inside a prohibition's conditional_override", () => {
+    const violations = findConditionExcludeSelfViolations({
+      card_id: "LINT-882",
+      card_name: "Lint fixture",
+      card_type: "Character",
+      effects: [{
+        id: "shield",
+        category: "permanent",
+        prohibitions: [{
+          type: "CANNOT_BE_KO",
+          conditional_override: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "X", exclude_self: true } },
+        }],
+      }],
+    } as unknown as EffectSchema);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("conditional_override");
+  });
+
   it("accepts the condition-level form on CARD_ON_FIELD", () => {
     expect(findConditionExcludeSelfViolations(schema({
       not: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "X" }, exclude_self: true },

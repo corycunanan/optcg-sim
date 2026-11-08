@@ -17,8 +17,14 @@
  */
 import type { EffectSchema } from "./effect-types.js";
 
-/** Schema keys whose value is a Condition (or a list of them). */
-const CONDITION_KEYS = new Set(["conditions", "post_cost_conditions", "option_conditions", "condition"]);
+/**
+ * Schema keys whose value is a Condition (or a list of them). A
+ * `conditional_override` is a Condition or `{ action }`; the action form has
+ * no condition fields and is walked like any other subtree.
+ */
+const CONDITION_KEYS = new Set([
+  "conditions", "post_cost_conditions", "option_conditions", "condition", "conditional_override",
+]);
 
 /** Condition types whose evaluator honors the condition-level `exclude_self`. */
 export const CONDITION_EXCLUDE_SELF_TYPES: ReadonlySet<string> = new Set(["CARD_ON_FIELD"]);
