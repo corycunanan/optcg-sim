@@ -118,7 +118,9 @@ function opponentDonRecipients(
     cardDb,
     sourceCardInstanceId ?? "",
     new Map(),
-  ).filter((id) => opponentCharacters.has(id));
+    // OPT-931: the same CANNOT_ATTACH_DON gate as the GIVE_DON cost, read
+    // relative to the payer (rule 1-3-3; see `giveDonRecipients`).
+  ).filter((id) => opponentCharacters.has(id) && !isDonAttachProhibited(state, id, cardDb, controller));
 }
 
 /** OPT-824: unattached ACTIVE DON!! in the cost area — the only DON!! a give can use (rule 6-5-5-1). */

@@ -1213,8 +1213,15 @@ function handleAwaitingCostSelectionCore(
     // that became active or left the cost area, or a departed Character.
     const reject = (): HandlerResult => ({ kind: "waiting", state, events: [], resolved: false });
     const selected = [...new Set(action.selectedInstanceIds ?? [])];
+    //
+    // OPT-931: as for the GIVE_DON cost below, the live check reads the board
+    // with prohibitions cleared and CANNOT_ATTACH_DON coverage is read once,
+    // in the reconciled staged payment view (rule 8-3-1-1).
     const recipientEligibleIn = (candidateState: GameState, id: string): boolean =>
       computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId).includes(id);
+    const recipientEligible = (id: string): boolean =>
+      recipientEligibleIn({ ...baselineState, prohibitions: [] }, id) &&
+      recipientEligibleIn(stagedProhibitionView(baselineState, nextState, topFrame.costExpectedRoot), id);
     const donEligibleIn = (candidateState: GameState, id: string): boolean =>
       opponentRestedCostDon(candidateState, controller).some((don) => don.instanceId === id);
     const marker = topFrame.validTargets.find((id) => id.startsWith(OPPONENT_DON_RECIPIENT_PREFIX));
@@ -1224,8 +1231,7 @@ function handleAwaitingCostSelectionCore(
       if (
         !recipient ||
         !topFrame.validTargets.includes(recipient) ||
-        !recipientEligibleIn(baselineState, recipient) ||
-        !recipientEligibleIn(nextState, recipient)
+        !recipientEligible(recipient)
       ) {
         return reject();
       }
@@ -1269,8 +1275,7 @@ function handleAwaitingCostSelectionCore(
         !topFrame.validTargets.includes(donId) ||
         !donEligibleIn(baselineState, donId) ||
         !donEligibleIn(nextState, donId) ||
-        !recipientEligibleIn(baselineState, recipient) ||
-        !recipientEligibleIn(nextState, recipient)
+        !recipientEligible(recipient)
       ) {
         return reject();
       }
@@ -1304,7 +1309,7 @@ function handleAwaitingCostSelectionCore(
       !recipient ||
       !topFrame.validTargets.includes(recipient) ||
       !eligibleIn({ ...baselineState, prohibitions: [] }) ||
-      !eligibleIn(stagedProhibitionView(baselineState, nextState))
+      !eligibleIn(stagedProhibitionView(baselineState, nextState, topFrame.costExpectedRoot))
     ) {
       return { kind: "waiting", state, events: [], resolved: false };
     }

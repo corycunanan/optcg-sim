@@ -33,12 +33,15 @@ import {
 import { resolveSourceTarget } from "../actions/modifiers.js";
 import {
   applyRedistributeDonTransfers,
+  attachOpponentDonById,
+  donGiveRecipients,
   fieldSideOf,
   giveableDon,
+  giveOpponentDonPool,
   GIVE_DON_IDENTITY_PREFIX,
   parseGiveDonIdentityMarker,
 } from "../actions/don.js";
-import { attachDonToCard } from "../card-mutations.js";
+import { isDonAttachProhibited } from "../../prohibitions.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { trashFromHandSelection } from "../actions/removal.js";
 import type {
@@ -67,14 +70,16 @@ export type TargetBranchResult = TargetFallthrough | TargetTerminal | null;
 
 /**
  * REDISTRIBUTE_DON resume — validates transfers against re-derived source
- * set and the prompt's validTargets, applies accepted transfers, then falls
- * through to remainingActions.
+ * set and the prompt's validTargets, applies accepted transfers (skipping any
+ * to a recipient now under CANNOT_ATTACH_DON), then falls through to
+ * remainingActions.
  */
 export function handleRedistributeDon(
   state: GameState,
   action: GameAction,
   resumeCtx: ResumeContext,
   resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
   events: PendingEvent[]
 ): TargetBranchResult {
   const { pausedAction, controller, validTargets } = resumeCtx;
@@ -115,11 +120,19 @@ export function handleRedistributeDon(
     };
   }
 
+  // OPT-931: a recipient that came under CANNOT_ATTACH_DON while the prompt
+  // was pending is skipped (rule 1-3-3: the prohibition takes precedence;
+  // rule 1-3-2: the remaining transfers are still carried out).
+  const allowedRecipients = new Set(
+    donGiveRecipients(state, [...new Set(transfers.map((t) => t.toCardInstanceId))], cardDb, controller),
+  );
+  const permitted = transfers.filter((t) => allowedRecipients.has(t.toCardInstanceId));
+
   let nextState = state;
-  if (transfers.length > 0) {
+  if (permitted.length > 0) {
     const actionResult = applyRedistributeDonTransfers(
       nextState,
-      transfers,
+      permitted,
       controller
     );
     // Rule 3-1-6-1: moved DON!! shed their effects.
@@ -137,22 +150,33 @@ export function handleRedistributeDon(
  * OPT-868: GIVE_DON identity resume — the activating player chose which of the
  * opponent's DON!! to give the recipient bound in `giveDonIdentity` (or, for
  * sessions saved before OPT-861, the legacy validTargets marker)
- * (faq_op15-eb04.md OP15-003/010/012/017/023). The reply must be exactly one
- * offered DON!! that is still an unattached cost-area DON!! of the bound owner
- * in the action's DON!! state, and the recipient must still be on that
- * owner's field; otherwise the reply is rejected and the prompt stays.
+ * (faq_op15-eb04.md OP15-003/010/012/017/023). OPT-932: the same step for a
+ * GIVE_OPPONENT_DON_TO_OPPONENT action (OP15-008/015/025/026/028) selects
+ * exactly min(amount, offered pool) DON!!.
+ *
+ * The reply must name exactly that many distinct offered DON!! that are still
+ * unattached cost-area DON!! of the bound owner eligible for the action, and
+ * the recipient must still be on that owner's field; otherwise the reply is
+ * rejected and the prompt stays.
+ *
+ * OPT-931: a CANNOT_ATTACH_DON prohibition that appeared on the bound
+ * recipient while the prompt was pending takes precedence (rule 1-3-3): the
+ * give is not carried out and the chain continues with the action failed.
  */
 export function handleGiveDonIdentity(
   state: GameState,
   action: GameAction,
   resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
   events: PendingEvent[]
 ): TargetBranchResult {
   const { pausedAction, controller, validTargets } = resumeCtx;
   if (
     action.type !== "SELECT_TARGET" ||
     !pausedAction ||
-    pausedAction.type !== "GIVE_DON"
+    (pausedAction.type !== "GIVE_DON" &&
+      pausedAction.type !== "GIVE_OPPONENT_DON_TO_OPPONENT")
   ) {
     return null;
   }
@@ -163,23 +187,45 @@ export function handleGiveDonIdentity(
     kind: "handled",
     result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
   };
+  const isGiveDon = pausedAction.type === "GIVE_DON";
+  const offered = validTargets.filter((id) => !id.startsWith(GIVE_DON_IDENTITY_PREFIX));
+  const count = isGiveDon
+    ? 1
+    : Math.min(pausedAction.params?.amount ?? 1, offered.length);
+  const eligible = new Set(
+    (isGiveDon
+      ? giveableDon(state, binding.owner, pausedAction.params?.don_state ?? "ACTIVE")
+      : giveOpponentDonPool(state, binding.owner, pausedAction.params)
+    ).map((d) => d.instanceId),
+  );
   const selected = action.selectedInstanceIds ?? [];
-  const donId = selected.length === 1 ? selected[0] : undefined;
-  const donState = pausedAction.params?.don_state ?? "ACTIVE";
   if (
-    !donId ||
-    donId.startsWith(GIVE_DON_IDENTITY_PREFIX) ||
-    !validTargets.includes(donId) ||
-    fieldSideOf(state, binding.recipient) !== binding.owner ||
-    !giveableDon(state, binding.owner, donState).some((d) => d.instanceId === donId)
+    count < 1 ||
+    selected.length !== count ||
+    new Set(selected).size !== count ||
+    selected.some((id) => !offered.includes(id) || !eligible.has(id)) ||
+    fieldSideOf(state, binding.recipient) !== binding.owner
   ) {
     return reject;
   }
-  const given = attachDonToCard(state, binding.owner, binding.recipient, donState, donId);
-  if (!given) return reject;
-  // Rule 3-1-6-1: the moved DON!! sheds the effects applied to it.
-  const nextState = releaseMovedDonEffects(state, given);
-  events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: 1 } });
+  if (isDonAttachProhibited(state, binding.recipient, cardDb, controller)) {
+    return { kind: "continued", state, succeeded: false };
+  }
+  const applied = attachOpponentDonById(state, binding.owner, binding.recipient, selected);
+  if (applied.given !== count) return reject;
+  // Rule 3-1-6-1: the moved DON!! shed the effects applied to them.
+  const nextState = releaseMovedDonEffects(state, applied.state);
+  events.push({
+    type: "DON_GIVEN_TO_CARD",
+    playerIndex: isGiveDon ? controller : binding.owner,
+    payload: { count },
+  });
+  if (!isGiveDon && pausedAction.result_ref) {
+    resultRefs.set(pausedAction.result_ref, {
+      targetInstanceIds: [binding.recipient],
+      count,
+    });
+  }
   return { kind: "continued", state: nextState, succeeded: true };
 }
 
