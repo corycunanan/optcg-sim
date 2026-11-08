@@ -333,6 +333,32 @@ describe("OPT-892 OP03-043 Gaimon on effect damage", () => {
   });
 });
 
+describe("OPT-887 bare DAMAGE_TAKEN defaults to the host's controller", () => {
+  const BARE: CardData = {
+    ...CARDS.VANILLA,
+    id: "OPT887-BARE-WATCHER",
+    name: "Bare watcher",
+    effectSchema: {
+      card_id: "OPT887-BARE-WATCHER",
+      card_name: "Bare watcher",
+      card_type: "Character",
+      effects: [{ id: "watch", category: "auto", trigger: { event: "DAMAGE_TAKEN" }, actions: [{ type: "DRAW", params: { amount: 1 } }] }],
+    } as EffectSchema,
+  };
+
+  it.each([[1, 1], [0, 0]] as const)("a watcher controlled by player %i draws %i when player 1 takes effect damage", (owner, drawn) => {
+    // Ace sits on player 0 without DON!!, so it never competes with the watcher.
+    const f = fixture({ aceController: 0, aceDon: 0 });
+    f.cardDb.set(BARE.id, BARE);
+    f.putChar(BARE.id, owner);
+    const source = f.putHand(DEAL_1.id, 0);
+    const start = f.state.eventLog.length;
+    const state = play(f, source);
+    expect(state.players[1].life).toHaveLength(2);
+    expect(draws(state.eventLog.slice(start), owner)).toHaveLength(drawn);
+  });
+});
+
 describe("OPT-887 DAMAGE_TAKEN controller semantics on legacy events", () => {
   it("a pre-OPT-887 battle event (no damagedPlayerIndex) is attributed to the non-dealer", () => {
     const f = fixture();

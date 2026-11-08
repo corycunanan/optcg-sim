@@ -739,7 +739,7 @@ Example:
 
 Fires when the controller takes damage (a Life card is removed as combat damage or effect damage).
 
-OPT-887: `DAMAGE_DEALT.playerIndex` is the player who dealt the damage. `filter.controller` is compared against the damaged player: `payload.damagedPlayerIndex`, or the non-dealer for battle events written before OPT-887 (`damagedPlayerOf` in `shared/game-types.ts`). Only the first point of an attack (`firstDamageOfAttack`) or of a damage instruction (`firstDamageOfEffect`) matches. Activation waits until the damage processing ends, after any [Trigger] (rule 8-6-2; qa_op13.md OP13-002).
+OPT-887: `DAMAGE_DEALT.playerIndex` is the player who dealt the damage. `filter.controller` (default `SELF`; `OPPONENT` or `ANY` widen it) is compared against the damaged player: `payload.damagedPlayerIndex`, or the non-dealer for battle events written before OPT-887 (`damagedPlayerOf` in `shared/game-types.ts`). Only the first point of an attack (`firstDamageOfAttack`) or of a damage instruction (`firstDamageOfEffect`) matches. Activation waits until the damage processing ends, after any [Trigger] (rule 8-6-2; qa_op13.md OP13-002).
 
 ```typescript
 { event: "DAMAGE_TAKEN" }

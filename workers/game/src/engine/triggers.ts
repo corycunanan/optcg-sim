@@ -856,9 +856,11 @@ function matchesDamageTaken(
   if (event.type !== "DAMAGE_DEALT") return false;
   if (event.payload.firstDamageOfAttack === false || event.payload.firstDamageOfEffect === false) return false;
   const damaged = damagedPlayerOf(event);
-  if (trigger.filter?.controller === "SELF" && damaged !== sourceCard.controller) return false;
-  if (trigger.filter?.controller === "OPPONENT" && damaged === sourceCard.controller) return false;
-  return true;
+  // "When you take damage": the host's controller unless the filter names
+  // the opponent or ANY (02-TRIGGERS DAMAGE_TAKEN; the bare form is SELF).
+  if (trigger.filter?.controller === "ANY") return true;
+  if (trigger.filter?.controller === "OPPONENT") return damaged !== sourceCard.controller;
+  return damaged === sourceCard.controller;
 }
 
 /**
