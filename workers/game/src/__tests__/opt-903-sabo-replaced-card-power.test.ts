@@ -426,12 +426,9 @@ describe("OP05-001 Sabo — battle K.O.", () => {
     expect(f.trashIds(0)).toContain("OPT903-C5");
   });
 
-  // Known engine gap (tracked by OPT-909): the WOULD_BE_KO
-  // power_min filter reads getEffectivePower, which excludes the Counter Step
-  // bonus stored on BattleContext.counterPowerAdded, so the Character reads
-  // 4000 and Sabo is never offered. Fails loudly once the filter uses battle
-  // power (getBattleDefenderPower) for the defender.
-  it.fails("qa_op05: base 4000 raised to 6000 in the Counter Step qualifies (effective power)", () => {
+  // OPT-909: the WOULD_BE_KO power_min filter reads the defender's battle
+  // power, which includes BattleContext.counterPowerAdded (rules §7-1-3-2-1).
+  it("qa_op05: base 4000 raised to 6000 in the Counter Step qualifies (effective power)", () => {
     const f = fixture();
     sabo(f);
     const c = protectedChar(f, "OPT903-BASE4", 4000);
