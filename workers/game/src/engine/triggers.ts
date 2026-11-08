@@ -727,6 +727,14 @@ function matchesCustomTrigger(
       if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
       filter = { ...filter, controller: undefined, cause: undefined };
     }
+    // OPT-1033: "one of your Characters is K.O.'d" compares the K.O.'d
+    // card's field controller, like CHARACTER_REMOVED_FROM_FIELD above.
+    if (trigger.event === "ANY_CHARACTER_KO" && event.type === "CARD_KO" && filter.controller) {
+      const removedController = event.payload.sourceController ?? event.playerIndex;
+      if (filter.controller === "SELF" && removedController !== sourceCard.controller) return false;
+      if (filter.controller === "OPPONENT" && removedController === sourceCard.controller) return false;
+      filter = { ...filter, controller: undefined };
+    }
     if (trigger.event === "DAMAGE_TAKEN") {
       // Controller was compared against the damaged player in matchesDamageTaken.
       filter = { ...filter, controller: undefined };

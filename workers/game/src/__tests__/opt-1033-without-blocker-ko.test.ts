@@ -241,6 +241,15 @@ describe("EB05-010 Nico Robin: Wisdom Character without [Blocker] K.O.'d", () =>
     expect(f.life()).toBe(life);
   });
 
+  it("compares the K.O.'d Character's controller, not its owner", () => {
+    const f = fixture();
+    const target = wisdom(f, "WISDOM-PLAIN", false);
+    target.owner = 0;
+    const life = f.life();
+    f.koInBattle(target);
+    expect(f.life()).toBe(life + 1);
+  });
+
   it("is [Once Per Turn]: a second qualifying K.O. in the same turn adds nothing", () => {
     const f = fixture();
     const first = wisdom(f, "WISDOM-PLAIN", false);
