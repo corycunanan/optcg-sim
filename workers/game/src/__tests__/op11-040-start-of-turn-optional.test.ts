@@ -13,7 +13,8 @@ const MULTI_CLAUSE_EFFECT = `${PRINTED_EFFECT}\n[Trigger] Draw 1 card.`;
 
 function setup(
   donCount = 8,
-  effectText = PRINTED_EFFECT
+  effectText = PRINTED_EFFECT,
+  owner: 0 | 1 = 1
 ): {
   state: GameState;
   cardDb: Map<string, CardData>;
@@ -23,9 +24,9 @@ function setup(
 } {
   const cardDb = createTestCardDb();
   let state = createBattleReadyState(cardDb);
-  const leader = state.players[1].leader;
+  const leader = state.players[owner].leader;
   const leaderData = cardDb.get(leader.cardId);
-  const searchableCard = state.players[1].deck[1];
+  const searchableCard = state.players[owner].deck[1];
   const searchableCardData = cardDb.get(searchableCard.cardId);
   if (!leaderData || !searchableCardData) {
     throw new Error("Expected leader and deck card data in the test database");
@@ -42,8 +43,8 @@ function setup(
   });
 
   const players = [...state.players] as [PlayerState, PlayerState];
-  players[1] = {
-    ...players[1],
+  players[owner] = {
+    ...players[owner],
     donCostArea: Array.from({ length: donCount }, (_, index) => ({
       instanceId: `op11-040-don-${index}`,
       state: "ACTIVE" as const,
@@ -56,9 +57,9 @@ function setup(
   return {
     state,
     cardDb,
-    deckOrder: state.players[1].deck.map((card) => card.instanceId),
-    handSize: state.players[1].hand.length,
-    strawHatDeckIds: state.players[1].deck
+    deckOrder: state.players[owner].deck.map((card) => card.instanceId),
+    handSize: state.players[owner].hand.length,
+    strawHatDeckIds: state.players[owner].deck
       .filter((card) =>
         cardDb.get(card.cardId)?.types.includes("Straw Hat Crew")
       )
@@ -205,5 +206,21 @@ describe("OP11-040 start-of-turn search", () => {
       activePlayerIndex: 1,
       phase: "MAIN",
     });
+  });
+
+  // OPT-938: "at the start of your turn" — TURN_STARTED also fires for the
+  // opponent's turn, so the schema scopes it with turn_restriction YOUR_TURN.
+  it("does not offer the search at the start of the opponent's turn", () => {
+    const { state, cardDb, deckOrder, handSize } = setup(8, PRINTED_EFFECT, 0);
+    expect(state.turn.activePlayerIndex).toBe(0);
+    const ended = runPipeline(state, { type: "ADVANCE_PHASE" }, cardDb, 0);
+    expect(ended.valid).toBe(true);
+    expect(ended.pendingPrompt).toBeUndefined();
+    const advanced = advanceStartOfTurn(ended.state, cardDb);
+
+    expect(advanced.pendingPrompt).toBeNull();
+    expect(advanced.turn).toMatchObject({ activePlayerIndex: 1, phase: "MAIN" });
+    expect(advanced.players[0].hand).toHaveLength(handSize);
+    expect(advanced.players[0].deck.map((card) => card.instanceId)).toEqual(deckOrder);
   });
 });

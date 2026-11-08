@@ -887,8 +887,10 @@ describe("OPT-799 schema validation of action-level optional", () => {
     }
     expect(users.sort()).toEqual([
       "EB04-001 effects[1].actions[1]",
+      "OP08-116 effects[0].actions[1]", // OPT-919
       "OP14-079 effects[1].actions[1]",
       "P-036 effects[0].actions[1]",
+      "ST22-015 effects[0].actions[1]", // OPT-919
     ]);
   });
 });
