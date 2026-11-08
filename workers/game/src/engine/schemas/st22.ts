@@ -383,9 +383,11 @@ export const ST22_015_I_AM_WHITEBEARD: EffectSchema = {
           params: { source_zone: "HAND", cost_override: "FREE" },
         },
         {
+          // "Then, you may add 1 card ... to your hand." (OPT-919)
           type: "LIFE_TO_HAND",
           params: { amount: 1, position: "TOP_OR_BOTTOM" },
           chain: "THEN",
+          optional: true,
         },
         {
           type: "MODIFY_POWER",
