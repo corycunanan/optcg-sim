@@ -465,8 +465,9 @@ describe("OPT-826 attacker-binding schema contract", () => {
     // OPT-899: OP13-057's Leader binding is enumerated separately.
     expect(leaderBound).toEqual(["OP13-057"]);
     // Inventory size at this change; a new Blocker prohibition should be
-    // classified (bound vs blanket) deliberately.
-    expect(uses).toHaveLength(21);
+    // classified (bound vs blanket) deliberately. EB05-048 Hedgehog Stinger
+    // (2026-11-08) is blanket: all of the opponent's cost-0 Characters.
+    expect(uses).toHaveLength(22);
   });
 
   const base = (action: Record<string, unknown>) => ({

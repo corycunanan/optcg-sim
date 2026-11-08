@@ -666,6 +666,7 @@ it("recursively inventories every authored rest watcher against canonical host s
     "OP14-070",
     "OP14-119",
     "PRB02-009",
+    "ST32-003",
   ]);
 });
 it.each([{ cardType: "UNKNOWN" }, { instanceId: 42 }])(

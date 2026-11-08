@@ -103,9 +103,9 @@
 
 ## OP17-044 — Captain John
 
-**Q:** If I have this rested Character and a rested “P-067 Eustass"Captain"Kid” on my field, and my Leader has a type including "Rocks Pirates" or has the effect “This Leader is treated as a card with all card names, types, and attributes.”, can my opponent attack?
+**Q:** If I have this Character and "P-067 Eustass"Captain"Kidd" rested on my field, and my Leader's type includes {Rock's Pirates} or has an effect that reads "is treated as a card with all card names, types, and attributes," can my opponent attack?
 
-**A:** In this case, your opponent can attack either your rested [Eustass"Captain"Kid] or your rested [Captain John].
+**A:** In this case, the opponent can choose to attack either your rested "Eustass"Captain"Kidd" or your rested "Captain John". This is a special ruling that applies when the effects of "OP01-051 Eustass"Captain"Kidd" or "P-067 Eustass"Captain"Kidd" and "OP17-044 Captain John" are active simultaneously.
 
 
 ## OP17-045 — Kyo
@@ -368,3 +368,45 @@
 **Q:** If my Leader has the effect “This Leader is treated as a card with all card names, types, and attributes.”, can my Leader gain [Blocker] with this [Once Per Turn] effect?
 
 **A:** Yes, it can.
+
+
+## OP17-118 — Rocks.D.Xebec
+
+**Q:** Does "if you only have Characters without a Counter" include Character cards in my Life and trash?
+
+**A:** No, it only applies to Characters in your Character area.
+
+
+## OP17-117 — Maser Saber
+
+**Q:** What happens if I activate this [Trigger] and my opponent only has 2 cards or less in their hand?
+
+**A:** Since your opponent cannot fulfill the option to trash 3 cards from this [Trigger]'s effect, you can choose to K.O. up to 1 of your opponent's Characters with a cost of 6 or less.
+
+
+## OP17-119 — Loki
+
+**Q:** When playing this Character, can I choose not to K.O. any Character using this [On Play] effect?
+
+**A:** Yes, you can. You can choose 0 Characters, bringing the total cost to 0.
+
+
+## OP17-063 — Kaido
+
+**Q:** What happens if I have multiple Counter related effects, such as [Counter +1000] or [Counter +2000], that apply to the same Character card when using that Character card from my hand during the Counter step?
+
+**A:** If multiple similar effects apply, such as [Counter +1000] and [Counter +2000], only the one with the highest value will be applied.
+
+
+## OP17-118 — Rocks.D.Xebec
+
+**Q:** What happens if I have multiple Counter related effects, such as [Counter +1000] or [Counter +2000], that apply to the same Character card when using that Character card from my hand during the Counter step?
+
+**A:** If multiple similar effects apply, such as [Counter +1000] and [Counter +2000], only the one with the highest value will be applied.
+
+
+## OP17-119 — Loki
+
+**Q:** Imagine my opponent has two Characters on their field. Character A's base cost was 1, but it was reduced by −3 thanks to "OP07-096 Tempest Kick". Character B has a cost of 6. Can I K.O. both Character A and B with this Character's [On Play] effect?
+
+**A:** No, you cannot. In this situation, Character A is treated as having a cost of 0 and Character B as a cost of 6, bringing the total cost to 6.

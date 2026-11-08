@@ -398,3 +398,10 @@
 **Q:** If my Leader has the effect “This Leader is treated as a card with all card names, types, and attributes.”, can my Leader gain [Blocker] with this [Once Per Turn] effect?
 
 **A:** Yes, it can.
+
+
+## OP16-118 — Portgas.D.Ace
+
+**Q:** What happens if I have multiple Counter related effects, such as [Counter +1000] or [Counter +2000], that apply to the same Character card when using that Character card from my hand during the Counter step?
+
+**A:** If multiple similar effects apply, such as [Counter +1000] and [Counter +2000], only the one with the highest value will be applied.

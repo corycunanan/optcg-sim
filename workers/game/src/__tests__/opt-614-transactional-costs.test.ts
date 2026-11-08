@@ -283,11 +283,16 @@ describe("OPT-614 — transactional multi-cost payment", () => {
     // OPT-727 adds OP17-057 Fullalead, OP17-077 Kundali Dragon Swarm, and
     // OP17-078 Drunken Dragon Bagua. Their selection costs use the
     // transactional path and add no stranding shape.
-    expect(mixedBlocks).toHaveLength(58);
+    // 2026-11-08 adds EB05-008 Luffy, Now's Your Chance (GIVE_DON + reveal),
+    // EB05-048 Hedgehog Stinger (rest DON!! + K.O. own Character) and
+    // ST34-004 Charlotte Linlin (DON!! −4 + hand trash). EB05-048's later
+    // K.O. cost joins the existing replaceable-field-exit stranding shape.
+    expect(mixedBlocks).toHaveLength(61);
     expect([...strandableCardIds].sort()).toEqual([
       "EB01-011",
       "EB02-047",
       "EB03-062",
+      "EB05-048",
       "OP02-035",
       "OP04-055",
       "OP04-073",

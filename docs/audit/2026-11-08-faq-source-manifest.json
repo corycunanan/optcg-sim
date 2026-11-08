@@ -1,0 +1,33 @@
+{
+  "importedAt": "2026-11-08",
+  "supersedes": {
+    "qa_op16.pdf": "2026-09-09-faq-source-manifest.json",
+    "qa_op17.pdf": "2026-09-09-faq-source-manifest.json"
+  },
+  "documents": [
+    {
+      "file": "qa_eb05.pdf",
+      "pages": 4,
+      "questions": 23,
+      "cards": 16,
+      "sha256": "f7c8dcd2e89b0d7ccc81bd511cdfa1251c286b7b563a3b61846eca7dd311ce28",
+      "source": "https://en.onepiece-cardgame.com/pdf/qa_eb05.pdf"
+    },
+    {
+      "file": "qa_op16.pdf",
+      "pages": 9,
+      "questions": 61,
+      "cards": 51,
+      "sha256": "9f21c16aeeccc9240a73d0cee1bbc41be4f2aa24cc08f4e04de3410b10d0304f",
+      "source": "https://en.onepiece-cardgame.com/pdf/qa_op16.pdf"
+    },
+    {
+      "file": "qa_op17.pdf",
+      "pages": 10,
+      "questions": 66,
+      "cards": 43,
+      "sha256": "fc1a12bc8565f5268994312f639874f812f543692bb1ed5be96990bc7073a818",
+      "source": "https://en.onepiece-cardgame.com/pdf/qa_op17.pdf"
+    }
+  ]
+}

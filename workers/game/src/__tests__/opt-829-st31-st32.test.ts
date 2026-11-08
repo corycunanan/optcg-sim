@@ -255,8 +255,9 @@ it("inventories every authored DON_GIVEN consumer without migrating existing mod
   }
   for (const [id, schema] of Object.entries(AUTHORED_SCHEMAS)) walk(schema, id);
   // OPT-858 migrated the other printed "total of N or more given DON!!" cards.
-  expect(inventory.filter(s => s.endsWith("TOTAL_GIVEN")).sort()).toEqual(["OP12-015: TOTAL_GIVEN", "OP12-024: TOTAL_GIVEN", "OP13-112: TOTAL_GIVEN", "ST31-004: TOTAL_GIVEN"]);
-  expect(inventory.filter(s => !s.startsWith("ST31-004"))).toHaveLength(96);
+  expect(inventory.filter(s => s.endsWith("TOTAL_GIVEN")).sort()).toEqual(["OP12-015: TOTAL_GIVEN", "OP12-024: TOTAL_GIVEN", "OP13-112: TOTAL_GIVEN", "ST31-003: TOTAL_GIVEN", "ST31-004: TOTAL_GIVEN"]);
+  // 2026-11-08: +ST31-001 (SPECIFIC_CARD) and ST31-003 (TOTAL_GIVEN).
+  expect(inventory.filter(s => !s.startsWith("ST31-004"))).toHaveLength(98);
   expect(inventory.every(s => /: (ANY_CARD_HAS_DON|SPECIFIC_CARD|TOTAL_GIVEN)$/.test(s))).toBe(true);
 });
 
