@@ -2142,7 +2142,8 @@ export const OP07_060_ITOMIMIZU: EffectSchema = {
             not: {
               type: "CARD_ON_FIELD",
               controller: "SELF",
-              filter: { name: "Itomimizu", exclude_self: true },
+              filter: { name: "Itomimizu" },
+              exclude_self: true,
             },
           },
         ],

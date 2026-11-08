@@ -135,6 +135,22 @@ function applyCostSelectionUnreleased(
       }
     }
 
+    case "PLACE_STAGE_TO_DECK": {
+      // OPT-866: the EITHER form may select the opponent's Stage; it moves to
+      // its OWNER's deck bottom (rule 4-2-1-1). The fixed own-Stage form pays
+      // in payCosts and never reaches a selection.
+      const stages = state.players
+        .map((fieldPlayer) => fieldPlayer.stage)
+        .filter((stage): stage is CardInstance => !!stage && selectedSet.has(stage.instanceId));
+      const moved = transitionCards(state, stages.map((stage) => stage.instanceId), "DECK", { position: "BOTTOM" });
+      const events: PendingEvent[] = moved.transitions.map((transition) => ({
+        type: "CARD_RETURNED_TO_DECK",
+        playerIndex: transition.fact.owner,
+        payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId, cardId: transition.fact.cardId, position: "BOTTOM", sourceZone: transition.fact.source, sourceController: transition.fact.controller, causingController: controller, movementCause: "COST" },
+      }));
+      return { state: moved.state, events };
+    }
+
     case "PLACE_FROM_TRASH_TO_DECK": {
       // selectedIds arrive in final order (arranged top→bottom of the placed
       // group when the arrange step ran; selection order otherwise).

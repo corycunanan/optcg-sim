@@ -128,7 +128,8 @@ export const OP05_003_INAZUMA: EffectSchema = {
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
-        filter: { card_type: "CHARACTER", power_min: 7000, exclude_self: true },
+        filter: { card_type: "CHARACTER", power_min: 7000 },
+        exclude_self: true,
       },
       modifiers: [
         {

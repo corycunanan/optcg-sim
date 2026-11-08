@@ -203,6 +203,7 @@ type CostType =
   | "PLACE_OWN_CHARACTER_TO_DECK"   // Place character at bottom of the owner's deck
                                     // (controller: "EITHER" = either player's Character)
   | "PLACE_STAGE_TO_DECK"     // Place your Stage at bottom of deck
+                                    // (controller: "EITHER" = either player's Stage, a selection)
   | "ADD_OWN_CHARACTER_TO_LIFE"     // Place a Character in Life (position, face)
                                     // (controller: "OPPONENT" = 1 of the opponent's Characters
                                     //  to the opponent's Life; TOP_OR_BOTTOM = payer chooses)

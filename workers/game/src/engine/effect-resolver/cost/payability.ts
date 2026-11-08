@@ -4,7 +4,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, costSelectionCount, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -14,6 +14,10 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE":
       return cost.position === "TOP_OR_BOTTOM";
+    // OPT-866: the own-Stage form is fixed; the EITHER form ("the owner's
+    // deck", OP06-102/111/114) lets the paying player choose a Stage.
+    case "PLACE_STAGE_TO_DECK":
+      return isEitherPlayerStagePlacement(cost);
     case "PLAY_NAMED_CARD_FROM_HAND":
     case "TRASH_FROM_HAND":
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
@@ -44,7 +48,6 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "REST_SELF":
     case "TRASH_SELF":
     case "PLACE_SELF_TO_DECK":
-    case "PLACE_STAGE_TO_DECK":
     case "TRASH_OWN_STAGE":
     case "LEADER_POWER_REDUCTION":
     case "GIVE_OPPONENT_DON":

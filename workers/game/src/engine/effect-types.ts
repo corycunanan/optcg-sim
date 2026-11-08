@@ -1417,11 +1417,13 @@ export type SimpleCost = {
   [Type in SimpleCostType]: SimpleCostFields & { type: Type } & (
     Type extends "PLACE_OWN_CHARACTER_TO_DECK"
       ? PlaceCharacterToDeckCostFields
-      : Type extends "GIVE_DON" | "GIVE_OPPONENT_DON_TO_OPPONENT"
-        ? GiveDonCostFields
-        : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
-          ? AddCharacterToLifeCostFields
-          : unknown
+      : Type extends "PLACE_STAGE_TO_DECK"
+        ? PlaceStageToDeckCostFields
+        : Type extends "GIVE_DON" | "GIVE_OPPONENT_DON_TO_OPPONENT"
+          ? GiveDonCostFields
+          : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
+            ? AddCharacterToLifeCostFields
+            : unknown
   );
 }[SimpleCostType];
 
@@ -1433,6 +1435,18 @@ export type SimpleCost = {
  * Only this cost type accepts the field.
  */
 interface PlaceCharacterToDeckCostFields {
+  controller?: "SELF" | "EITHER";
+}
+
+/**
+ * OPT-866: "place 1 Stage with a cost of 1 at the bottom of the owner's deck"
+ * (OP06-102, OP06-111, OP06-114; no "your") selects either player's Stage
+ * (qa_op06.md). Omitted or "SELF" keeps the fixed own-Stage payment. EITHER
+ * makes the cost a selection: the paying player chooses, the Stage moves to
+ * its OWNER's deck (rule 4-2-1-1), and the opponent's Stage honors removal
+ * protections against effects.
+ */
+interface PlaceStageToDeckCostFields {
   controller?: "SELF" | "EITHER";
 }
 
