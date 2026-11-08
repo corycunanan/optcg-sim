@@ -110,7 +110,8 @@ describe("OPT-888 version 1 contexts keep the legacy generator", () => {
     // A game saved before the execution context existed is hydrated on the
     // generator it was always replayed with.
     const { state } = buildInitialState(createTestPayload());
-    const { executionContext: _dropped, ...withoutContext } = state;
+    const withoutContext = { ...state } as Partial<GameState>;
+    delete withoutContext.executionContext;
     expect(ensureExecutionContext(withoutContext as GameState).executionContext.version).toBe(1);
   });
 
