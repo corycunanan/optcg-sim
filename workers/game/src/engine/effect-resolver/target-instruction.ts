@@ -336,7 +336,7 @@ function targetNoun(target: Target): TargetNoun | undefined {
         ? { text: "yourself", plural: false }
         : { text: "your opponent", plural: false };
     case "OPPONENT_LIFE":
-      return { text: "cards in your opponent's Life", plural: true };
+      return { text: "your opponent's Life cards", plural: true };
     case "TRIGGERING_CARD":
     case "TRIGGERING_CARD_IN_TRASH":
       return { text: "the triggering card", plural: false };

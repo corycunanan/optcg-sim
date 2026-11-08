@@ -300,7 +300,7 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
   });
 
   describe.each([0, 1] as const)("ST04-001 (Leader, DON!! -7), choose %i", (choose) => {
-    it("pays DON!! -7, then trashes 0 or 1", () => {
+    it("pays DON!! -7, then trashes 0 or 1 chosen from the opponent's Life (OPT-917)", () => {
       const f = fixture({ donCount: 8 });
       f.register("ST04-001", { type: "Leader", cost: null });
       f.state.players[0].leader = inst("ldr", "ST04-001", 0, "LEADER");
@@ -309,7 +309,13 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
       if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") {
         f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
       }
-      answerUpTo(f, choose, 1);
+      const prompt = f.state.pendingPrompt;
+      expect(prompt?.respondingPlayer).toBe(0);
+      if (prompt?.options.promptType !== "SELECT_TARGET") throw new Error("no Life target prompt");
+      expect(prompt.options.countMin).toBe(0);
+      expect(prompt.options.countMax).toBe(1);
+      expect(prompt.options.validTargets).toEqual(before.map((c) => c.instanceId));
+      f.act({ type: "SELECT_TARGET", selectedInstanceIds: before.slice(0, choose).map((c) => c.instanceId) });
       expectOppLife(f, before, choose);
     });
   });
@@ -406,9 +412,10 @@ describe("OPT-889 ST09-010 trashes the top or bottom of its own Life", () => {
 });
 
 describe("OPT-889 authored shape", () => {
+  // ST04-001 is "up to 1" through its target count (OPT-917), below.
   const UP_TO = [
     "EB03-057", "OP03-114", "OP03-120", "OP08-119",
-    "OP09-107", "OP10-109", "OP10-112", "ST04-001",
+    "OP09-107", "OP10-109", "OP10-112",
   ];
   function lifeTrashes(cardId: string): Action[] {
     const out: Action[] = [];
@@ -432,11 +439,16 @@ describe("OPT-889 authored shape", () => {
     expect((actions[0] as { params: { up_to?: boolean } }).params.up_to).toBe(true);
   });
 
+  it("ST04-001 trashes up to 1 opponent Life card from any position", () => {
+    const [action, ...rest] = lifeTrashes("ST04-001");
+    expect(rest).toHaveLength(0);
+    expect(action.target).toMatchObject({ type: "OPPONENT_LIFE", count: { up_to: 1 } });
+    expect((action as { params?: { position?: string } }).params?.position).toBe("ANY");
+  });
+
   // ST04-001 prints "Trash up to 1 of your opponent's Life cards" (any
-  // position). Choosing among Life cards needs a target prompt over Life that
-  // does not exist yet; the leader is authored top-only. Tracked by OPT-917.
-  // This pins the intended end state and must pass once OPT-917 lands.
-  it.fails("ST04-001 lets the activating player trash a non-top Life card (OPT-917)", () => {
+  // position). OPT-917 offers a SELECT_TARGET over the opponent's Life.
+  it("ST04-001 lets the activating player trash a non-top Life card (OPT-917)", () => {
     const f = fixture({ donCount: 8 });
     f.register("ST04-001", { type: "Leader", cost: null });
     f.state.players[0].leader = inst("ldr", "ST04-001", 0, "LEADER");
