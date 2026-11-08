@@ -517,6 +517,7 @@ export function mergePlayerViewsForSpectator(
     winner: stripped.winner,
     winReason: stripped.winReason,
     engineOutcome: stripped.engineOutcome,
+    endReasonCode: stripped.endReasonCode,
     engineActionCount: stripped.engineActionCount,
   } satisfies GameState & Record<
     keyof Omit<GameState, "effectAvailability" | "pendingEventActivationEvents" | "schemaVersion" | "costSemanticsVersion" | "fieldTrashSemanticsVersion">,

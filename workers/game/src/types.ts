@@ -8,7 +8,7 @@ export type {
   Phase, PerformedAction, TurnState,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
-  EngineLimitDiagnostic, EngineTerminalOutcome,
+  EngineLimitDiagnostic, EngineTerminalOutcome, GameEndReasonCode,
   EngineExecutionContext,
   EngineExecutionContextV1,
   EngineExecutionContextV2,

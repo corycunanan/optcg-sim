@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { SessionRepository } from "../session/persistence.js";
 import { command } from "./fixtures/opt-981-writer.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const bytes = readFileSync(new URL("./fixtures/opt-981-writer-produced.json.gz", import.meta.url));
 const corpus = JSON.parse(gunzipSync(bytes).toString());
 
@@ -65,7 +66,7 @@ describe("OPT-981 immutable actual writer corpus", () => {
       if (record.replay) {
         const result = command(before.state, before.cardDb, before.undoHistory, record.owner, record.action);
         await repository.save({ ...before, state: result.state, undoHistory: result.history });
-        const replayed = JSON.parse(JSON.stringify(Object.fromEntries(storage.data)));
+        const replayed = withoutAssertedEndReasonCode(JSON.parse(JSON.stringify(Object.fromEntries(storage.data))));
         const next = corpus.records[index + 1];
         if (next && isLoneZeroValuePrompt(record.after, next)) {
           // OPT-918: the archived Rayleigh "add up to N DON!!" with an empty

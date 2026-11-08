@@ -1,14 +1,8 @@
 import { z } from "zod";
+import { GAME_END_REASON_CODES } from "@shared/game-types";
 
-export const GameEndReasonCodeSchema = z.enum([
-  "LEADER_KO",
-  "DECK_OUT",
-  "LIFE_LOSS",
-  "CONCEDE",
-  "DISCONNECT_TIMEOUT",
-  "FALLBACK_CONCEDE",
-  "UNKNOWN",
-]);
+/** Mirrors `GameEndReasonCode` in Prisma; the worker writes it from the terminal outcome (OPT-978). */
+export const GameEndReasonCodeSchema = z.enum(GAME_END_REASON_CODES);
 
 export type GameEndReasonCode = z.infer<typeof GameEndReasonCodeSchema>;
 

@@ -1,3 +1,4 @@
+import { inferLegacyGameEndReasonCode } from "@shared/game-end-reason";
 import { prisma } from "@/lib/db";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
@@ -19,17 +20,12 @@ export type FinalizeGameResultResult = {
   restoredLobbyId: string | null;
 };
 
+/** Legacy text inference, used only when a caller sends no structured code (OPT-978). */
 export function inferGameEndReasonCode(
   winReason: string | null | undefined,
   status: "FINISHED" | "ABANDONED"
 ): GameEndReasonCode {
-  if (status === "ABANDONED") return "DISCONNECT_TIMEOUT";
-
-  const reason = (winReason ?? "").toLowerCase();
-  if (reason.includes("conceded")) return "CONCEDE";
-  if (reason.includes("deck")) return "DECK_OUT";
-  if (reason.includes("life") || reason.includes("ko")) return "LIFE_LOSS";
-  return "UNKNOWN";
+  return inferLegacyGameEndReasonCode(winReason, status);
 }
 
 export async function finalizeGameResult(

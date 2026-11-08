@@ -20,6 +20,7 @@ import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
 import { activationProhibitionVeto } from "./prohibitions.js";
 import { isOncePerTurnBlock, type Cost } from "./effect-types.js";
 import { evaluateCondition } from "./conditions.js";
+import { isGameTerminated } from "./terminal.js";
 
 export function validate(
   state: GameState,
@@ -27,13 +28,13 @@ export function validate(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
 ): string | null {
-  if (state.status === "FINISHED") return "Game is already over";
-  if (
-    state.pendingPrompt &&
-    ["DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT", "PASS"].includes(
-      action.type
-    )
-  )
+  // OPT-979: every terminal status (FINISHED or ABANDONED) stops the engine.
+  if (isGameTerminated(state)) return "Game is already over";
+  // OPT-1011: the direct-pipeline admission contract while a decision waits.
+  // Only CONCEDE is admitted. Prompt replies belong to the session prompt
+  // lifecycle (SessionCoordinator, sandbox), and every other command (battle
+  // or Main-phase) must wait until the decision is answered.
+  if (state.pendingPrompt && action.type !== "CONCEDE")
     return "A player decision must finish before another game action";
 
   switch (action.type) {

@@ -3,6 +3,7 @@ import type { Card } from "@prisma/client";
 import { buildGameInitPayload } from "@/lib/game/init-payload";
 import { buildNotifyEndPayload } from "@/lib/game/notify-end";
 import { GameResultSchema } from "@/lib/validators/game";
+import { GAME_END_REASON_CODES } from "@shared/game-types";
 import { mintGameToken } from "@/lib/game/token";
 import { validateGameInitPayload, validateNotifyEndPayload } from "@engine/util/validate.js";
 import { verifyGameToken } from "@engine/util/auth.js";
@@ -224,6 +225,22 @@ describe("app ↔ worker contracts", () => {
       winReason: "Player 2 won",
       reasonCode: "UNKNOWN",
     });
+  });
+
+  it("accepts every structured worker end reason code (OPT-978)", () => {
+    const { state } = setupGame();
+    for (const endReasonCode of GAME_END_REASON_CODES) {
+      const finished: GameState = {
+        ...state,
+        status: "FINISHED",
+        winner: 0,
+        winReason: "Player 1 won",
+        endReasonCode,
+      };
+      expect(GameResultSchema.parse(buildGameResultCallbackPayload(finished)).reasonCode).toBe(
+        endReasonCode
+      );
+    }
   });
 
   it("builds app notify-end fallback payloads accepted by the worker parser", () => {

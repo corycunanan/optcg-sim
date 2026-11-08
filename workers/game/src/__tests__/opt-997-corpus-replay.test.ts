@@ -9,6 +9,7 @@ import { command, memoryRepository, type CostCorpus } from "./opt-997-corpus-sup
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import type { GameState } from "../types.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const dir = fileURLToPath(new URL("./fixtures/opt-997-v7-corrected/", import.meta.url));
 const historical = JSON.parse(readFileSync(new URL("./fixtures/opt-969/action-identity.json", import.meta.url), "utf8")).initial;
 for (const file of readdirSync(dir).filter(f => f.endsWith(".json") && f !== "manifest.json")) {
@@ -38,7 +39,7 @@ for (const file of readdirSync(dir).filter(f => f.endsWith(".json") && f !== "ma
         const saved = await repo.save({ ...loaded, state, undoHistory: [] });
         await repo.save({ ...saved, undoHistory: [saved.state] });
         state = toPersistedGameState(saved.state);
-        expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(step.expected));
+        expect(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(state))).toEqual(writerEnvelope(step.expected));
         const reloaded = (await repo.load())!;
         expect(reloaded.state).toEqual(state); expect(reloaded.undoHistory).toEqual([state]);
         expect(state.schemaVersion).toBe(8);
@@ -117,7 +118,7 @@ for (const file of readdirSync(originalDir).filter(f => f.endsWith(".json") && f
       state = command(state, old.steps[step].action, loaded.cardDb);
       const saved = await repo.save({ ...loaded, state, undoHistory: [] });
       state = toPersistedGameState(saved.state);
-      expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(corrected.steps[step].expected));
+      expect(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(state))).toEqual(writerEnvelope(corrected.steps[step].expected));
     }
     if (!old.knownDebt) expect(state.effectStack).toHaveLength(0);
     else expect(state.effectStack.some(f => f.kind === "COST" && !f.costReplacementResolution)).toBe(true);
