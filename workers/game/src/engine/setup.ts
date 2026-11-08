@@ -29,6 +29,7 @@ import {
   allocateContextId,
   createDeterministicExecutionContext,
   ensureExecutionContext,
+  deckRandomStream,
   shuffleWithContext,
 } from "./execution-context.js";
 import { assertValidTestOrder } from "../util/test-order.js";
@@ -92,9 +93,9 @@ export function prepareDecksAndLeaders(
   const leader0Data = cardDb.get(payload.player1.leader.cardId);
   const leader1Data = cardDb.get(payload.player2.leader.cardId);
 
-  const arranged0 = arrangeDeck(p0Built.deck, payload.player1.testOrder, executionContext);
+  const arranged0 = arrangeDeck(p0Built.deck, payload.player1.testOrder, executionContext, 0);
   executionContext = arranged0.executionContext;
-  const arranged1 = arrangeDeck(p1Built.deck, payload.player2.testOrder, executionContext);
+  const arranged1 = arrangeDeck(p1Built.deck, payload.player2.testOrder, executionContext, 1);
   executionContext = arranged1.executionContext;
 
   const don0 = buildDonDeck(executionContext, resolveDonDeckSize(leader0Data));
@@ -255,7 +256,7 @@ export function applyMulligan(
     };
   });
   const combined = [...returned, ...player.deck];
-  const shuffled = shuffleWithContext(executionContext, combined);
+  const shuffled = shuffleWithContext(executionContext, combined, deckRandomStream(playerIndex));
   executionContext = shuffled.context;
 
   // Draw 5 new cards
@@ -361,11 +362,13 @@ function buildDonDeck(
  */
 function arrangeDeck(
   expandedDeck: CardInstance[],
-  testOrder?: { life: string[]; hand: string[] } | null,
-  initialExecutionContext: EngineExecutionContext = createDeterministicExecutionContext("setup"),
+  testOrder: { life: string[]; hand: string[] } | null | undefined,
+  initialExecutionContext: EngineExecutionContext,
+  owner: 0 | 1,
 ): { deck: CardInstance[]; executionContext: EngineExecutionContext } {
+  const stream = deckRandomStream(owner);
   if (!testOrder) {
-    const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
+    const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck, stream);
     return { deck: shuffled.values, executionContext: shuffled.context };
   }
 
@@ -406,7 +409,7 @@ function arrangeDeck(
 
   const rest: CardInstance[] = [];
   for (const arr of pool.values()) rest.push(...arr);
-  const shuffled = shuffleWithContext(initialExecutionContext, rest);
+  const shuffled = shuffleWithContext(initialExecutionContext, rest, stream);
   return {
     deck: [...handInstances, ...lifeInstances, ...shuffled.values],
     executionContext: shuffled.context,

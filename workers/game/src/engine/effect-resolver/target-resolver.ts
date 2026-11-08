@@ -42,6 +42,12 @@ export interface LifeCardTargetContext {
 export interface TargetValidationContext {
   controller: 0 | 1;
   sourceCardInstanceId: string;
+  /**
+   * The candidates the prompt being answered offers (OPT-920/OPT-880). When
+   * present, an `exact` count and each dual_targets slot pool are limited to
+   * these ids, so a requirement never exceeds what the player was offered.
+   */
+  offeredIds?: readonly string[];
 }
 
 /**
@@ -230,15 +236,25 @@ export function validateTargetConstraints(
   if (target.dual_targets?.some((slot) => slot.controller !== undefined) && !context) return false;
 
   const count = target.count;
-  if (count && "exact" in count && selectedIds.length !== count.exact) return false;
+  // OPT-880: an exact count asks for as many as the offer allows; a stale
+  // re-prompt may offer fewer candidates than the count.
+  const offered = context?.offeredIds ? new Set(context.offeredIds).size : Infinity;
+  const exactCount = (c: CountMode | undefined) =>
+    c && "exact" in c ? Math.min(c.exact, offered) : undefined;
+  const exact = exactCount(count);
+  if (exact !== undefined && selectedIds.length !== exact) return false;
   if (count && "up_to" in count && selectedIds.length > count.up_to) return false;
   // OPT-792: one shared maximum across every mixed-pool type.
-  if (violatesCount(selectedIds.length, target.mixed_pool?.total_count)) return false;
+  const totalExact = exactCount(target.mixed_pool?.total_count);
+  if (totalExact !== undefined
+    ? selectedIds.length !== totalExact
+    : violatesCount(selectedIds.length, target.mixed_pool?.total_count)) return false;
 
   if (selectedIds.length === 0) {
-    // Empty selection is invalid if dual_targets has exact-count slots
+    // OPT-920: an empty dual_targets selection is valid only when no slot
+    // minimum can be met from the slots' current candidates.
     if (target.dual_targets && target.dual_targets.length > 0) {
-      return target.dual_targets.every(dt => !("exact" in dt.count));
+      return validateDualTargetConstraints(selectedIds, target, state, cardDb, resultRefs, context);
     }
     return true;
   }
@@ -406,8 +422,9 @@ function validateDualTargetConstraints(
   context?: TargetValidationContext,
 ): boolean {
   // Pre-compute which slots each selected ID can go into
+  const offered = context?.offeredIds ? new Set(context.offeredIds) : undefined;
   const perSlotValidSets: Set<string>[] = target.dual_targets!.map((slot) =>
-    new Set(resolveDualTargetSlot(
+    new Set((resolveDualTargetSlot(
       state,
       target,
       slot,
@@ -415,16 +432,27 @@ function validateDualTargetConstraints(
       resultRefs,
       context,
       selectedIds,
-    ) ?? []),
+    ) ?? []).filter((id) => !offered || offered.has(id))),
   );
 
   const slotMaxes = target.dual_targets!.map((dt, i) => resolveCountMax(dt.count, perSlotValidSets[i].size));
   const slotMins = target.dual_targets!.map((dt) => resolveCountMin(dt.count));
+  // OPT-920: with a context the slot sets are each slot's full candidate pool
+  // in the current state, so the selection must meet as many slot minimums as
+  // those candidates can (an effect does as much as it can; an `exact: 1` slot
+  // with no candidate selects 0). Without one the sets hold only the selected
+  // ids, so every slot minimum stays required.
+  const required = context
+    ? maxFillableSlotMinimums(perSlotValidSets, slotMins)
+    : slotMins.reduce((sum, min) => sum + min, 0);
   const assignments: string[][] = target.dual_targets!.map(() => []);
 
   function backtrack(idx: number): boolean {
     if (idx === selectedIds.length) {
-      return assignments.every((a, i) => a.length >= slotMins[i]);
+      return assignments.reduce(
+        (sum, a, i) => sum + Math.min(a.length, slotMins[i]),
+        0,
+      ) >= required;
     }
     const id = selectedIds[idx];
     for (let s = 0; s < target.dual_targets!.length; s++) {
@@ -438,6 +466,45 @@ function validateDualTargetConstraints(
   }
 
   return backtrack(0);
+}
+
+/**
+ * OPT-920: the most slot-minimum seats the candidates can fill at once — a
+ * maximum bipartite matching of candidate ids onto `slotMins[i]` seats per
+ * slot, where an id may sit only in a slot whose pool holds it. For disjoint
+ * pools this is the sum of `min(slotMin, pool size)`; overlapping pools can
+ * fill fewer because one card fills one seat.
+ */
+export function maxFillableSlotMinimums(
+  slotPools: ReadonlyArray<ReadonlySet<string>>,
+  slotMins: readonly number[],
+): number {
+  const seats: number[] = [];
+  slotMins.forEach((min, slot) => {
+    for (let i = 0; i < Math.min(min, slotPools[slot].size); i++) seats.push(slot);
+  });
+  const seatHolder: (string | undefined)[] = seats.map(() => undefined);
+  const candidates = [...new Set(slotPools.flatMap((pool) => [...pool]))];
+
+  function place(id: string, visited: Set<number>): boolean {
+    for (let seat = 0; seat < seats.length; seat++) {
+      if (visited.has(seat) || !slotPools[seats[seat]].has(id)) continue;
+      visited.add(seat);
+      const holder = seatHolder[seat];
+      if (holder === undefined || place(holder, visited)) {
+        seatHolder[seat] = id;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  let filled = 0;
+  for (const id of candidates) {
+    if (filled === seats.length) break;
+    if (place(id, new Set())) filled++;
+  }
+  return filled;
 }
 
 // ─── Candidate pool bounds ───────────────────────────────────────────────────
@@ -852,10 +919,11 @@ export function buildSelectTargetPrompt(
             resultRefs,
             { controller, sourceCardInstanceId },
           ) ?? []).filter((id) => authoritativeValidIds.has(id));
+          // OPT-920: a slot cannot ask for more cards than it has candidates.
           return {
             validIds: slotValidIds,
-            countMin: resolveCountMin(dt.count),
-            countMax: resolveCountMax(dt.count, slotValidIds.length),
+            countMin: Math.min(resolveCountMin(dt.count), slotValidIds.length),
+            countMax: Math.min(resolveCountMax(dt.count, slotValidIds.length), slotValidIds.length),
           };
         }),
       }
@@ -865,13 +933,21 @@ export function buildSelectTargetPrompt(
   let countMin: number;
   let countMax: number;
   if (dualTargetsMetadata) {
-    countMin = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMin, 0);
+    // OPT-920: the overall minimum is what the slots can fill together, which
+    // overlapping slot pools can make smaller than the per-slot sum.
+    countMin = maxFillableSlotMinimums(
+      dualTargetsMetadata.slots.map((s) => new Set(s.validIds)),
+      dualTargetsMetadata.slots.map((s) => s.countMin),
+    );
     countMax = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMax, 0);
   } else {
     const count = effectiveTargetCount(target);
-    countMin = targetPromptCountMin(target);
+    // OPT-880: an exact count never asks for more cards than are offered (a
+    // stale re-prompt can offer fewer candidates than the count).
+    const offered = new Set(allValidIds).size;
+    countMin = Math.min(targetPromptCountMin(target), offered);
     countMax = !count ? 1
-      : "exact" in count ? count.exact
+      : "exact" in count ? Math.min(count.exact, offered)
       : "up_to" in count ? count.up_to
       : allValidIds.length;
   }

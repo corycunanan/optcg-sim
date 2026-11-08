@@ -28,6 +28,7 @@ import {
   createBattleReadyState,
   createTestCardDb,
   padChars,
+  v1RngState,
 } from "./helpers.js";
 
 class ActivationMemory implements SessionStorage {
@@ -243,7 +244,7 @@ function searchFixture(id: string, matches = true) {
           : CARDS.VANILLA.id,
   }));
   const before = f.state.players[owner].deck.map((c) => c.instanceId);
-  const beforeRng = f.state.executionContext.rngState;
+  const beforeRng = v1RngState(f.state.executionContext);
   let host: CardInstance;
   if (owner === 1) {
     host = f.put(id, 1);
@@ -293,7 +294,7 @@ describe("OPT805 registered authored searches", () => {
       const f = searchFixture(id, false);
       expect(f.state.pendingPrompt).toBeNull();
       if (id !== "OP01-116")
-        expect(f.state.executionContext.rngState).not.toBe(f.beforeRng);
+        expect(v1RngState(f.state.executionContext)).not.toBe(f.beforeRng);
       expect(f.state.players[f.owner].deck).toHaveLength(8);
       expect(
         f.state.players[f.owner].characters.some(
@@ -327,7 +328,7 @@ describe("OPT805 registered authored searches", () => {
           )
         ).toHaveLength(count);
         if (id !== "OP01-116")
-          expect(f.state.executionContext.rngState).not.toBe(f.beforeRng);
+          expect(v1RngState(f.state.executionContext)).not.toBe(f.beforeRng);
         expect(f.state.players[f.owner].deck).toHaveLength(8 - count);
         expect(
           f.state.players[f.owner].deck.map((c) => c.instanceId).sort()
