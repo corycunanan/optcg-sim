@@ -3560,7 +3560,7 @@ export const OP06_096_NOTHING_AT_ALL: EffectSchema = {
       actions: [
         {
           type: "REUSE_EFFECT",
-          params: { target_effect: "COUNTER" },
+          params: { target_effect: "COUNTER_EVENT" },
         },
       ],
     },

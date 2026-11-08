@@ -28,6 +28,7 @@ import type { EffectResolverServices } from "../services.js";
 import { evaluateCondition } from "../../conditions.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
 import { isActionBranchFeasible } from "../feasibility.js";
+import { findReuseTargetBlocks } from "../../trigger-keywords.js";
 
 export function executePlayerChoice(
   state: GameState,
@@ -282,13 +283,11 @@ export function executeReuseEffect(
   const schema = data.effectSchema;
   if (!schema) return { state, events, succeeded: false };
 
-  const targetBlock = schema.effects.find((b) => {
-    if (!b.trigger) return false;
-    if ("keyword" in b.trigger) return b.trigger.keyword === targetEffect;
-    return false;
-  });
-
-  if (!targetBlock) return { state, events, succeeded: false };
+  // OPT-913: block id or trigger keyword (any_of included), exactly one match.
+  // Schema validation rejects any other shape, so a miss here is a bad schema.
+  const matches = findReuseTargetBlocks(schema.effects, targetEffect);
+  if (matches.length !== 1) return { state, events, succeeded: false };
+  const targetBlock = matches[0];
 
   // OP16-103 Van Augur FAQ: the reused block's turn_restriction still applies —
   // reusing an OPPONENT_TURN-only [On K.O.] during your own turn does nothing.

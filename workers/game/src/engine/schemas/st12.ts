@@ -397,7 +397,7 @@ export const ST12_016_LION_STRIKE: EffectSchema = {
   effects: [
     {
       id: "main_counter_rest",
-      category: "activate",
+      category: "auto",
       trigger: {
         any_of: [
           { keyword: "MAIN_EVENT" },
