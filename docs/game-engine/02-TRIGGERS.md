@@ -811,7 +811,7 @@ Fires when an attack by this card's controller deals damage to the opponent's Li
 
 The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.
 
-Effect damage (OPT-892, decided 2026-11-08): `DEAL_DAMAGE` and `SELF_TAKE_DAMAGE` emit one `DAMAGE_DEALT` per point with `damageSource: "EFFECT"`. Rule 4-6-2 makes effect damage damage processing, and qa_op03.md OP03-043 only excludes Life moved to hand or trashed by an effect that deals no damage. So OP03-043 Gaimon (no `filter.attacker`) fires once per damage instruction that its controller deals to the opponent, after the instruction's [Trigger] window (rule 8-6-2). Attack-bound watchers (`filter.attacker: "SELF"`) never match effect damage.
+Effect damage (OPT-892, decided 2026-11-08): `DEAL_DAMAGE` and `SELF_TAKE_DAMAGE` emit one `DAMAGE_DEALT` per point with `damageSource: "EFFECT"`; a point dealt at 0 Life is logged with `lethal: true`, as battle damage is. Rule 4-6-2 makes effect damage damage processing, and qa_op03.md OP03-043 only excludes Life moved to hand or trashed by an effect that deals no damage. So OP03-043 Gaimon (no `filter.attacker`) fires once per damage instruction that its controller deals to the opponent, after the instruction's [Trigger] window (rule 8-6-2). Attack-bound watchers (`filter.attacker: "SELF"`) never match effect damage.
 
 Sessions saved before OPT-796 still carry `LEADER_ATTACK_DEALS_DAMAGE` in their stored card schemas and trigger registry. `session/legacy-trigger-migration.ts` rewrites them at load to this encoding.
 

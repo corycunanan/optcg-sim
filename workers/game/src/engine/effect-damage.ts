@@ -208,6 +208,21 @@ export function continueEffectDamageSequence(
   for (let i = 0; i < remainingDamages; i++) {
     const popResult = popLifeForDamage(nextState, damagedPlayerIndex);
     if (popResult.lethal) {
+      // Damage dealt at 0 Life is still dealt (battle.ts logs it the same
+      // way): record it with `lethal: true` so the game-ending effect is in
+      // the event log. Lethal events never satisfy ATTACK_DEALS_DAMAGE.
+      events.push({
+        type: "DAMAGE_DEALT",
+        playerIndex: controllerIndex,
+        payload: {
+          amount: 1,
+          lethal: true,
+          damageSource: "EFFECT",
+          damagedPlayerIndex,
+          sourceCardInstanceId,
+          firstDamageOfEffect: dealt === 0,
+        },
+      });
       if (damageTaken && i === 0) {
         return { state: nextState, events, lethalDamagePlayerIndex: damagedPlayerIndex, dealt };
       }

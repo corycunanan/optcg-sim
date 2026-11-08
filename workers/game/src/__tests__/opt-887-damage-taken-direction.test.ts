@@ -275,6 +275,35 @@ describe("OPT-887 OP13-002 Ace: when you take damage (effect)", () => {
   });
 });
 
+describe("OPT-887 lethal effect damage is logged", () => {
+  it("DEAL_DAMAGE at 0 Life records a lethal DAMAGE_DEALT and ends the game", () => {
+    const f = fixture({ aceDon: 0, aceLife: [] });
+    const source = f.putHand(DEAL_1.id, 0);
+    const start = f.state.eventLog.length;
+    const result = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: source.instanceId }, f.cardDb, 0);
+    expect(result.valid).toBe(true);
+    const damage = result.state.eventLog.slice(start).filter((e) => e.type === "DAMAGE_DEALT");
+    expect(damage).toHaveLength(1);
+    expect(damage[0]).toMatchObject({
+      playerIndex: 0,
+      payload: { amount: 1, lethal: true, damageSource: "EFFECT", damagedPlayerIndex: 1, firstDamageOfEffect: true },
+    });
+    expect(result.state.status).toBe("FINISHED");
+    expect(result.state.winner).toBe(0);
+  });
+
+  it("a later point of a 2-damage instruction at 0 Life is logged but does not defeat", () => {
+    const f = fixture({ aceDon: 0, aceLife: [CARDS.VANILLA.id] });
+    const source = f.putHand(DEAL_2.id, 0);
+    const start = f.state.eventLog.length;
+    const result = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: source.instanceId }, f.cardDb, 0);
+    expect(result.valid).toBe(true);
+    const damage = result.state.eventLog.slice(start).filter((e) => e.type === "DAMAGE_DEALT");
+    expect(damage.map((e) => (e.payload as { lethal?: boolean }).lethal === true)).toEqual([false, true]);
+    expect(result.state.status).toBe("IN_PROGRESS");
+  });
+});
+
 describe("OPT-892 OP03-043 Gaimon on effect damage", () => {
   it("fires once after a 2-damage instruction, after its [Trigger] window (rule 8-6-2)", () => {
     const f = fixture({ aceDon: 0, aceLife: [TRIGGER_LIFE.id, CARDS.VANILLA.id, CARDS.VANILLA.id] });
