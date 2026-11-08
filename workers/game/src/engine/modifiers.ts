@@ -1026,6 +1026,29 @@ export function getBattleDefenderPower(
   );
 }
 
+/**
+ * Power of a card as the current battle sees it (OPT-909). Rules §7-1-3-2-1:
+ * a [Symbol Counter] raises the attacked card's power "during that battle", so
+ * the battle target reads its effective power plus
+ * `BattleContext.counterPowerAdded`. Every other card, and every card outside
+ * a battle, reads plain effective power.
+ *
+ * Use this for checks that run inside a battle against the card being
+ * attacked, such as replacement target filters at the battle K.O.
+ */
+export function getBattlePower(
+  card: CardInstance,
+  cardData: CardData,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>
+): number {
+  const battle = state.turn.battle;
+  const power = getEffectivePower(card, cardData, state, cardDb);
+  if (!battle || battle.targetInstanceId !== card.instanceId) return power;
+  if (card.zone !== "CHARACTER" && card.zone !== "LEADER") return power;
+  return power + battle.counterPowerAdded;
+}
+
 // ─── One-Time Modifiers ──────────────────────────────────────────────────────
 
 /**

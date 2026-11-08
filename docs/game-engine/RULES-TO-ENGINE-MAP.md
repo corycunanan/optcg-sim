@@ -355,7 +355,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **7-1-3-1.** "When attacked" effects activate during Counter Step | **IMPL** | `triggers.ts` | WHEN_ATTACKED trigger fires during counter step |
 | **7-1-3-2.** Defender can use Symbol Counters and Counter Events | **IMPL** | `executeUseCounter()`, `executeUseCounterEvent()` in `battle.ts` | |
-| **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts:140–182` | Trashes card, adds `counterValue` to `counterPowerAdded` |
+| **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts:140–182`, `getBattlePower()` in `modifiers.ts` | Trashes card, adds `counterValue` to `counterPowerAdded`. Replacement `target_filter` power checks read the battle target's power with it (OPT-909, [opt-903-sabo-replaced-card-power.test.ts](../../workers/game/src/__tests__/opt-903-sabo-replaced-card-power.test.ts)); other battle-time power reads are inventoried in [evidence/opt-909](./evidence/opt-909/battle-power-reads.md) |
 | **7-1-3-2-2.** Counter Event: pay cost, trash, activate [Counter] | **IMPL** | `battle.ts:186–211` + `effect-resolver/` | Cost paid, card trashed, effect resolved via schema |
 | **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **IMPL** | `pending-work-drain.ts`, `battle.ts → checkpointBattleStepEnd()` | OPT-967: Counter children complete before Damage entry; removal emits one aborted End of Battle with no damage/result events; `opt-967-step-end.test.ts` |
 
