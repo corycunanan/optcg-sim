@@ -541,7 +541,7 @@ Merged means a commit with that ID is on `main`; anything without one is
 Known residuals and follow-ups for the merged rows (commit messages and
 `docs/project/handoffs/` on `main`):
 
-- OPT-892 (open, no merged commit): `DEAL_DAMAGE` effects emit no `DAMAGE_DEALT`, so OP03-043 Gaimon never sees them; whether it should is an open rules question (`docs/game-engine/02-TRIGGERS.md`, OPT-796 commit a6c97437).
+- OPT-892 (resolved by OPT-1016, #808): effect damage emits `DAMAGE_DEALT` with `damageSource: "EFFECT"`, and OP03-043 Gaimon fires once per `DEAL_DAMAGE` instruction (`docs/game-engine/02-TRIGGERS.md`).
 - OPT-796: its Double Attack lethal case is fixed by OPT-886 (#721, bfb9d8d7), which flipped the OPT-796 `it.fails` ratchet.
 - OPT-792: OP15-035 was left unchanged (it rests your own cards as a replacement; "see PR follow-ups" in commit 7e925017).
 - OPT-788: follow-ups OPT-834 (merged, #705) and OPT-852 (merged, #677), per `opt-788-name-aliases.md`.

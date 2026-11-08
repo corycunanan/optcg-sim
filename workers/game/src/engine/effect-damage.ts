@@ -208,6 +208,21 @@ export function continueEffectDamageSequence(
   for (let i = 0; i < remainingDamages; i++) {
     const popResult = popLifeForDamage(nextState, damagedPlayerIndex);
     if (popResult.lethal) {
+      // Damage dealt at 0 Life is still dealt (battle.ts logs it the same
+      // way): record it with `lethal: true` so the game-ending effect is in
+      // the event log. Lethal events never satisfy ATTACK_DEALS_DAMAGE.
+      events.push({
+        type: "DAMAGE_DEALT",
+        playerIndex: controllerIndex,
+        payload: {
+          amount: 1,
+          lethal: true,
+          damageSource: "EFFECT",
+          damagedPlayerIndex,
+          sourceCardInstanceId,
+          firstDamageOfEffect: dealt === 0,
+        },
+      });
       if (damageTaken && i === 0) {
         return { state: nextState, events, lethalDamagePlayerIndex: damagedPlayerIndex, dealt };
       }
@@ -215,6 +230,23 @@ export function continueEffectDamageSequence(
     }
     if (!popResult.lifeCard) break;
     nextState = popResult.state;
+    // OPT-887 / OPT-892: effect damage is damage (4-6-2), so it raises the
+    // same DAMAGE_DEALT as battle damage, owned by the effect's controller
+    // and naming the damaged player. Its watchers ("when you take damage",
+    // "when you deal damage to your opponent's Life") wait until the whole
+    // instruction completes (8-6-2): the events are retained to the issuing
+    // chain's end, after any [Trigger] window.
+    events.push({
+      type: "DAMAGE_DEALT",
+      playerIndex: controllerIndex,
+      payload: {
+        amount: 1,
+        damageSource: "EFFECT",
+        damagedPlayerIndex,
+        sourceCardInstanceId,
+        firstDamageOfEffect: dealt === 0,
+      },
+    });
     dealt += 1;
     events.push(...popResult.events);
     const lifeCard = popResult.lifeCard;

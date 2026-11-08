@@ -297,10 +297,25 @@ export interface GameEventPayloadMap {
   BLOCK_DECLARED: { blockerInstanceId: string };
   COUNTER_USED: { cardId: string; counterValue?: number; counterTargetInstanceId?: string; cardInstanceId?: string; type?: string };
   BATTLE_RESOLVED: Record<string, never>;
+  /**
+   * OPT-887: `playerIndex` is the player who DEALT the damage (the attacker's
+   * controller, or the controller of the damaging effect). The player whose
+   * Leader took it is `damagedPlayerIndex`; events written before OPT-887
+   * lack it and are always battle damage, so the damaged player is the other
+   * one (`damagedPlayerOf`).
+   */
   DAMAGE_DEALT: {
     amount: number;
-    attackerInstanceId: string;
-    attackerType: string;
+    /** Absent on pre-OPT-887 events, which are all battle damage. */
+    damageSource?: "BATTLE" | "EFFECT";
+    damagedPlayerIndex?: 0 | 1;
+    /** Battle damage only: the attacking card. */
+    attackerInstanceId?: string;
+    attackerType?: string;
+    /** Effect damage only: the card whose effect dealt the damage. */
+    sourceCardInstanceId?: string;
+    /** Effect damage only: true for the first point one DEAL_DAMAGE instruction deals. */
+    firstDamageOfEffect?: boolean;
     target?: string;
     /**
      * The damage found 0 Life, so no Life card was checked. Only an attack's
@@ -348,8 +363,8 @@ export interface GameEventPayloadMap {
   EVENT_TRIGGER_RESOLVED: { cardId?: string; cardInstanceId: string };
   LIFE_CARD_TURNED_FACE_UP: { count: number };
   LIFE_CARD_TURNED_FACE_DOWN: { count: number };
-  COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string };
-  CHARACTER_BATTLES: { cardInstanceId: string; targetInstanceId: string };
+  COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string; grantedAttributes?: Record<string, string[]> };
+  CHARACTER_BATTLES: { cardInstanceId: string; targetInstanceId: string; grantedAttributes?: Record<string, string[]> };
   END_OF_BATTLE: { attackerInstanceId: string; targetInstanceId: string; aborted: boolean };
   BATTLE_ABORTED: { attackerInstanceId: string; targetInstanceId: string; reason: "ATTACKER_LEFT_FIELD" | "TARGET_LEFT_FIELD" };
   LIFE_COUNT_BECOMES_ZERO: Record<string, never>;
@@ -433,6 +448,18 @@ export type GameEvent = {
     timestamp: number;
   };
 }[GameEventType];
+
+/**
+ * OPT-887: the player whose Leader took a DAMAGE_DEALT. `playerIndex` is the
+ * dealer; pre-OPT-887 events have no `damagedPlayerIndex` and are always
+ * battle damage, dealt to the non-attacking player.
+ */
+export function damagedPlayerOf(event: {
+  playerIndex: 0 | 1;
+  payload: { damagedPlayerIndex?: 0 | 1 };
+}): 0 | 1 {
+  return event.payload.damagedPlayerIndex ?? (event.playerIndex === 0 ? 1 : 0);
+}
 
 /**
  * Pre-emission event shape used internally by the engine.

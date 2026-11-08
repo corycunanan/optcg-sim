@@ -37,6 +37,7 @@ import {
   getEffectivePower,
   getEffectiveCost,
   getBattleDefenderPower,
+  getGrantedAttributes,
 } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { parkBattleCompletion } from "./battle-completion.js";
@@ -1042,6 +1043,31 @@ function isOnField(
   return { found, onField };
 }
 
+/**
+ * CHARACTER_BATTLES / COMBAT_VICTORY payload. OPT-1016: `grantedAttributes`
+ * records attributes that effects give either combatant as they battle, so an
+ * attribute watcher (ST05-010 Zephyr) still sees them after a combatant is
+ * K.O.'d in the battle.
+ * Omitted when nothing is granted, so ordinary battles log the same payload.
+ */
+function battleCombatantsPayload(
+  state: GameState,
+  cardInstanceId: string,
+  targetInstanceId: string,
+  cardDb: Map<string, CardData>
+): { cardInstanceId: string; targetInstanceId: string; grantedAttributes?: Record<string, string[]> } {
+  const grantedAttributes: Record<string, string[]> = {};
+  for (const id of [cardInstanceId, targetInstanceId]) {
+    const found = findCardInState(state, id);
+    if (!found) continue;
+    const granted = getGrantedAttributes(found.card, state, cardDb);
+    if (granted.length > 0) grantedAttributes[id] = granted;
+  }
+  return Object.keys(grantedAttributes).length > 0
+    ? { cardInstanceId, targetInstanceId, grantedAttributes }
+    : { cardInstanceId, targetInstanceId };
+}
+
 export function executeDamageStep(
   state: GameState,
   cardDb: Map<string, CardData>,
@@ -1078,10 +1104,12 @@ export function executeDamageStep(
     events.push({
       type: "CHARACTER_BATTLES",
       playerIndex: pi,
-      payload: {
-        cardInstanceId: battleBeforeRecalc.attackerInstanceId,
-        targetInstanceId: battleBeforeRecalc.targetInstanceId,
-      },
+      payload: battleCombatantsPayload(
+        state,
+        battleBeforeRecalc.attackerInstanceId,
+        battleBeforeRecalc.targetInstanceId,
+        cardDb
+      ),
     });
   }
 
@@ -1141,7 +1169,7 @@ export function executeDamageStep(
         };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
-        events.push(combatVictoryEvent(pi as 0 | 1, battle));
+        events.push(combatVictoryEvent(pi as 0 | 1, battle, nextState, cardDb));
 
         // Check for replacement effects before KO
         const depthBefore = nextState.effectStack.length;
@@ -1254,15 +1282,14 @@ export function executeDamageStep(
 /** COMBAT_VICTORY for an attacker that beat a Character in battle. */
 function combatVictoryEvent(
   causingPlayerIndex: 0 | 1,
-  battle: { attackerInstanceId: string; targetInstanceId: string }
+  battle: { attackerInstanceId: string; targetInstanceId: string },
+  state: GameState,
+  cardDb: Map<string, CardData>
 ): PendingEvent {
   return {
     type: "COMBAT_VICTORY",
     playerIndex: causingPlayerIndex,
-    payload: {
-      cardInstanceId: battle.attackerInstanceId,
-      targetInstanceId: battle.targetInstanceId,
-    },
+    payload: battleCombatantsPayload(state, battle.attackerInstanceId, battle.targetInstanceId, cardDb),
   };
 }
 
@@ -1353,13 +1380,15 @@ export function finishCharacterBattleResult(
     events.push({
       type: "CHARACTER_BATTLES",
       playerIndex: pending.causingPlayerIndex,
-      payload: {
-        cardInstanceId: battle.attackerInstanceId,
-        targetInstanceId: pending.targetInstanceId,
-      },
+      payload: battleCombatantsPayload(
+        state,
+        battle.attackerInstanceId,
+        pending.targetInstanceId,
+        cardDb
+      ),
     });
   }
-  events.push(combatVictoryEvent(pending.causingPlayerIndex, battle));
+  events.push(combatVictoryEvent(pending.causingPlayerIndex, battle, state, cardDb));
   events.push(...replacementEvents);
 
   let nextState = state;
