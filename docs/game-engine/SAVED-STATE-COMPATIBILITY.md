@@ -13,7 +13,7 @@
 | Version | Where | Meaning | Who bumps it |
 |---|---|---|---|
 | `SESSION_STORAGE_FORMAT_VERSION` (`persistence.ts`, currently `2`) | `session.formatVersion` | How the Durable Object splits one session across storage keys (`session`, `session:card-db`, `session:undo-history`) and which envelope fields exist. Says nothing about the shape of a game state. | Storage layout changes only. |
-| `executionContext.version` (`execution-context.ts`; writer `1`, reader `1` and `2` from OPT-888, see [Engine RNG version 2](#engine-rng-version-2-reader-opt-888)) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
+| `executionContext.version` (`execution-context.ts`; reader `1` and `2` from OPT-888 #805; new production games written at `2` from the OPT-888 writer, see [Engine RNG version 2](#engine-rng-version-2-reader-opt-888)) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
 | **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1, **`2`** from PR 4b; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's; PR 5a raises it to `3` and adds `RUNTIME_GAME_STATE_SCHEMA_VERSION = 2`, the shape the engine executes) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
 
 The three are independent. A game-state bump never implies a session-format bump and vice versa.
@@ -1210,4 +1210,10 @@ A version 1 context keeps running Mulberry32, byte-for-byte as before, until the
 
 ### Writer gate
 
-This change ships the reader and the generator only. `WRITTEN_EXECUTION_CONTEXT_VERSION` stays `1`, so production and deterministic contexts are still created at version 1 and the persisted bytes of every game are unchanged. The follow-up writer change raises it to `2` for new games, after this build is deployed and verified; from then on this build is the rollback floor, because an older build rejects a version 2 context as an invalid core shape.
+The reader PR (#805) shipped the reader and the generator only: writers stayed at `1`, so production and deterministic contexts are still created at version 1 and the persisted bytes of every game are unchanged. The writer section below raises new games to `2`, after this build is deployed and verified; from then on this build is the rollback floor, because an older build rejects a version 2 context as an invalid core shape.
+
+### New-game RNG version 2 writer (OPT-888)
+
+After the reader's verified deployment (squash merge `4bbf3ee6b948bb248fff4ce698bc614a40549758`, Deploy Cloudflare Workers run 42455376845, success 2026-11-08), `createProductionExecutionContext` creates every new game at `NEW_GAME_EXECUTION_CONTEXT_VERSION = 2`. Nothing else is promoted: existing version 1 games keep their context, and `createDeterministicExecutionContext` still defaults to `DETERMINISTIC_EXECUTION_CONTEXT_VERSION = 1`, so fixtures, the opt-940 writer golden, and the `legacy:<gameId>` hydration of pre-context saves (`ensureExecutionContext`, OPT-1013 admission) reproduce their historical streams. `GAME_STATE_SCHEMA_VERSION` is unchanged.
+
+**Rollback floor:** `4bbf3ee` or newer. Every earlier build rejects a version 2 context in the strict core shape, which would fail to load every game started after this writer deploys.

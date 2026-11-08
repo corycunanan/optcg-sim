@@ -2,18 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { EngineExecutionContext, EngineExecutionContextV2, GameState } from "../types.js";
 import {
   ENGINE_RANDOM_STREAMS,
-  WRITTEN_EXECUTION_CONTEXT_VERSION,
+  DETERMINISTIC_EXECUTION_CONTEXT_VERSION,
+  NEW_GAME_EXECUTION_CONTEXT_VERSION,
   createDeterministicExecutionContext,
   createProductionExecutionContext,
   deckRandomStream,
   deriveRngV2Key,
+  ensureExecutionContext,
   nextContextRandom,
   shuffleWithContext,
   shuffleWithEngineContext,
   takeEngineRandom,
 } from "../engine/execution-context.js";
 import { chacha20Block, sha256Words } from "../engine/secure-random.js";
-import { applyMulligan, buildInitialState } from "../engine/setup.js";
+import { applyMulligan, buildInitialState, prepareDecksAndLeaders } from "../engine/setup.js";
+import { advancePregame, startPregame } from "../engine/pregame.js";
 import { createBlindHandSlots } from "../engine/effect-resolver/blind-hand-slots.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
@@ -99,10 +102,30 @@ describe("OPT-888 primitives match their published test vectors", () => {
 });
 
 describe("OPT-888 version 1 contexts keep the legacy generator", () => {
-  it("still writes version 1 until the version 2 reader is deployed", () => {
-    expect(WRITTEN_EXECUTION_CONTEXT_VERSION).toBe(1);
+  it("creates new production games at version 2 and keeps deterministic and legacy contexts at version 1", () => {
+    expect(NEW_GAME_EXECUTION_CONTEXT_VERSION).toBe(2);
+    expect(DETERMINISTIC_EXECUTION_CONTEXT_VERSION).toBe(1);
+    expect(createProductionExecutionContext("game").version).toBe(2);
     expect(createDeterministicExecutionContext("seed").version).toBe(1);
-    expect(createProductionExecutionContext("game").version).toBe(1);
+    // A game saved before the execution context existed is hydrated on the
+    // generator it was always replayed with.
+    const { state } = buildInitialState(createTestPayload());
+    const { executionContext: _dropped, ...withoutContext } = state;
+    expect(ensureExecutionContext(withoutContext as GameState).executionContext.version).toBe(1);
+  });
+
+  it("runs a new production game end to end on version 2 and persists it", () => {
+    const payload = createTestPayload();
+    const { state: prepared, cardDb } = prepareDecksAndLeaders(
+      payload,
+      createProductionExecutionContext(payload.gameId),
+    );
+    const started = advancePregame(startPregame(prepared, "RANDOM_FIXED"), cardDb, []).state;
+    expect(started.executionContext.version).toBe(2);
+    expect(counters(started)).toMatchObject({ pregame: 2 });
+    expect(counters(started).deck0).toBeGreaterThan(0);
+    expect(counters(started).deck1).toBeGreaterThan(0);
+    expect(roundTrip(started).executionContext).toEqual(started.executionContext);
   });
 
   it("replays the pre-change Mulberry32 stream byte-for-byte, whatever stream is named", () => {
@@ -293,7 +316,7 @@ describe("OPT-888 persistence and projection of version 2", () => {
   });
 
   it("production contexts draw a 128-bit seed and a trace id that shares none of it", () => {
-    const context = createProductionExecutionContext("game-1", { version: 2 });
+    const context = createProductionExecutionContext("game-1");
     expect(context.version).toBe(2);
     expect(context.seed).toMatch(/^[0-9a-f]{32}$/);
     expect(context.trace.traceId).toMatch(/^trace-[0-9a-f]{16}$/);

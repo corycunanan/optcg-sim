@@ -28,11 +28,17 @@ function randomHex(words: number): string {
 /** Execution-context versions the engine can execute (OPT-888). */
 export const SUPPORTED_EXECUTION_CONTEXT_VERSIONS = [1, 2] as const;
 /**
- * Version new contexts are created at. Stays 1 until the version 2 reader is
- * deployed and verified (SAVED-STATE-COMPATIBILITY.md §5.1, "Engine RNG
- * version 2"); the writer PR raises it.
+ * Version every new production game is created at (OPT-888 writer). The
+ * version 2 reader (#805) is the rollback floor once this ships
+ * (SAVED-STATE-COMPATIBILITY.md, "Engine RNG version 2").
  */
-export const WRITTEN_EXECUTION_CONTEXT_VERSION: EngineExecutionContext["version"] = 1;
+export const NEW_GAME_EXECUTION_CONTEXT_VERSION: EngineExecutionContext["version"] = 2;
+/**
+ * Default for deterministic contexts: fixtures, and hydration of games that
+ * predate the execution context (`legacy:<gameId>`). These reproduce
+ * historical streams, so they stay version 1 unless a caller asks for 2.
+ */
+export const DETERMINISTIC_EXECUTION_CONTEXT_VERSION: EngineExecutionContext["version"] = 1;
 
 export const ENGINE_RANDOM_STREAMS = ["pregame", "deck0", "deck1", "blindHand"] as const satisfies
   readonly EngineRandomStream[];
@@ -51,7 +57,7 @@ interface ExecutionContextOptions {
   clockEpochMs?: number;
   traceId?: string;
   actionLimit?: number;
-  /** RNG algorithm version; defaults to WRITTEN_EXECUTION_CONTEXT_VERSION. */
+  /** RNG algorithm version; defaults to DETERMINISTIC_EXECUTION_CONTEXT_VERSION. */
   version?: EngineExecutionContext["version"];
 }
 
@@ -67,7 +73,7 @@ export function createDeterministicExecutionContext(
     actionBudget: { limit: options.actionLimit ?? DEFAULT_ACTION_BUDGET, consumed: 0 },
     trace: { gameId, traceId: options.traceId ?? `trace-${hashSeed(seed).toString(16)}` },
   };
-  const version = options.version ?? WRITTEN_EXECUTION_CONTEXT_VERSION;
+  const version = options.version ?? DETERMINISTIC_EXECUTION_CONTEXT_VERSION;
   // Key order is persisted byte order: version 1 keeps its pre-OPT-888 layout
   // (opt-940 writer golden).
   if (version === 2) return { version: 2, seed, rngCounters: emptyStreamCounters(), ...rest };
@@ -88,7 +94,7 @@ export function createProductionExecutionContext(
     gameId,
     clockEpochMs: Date.now(),
     traceId: `trace-${randomHex(2)}`,
-    version: options.version,
+    version: options.version ?? NEW_GAME_EXECUTION_CONTEXT_VERSION,
   });
 }
 
