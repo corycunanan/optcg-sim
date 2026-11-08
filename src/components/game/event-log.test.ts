@@ -55,3 +55,27 @@ describe("formatEvent public reveals", () => {
     expect(formatEvent(gameEvent, cardDb, 0)).toBeNull();
   });
 });
+
+describe("formatEvent damage direction (OPT-887)", () => {
+  const battle = (attacker: 0 | 1): GameEvent => ({
+    type: "DAMAGE_DEALT",
+    playerIndex: attacker,
+    timestamp: 1,
+    payload: { amount: 1, attackerInstanceId: "a", attackerType: "LEADER", firstDamageOfAttack: true },
+  });
+
+  it("names the defender, not the attacker, for battle damage", () => {
+    expect(formatEvent(battle(0), cardDb, 0)?.text).toBe("Opponent took damage");
+    expect(formatEvent(battle(1), cardDb, 0)?.text).toBe("You took damage");
+  });
+
+  it("names the damaged player for effect damage, including self-inflicted", () => {
+    const self: GameEvent = {
+      type: "DAMAGE_DEALT",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { amount: 1, damageSource: "EFFECT", damagedPlayerIndex: 0, sourceCardInstanceId: "s", firstDamageOfEffect: true },
+    };
+    expect(formatEvent(self, cardDb, 0)?.text).toBe("You took damage");
+  });
+});

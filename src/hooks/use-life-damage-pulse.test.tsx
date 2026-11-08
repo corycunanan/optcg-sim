@@ -85,6 +85,17 @@ describe("useLifeDamagePulse", () => {
     expect(readActivePlayers().size).toBe(0);
   });
 
+  it("pulses the damaged player's life for self-inflicted effect damage (OPT-887)", async () => {
+    await render([]);
+    await render([{
+      type: "DAMAGE_DEALT",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { amount: 1, damageSource: "EFFECT", damagedPlayerIndex: 0, sourceCardInstanceId: "src", firstDamageOfEffect: true },
+    }]);
+    expect(readActivePlayers()).toEqual(new Map([[0, 1]]));
+  });
+
   it("emits two observable pulses for Double Attack damage in one update", async () => {
     await render([]);
     await render([damageEvent(1, 0), damageEvent(2, 0)]);

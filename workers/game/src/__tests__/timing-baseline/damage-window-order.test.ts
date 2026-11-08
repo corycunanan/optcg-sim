@@ -72,10 +72,8 @@ const SYN_NAMI = synCard(
 );
 
 /**
- * Stands in for OP13-002 Ace (no conditions). The README encodes filter.controller "SELF",
- * but the engine stamps DAMAGE_DEALT with the ATTACKER's playerIndex, so a "SELF" filter on
- * the defender never matches. The filter is omitted so the fixture tests ordering only;
- * the only damage in these scenarios is dealt to this Leader's controller.
+ * Stands in for OP13-002 Ace (no DON!! condition), with its real `filter.controller: "SELF"`
+ * trigger. OPT-887: the filter compares the damaged player, not DAMAGE_DEALT's dealer.
  */
 const SYN_ACE = synCard(
   "SYN-ACE",
@@ -83,7 +81,7 @@ const SYN_ACE = synCard(
   {
     id: "syn_ace",
     category: "auto",
-    trigger: { event: "DAMAGE_TAKEN" },
+    trigger: { event: "DAMAGE_TAKEN", filter: { controller: "SELF" } },
     actions: [{ type: "DRAW", params: { amount: 1 } }],
   },
 );
@@ -248,6 +246,9 @@ describe("F6 [Rule 8-6-2 line 862, 8-6-2-1 line 864; FAQ qa_op13.md:13-15] Ace a
     const after = rig.state.eventLog.slice(start);
     expect(activatedIdx(after)).toBeGreaterThanOrEqual(0);
     expect(idx(after, "CARD_DRAWN", 1)).toBeGreaterThan(activatedIdx(after));
+    // OPT-887: exactly one draw for the damaged Leader's controller, none for the attacker.
+    expect(after.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(1);
+    expect(after.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 0)).toHaveLength(0);
   });
 });
 
@@ -341,14 +342,14 @@ describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668;
 });
 
 describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op05.md:237-239, qa_op03.md:111-113] Double Attack: the defender's taking-damage effect resolves once, after the last damage point", () => {
-  // Stands in for a no-filter DAMAGE_TAKEN watcher (README §3.1: the SELF filter never matches battle damage).
+  // Stands in for a "when you take damage" watcher with the real SELF filter (OPT-887).
   const SYN_TAKE_DAMAGE = synCard(
     "SYN-TAKE-DAMAGE",
     { type: "Leader", cost: null, power: 5000, life: 5 },
     {
       id: "syn_take_damage",
       category: "auto",
-      trigger: { event: "DAMAGE_TAKEN" },
+      trigger: { event: "DAMAGE_TAKEN", filter: { controller: "SELF" } },
       actions: [{ type: "DRAW", params: { amount: 1 } }],
     },
   );

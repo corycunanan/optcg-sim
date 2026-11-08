@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import type { CardDb, GameEvent } from "@shared/game-types";
+import { damagedPlayerOf, type CardDb, type GameEvent } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 
@@ -57,8 +57,11 @@ export function formatEvent(
       const name = cardName(event.payload.cardId);
       return { icon: "🔄", text: `${who} used counter ${name}` };
     }
-    case "DAMAGE_DEALT":
-      return { icon: "💥", text: `${who} took damage`, accent: "text-gb-accent-red" };
+    case "DAMAGE_DEALT": {
+      // OPT-887: playerIndex is the dealer; name the player who took it.
+      const damaged = damagedPlayerOf(event) === myIndex ? "You" : "Opponent";
+      return { icon: "💥", text: `${damaged} took damage`, accent: "text-gb-accent-red" };
+    }
     case "TRIGGER_ACTIVATED": {
       if (event.payload.activated !== true) return null;
       const name = cardName(event.payload.cardId);

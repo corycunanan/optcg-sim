@@ -11,8 +11,8 @@
  * docs/cards/UNKNOWN.md P-117) and docs/FAQs/qa_op03.md:88-140:
  * - Gaimon fires on any attack by its controller (Leader or Character), once
  *   for [Double Attack], never when Life is moved or trashed by an effect.
- *   DEAL_DAMAGE effect damage emits no DAMAGE_DEALT today, so it fires no
- *   watcher; whether Gaimon should see it is an open rules question (OPT-892).
+ *   OPT-892: DEAL_DAMAGE effect damage is damage (rule 4-6-2), so Gaimon fires
+ *   on it too; the attack-bound watchers stay limited to attacks.
  * - Every watcher activates after the Life check and before the resulting
  *   [Trigger] choice.
  */
@@ -338,16 +338,48 @@ describe("OPT-796 OP03-043 Gaimon — any attack by its controller", () => {
     expect(state.players[1].life).toHaveLength(1);
   });
 
-  it("does not fire on DEAL_DAMAGE effect damage (no DAMAGE_DEALT today; rules question OPT-892)", () => {
+  // OPT-892: effect damage is damage (rule 4-6-2); qa_op03.md OP03-043 only
+  // excludes Life moved by an effect that deals no damage.
+  it("fires once on DEAL_DAMAGE effect damage by its controller (OPT-892)", () => {
     const f = fixture();
-    f.put("OP03-043", 0);
+    const gaimon = f.put("OP03-043", 0);
     const source: CardInstance = { ...f.state.players[0].leader, instanceId: "effect-damage-hand", cardId: EFFECT_DAMAGE.id, zone: "HAND", attachedDon: [], turnPlayed: null };
     f.state.players[0].hand.push(source);
     const lifeBefore = f.state.players[1].life.length;
     const played = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: source.instanceId }, f.cardDb, 0);
     expect(played.valid).toBe(true);
     expect(played.state.players[1].life).toHaveLength(lifeBefore - 1);
+    const damage = played.state.eventLog.filter((e) => e.type === "DAMAGE_DEALT");
+    expect(damage).toHaveLength(1);
+    expect(damage[0].playerIndex).toBe(0);
+    expect(damage[0].payload).toMatchObject({ damageSource: "EFFECT", damagedPlayerIndex: 1, firstDamageOfEffect: true });
+    expect(played.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(played.state.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(played.state.effectStack.at(-1)?.sourceCardInstanceId).toBe(gaimon.instanceId);
+  });
+
+  it("does not fire when its controller takes effect damage", () => {
+    const f = fixture({ activePlayer: 1 });
+    f.put("OP03-043", 0);
+    const source: CardInstance = { ...f.state.players[1].leader, instanceId: "effect-damage-hand", cardId: EFFECT_DAMAGE.id, zone: "HAND", owner: 1, controller: 1, attachedDon: [], turnPlayed: null };
+    f.state.players[1].hand.push(source);
+    const played = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: source.instanceId }, f.cardDb, 1);
+    expect(played.valid).toBe(true);
+    expect(played.state.players[0].life).toHaveLength(3);
     expect(played.pendingPrompt).toBeUndefined();
+  });
+
+  it.each(["OP03-040", "P-117"])("attack-bound %s stays limited to attacks: no fire on effect damage", (id) => {
+    const f = fixture();
+    f.put(id, 0, "LEADER", 1);
+    const source: CardInstance = { ...f.state.players[0].leader, instanceId: "effect-damage-hand", cardId: EFFECT_DAMAGE.id, zone: "HAND", attachedDon: [], turnPlayed: null };
+    f.state.players[0].hand.push(source);
+    const deckBefore = deckSize(f.state, 0);
+    const played = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: source.instanceId }, f.cardDb, 0);
+    expect(played.valid).toBe(true);
+    expect(played.state.players[1].life).toHaveLength(3);
+    expect(played.pendingPrompt).toBeUndefined();
+    expect(deckSize(played.state, 0)).toBe(deckBefore);
   });
 
   it("a lethal DAMAGE_DEALT fires no watcher (no Life to check; the game ends)", () => {

@@ -87,11 +87,11 @@ Every trigger requires an event to be emitted. If the event isn't emitted, the t
 | `TURN_STARTED` | START_OF_TURN | phases.ts:runEndPhase |
 | `CARD_STATE_CHANGED` | CHARACTER_BECOMES_RESTED | play.ts:executeSetRest, battle.ts:executeDeclareAttack, battle.ts:executeDeclareBlocker |
 | `CARD_RETURNED_TO_HAND` | CHARACTER_RETURNED_TO_HAND | card-mutations.ts:returnToHand |
-| `DON_DETACHED` | DON_RETURNED_TO_DON_DECK | don.ts, phases.ts |
+| `DON_DETACHED` | DON_RETURNED_TO_DON_DECK (only with `count` > 0) | don.ts, cost/payment.ts (DON!! deck returns, with `count`); phases.ts (Refresh, no `count`) |
 | `DON_GIVEN_TO_CARD` | DON_GIVEN_TO_CARD | don.ts, execute.ts |
 | `CARD_ADDED_TO_HAND_FROM_LIFE` | CARD_ADDED_TO_HAND_FROM_LIFE | life.ts, battle.ts |
 | `CARD_REMOVED_FROM_LIFE` | CARD_REMOVED_FROM_LIFE | battle.ts, effect-damage.ts, actions/life.ts, actions/battle-actions.ts, cost/payment.ts, card-mutations.ts:returnToDeck |
-| `DAMAGE_DEALT` | DAMAGE_TAKEN, ATTACK_DEALS_DAMAGE | battle.ts:executeDamageStep (includes attackerInstanceId, attackerType, firstDamageOfAttack) |
+| `DAMAGE_DEALT` | DAMAGE_TAKEN, ATTACK_DEALS_DAMAGE | battle.ts:executeDamageStep (playerIndex = attacker; attackerInstanceId, attackerType, firstDamageOfAttack); effect-damage.ts:continueEffectDamageSequence (playerIndex = effect controller; damageSource EFFECT, damagedPlayerIndex, sourceCardInstanceId, firstDamageOfEffect) |
 | `BATTLE_RESOLVED` | END_OF_BATTLE | battle.ts:endBattle |
 | `COMBAT_VICTORY` | COMBAT_VICTORY | battle.ts:executeDamageStep (attacker wins vs CHARACTER) |
 | `CHARACTER_BATTLES` | CHARACTER_BATTLES | battle.ts:executeDeclareAttack (attacker is CHARACTER) |

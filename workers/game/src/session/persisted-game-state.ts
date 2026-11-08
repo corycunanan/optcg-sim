@@ -610,11 +610,15 @@ const EventPayloadSchemas = {
   BATTLE_RESOLVED: EmptyPayload,
   DAMAGE_DEALT: z.strictObject({
     amount: FiniteNumber,
-    attackerInstanceId: z.string(),
-    attackerType: z.string(),
+    damageSource: z.enum(["BATTLE", "EFFECT"]).optional(),
+    damagedPlayerIndex: z.union([z.literal(0), z.literal(1)]).optional(),
+    attackerInstanceId: z.string().optional(),
+    attackerType: z.string().optional(),
+    sourceCardInstanceId: z.string().optional(),
     target: z.string().optional(),
     lethal: z.boolean().optional(),
     firstDamageOfAttack: z.boolean().optional(),
+    firstDamageOfEffect: z.boolean().optional(),
   }),
   TRIGGER_ACTIVATED: z.strictObject({
     cardId: z.string(),

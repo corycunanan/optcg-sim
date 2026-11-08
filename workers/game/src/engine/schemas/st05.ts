@@ -199,7 +199,7 @@ export const ST05_010_ZEPHYR: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BATTLES",
-        filter: { attribute: "STRIKE" },
+        filter: { battle_target_type: "CHARACTER", attribute: "STRIKE" },
       },
       actions: [
         {

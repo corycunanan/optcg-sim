@@ -243,6 +243,8 @@ Example — EB01-047 Laboon:
 
 Fires when DON!! cards leave the field and return to the DON!! deck. Supports quantity thresholds and cause filters.
 
+OPT-881: it matches `DON_DETACHED` events with a positive `count`. Every DON!!-deck return carries one: field returns, including scheduled and `until_count` returns (OP08-074 Black Maria), `FORCE_OPPONENT_DON_RETURN`, `RETURN_DON_TO_DECK` with `amount`, and DON!! −N costs. The Refresh Phase `DON_DETACHED` (rule 6-2-3: attached DON!! return to the cost area, not the deck) carries no `count` and never matches.
+
 ```typescript
 {
   event: "DON_RETURNED_TO_DON_DECK",
@@ -494,7 +496,7 @@ Example:
 
 ### COMBAT_VICTORY
 
-Fires when this Character battles and K.O.'s an opponent's Character as a result of that battle.
+Fires when this Character battles and K.O.'s an opponent's Character as a result of that battle. OPT-902: the host must be the battle's attacker, read from the event payload; another Character's victory never matches.
 
 ```typescript
 { event: "COMBAT_VICTORY" }
@@ -521,6 +523,8 @@ The engine determines a combat victory when: this Character is the attacker, the
 ### CHARACTER_BATTLES
 
 Fires when this Character enters a battle against a specific target type. Distinct from `WHEN_ATTACKING` — this fires for both attacking and defending, and can filter by the opponent's card properties.
+
+OPT-902: the host must be one of the event's two combatants, read from the payload rather than the live `turn.battle`. `battle_target_type`, `attribute` and `target_filter` describe the opposing combatant. `attribute` reads that card's last known identity, because a K.O.'d loser has already left the field when the event is matched. The event is published at the Damage Step only when both combatants remain on the field, so an aborted battle never matches.
 
 ```typescript
 {
@@ -735,6 +739,8 @@ Example:
 
 Fires when the controller takes damage (a Life card is removed as combat damage or effect damage).
 
+OPT-887: `DAMAGE_DEALT.playerIndex` is the player who dealt the damage. `filter.controller` is compared against the damaged player: `payload.damagedPlayerIndex`, or the non-dealer for battle events written before OPT-887 (`damagedPlayerOf` in `shared/game-types.ts`). Only the first point of an attack (`firstDamageOfAttack`) or of a damage instruction (`firstDamageOfEffect`) matches. Activation waits until the damage processing ends, after any [Trigger] (rule 8-6-2; qa_op13.md OP13-002).
+
 ```typescript
 { event: "DAMAGE_TAKEN" }
 ```
@@ -805,7 +811,7 @@ Fires when an attack by this card's controller deals damage to the opponent's Li
 
 The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.
 
-Effect damage: the engine currently emits no `DAMAGE_DEALT` for `DEAL_DAMAGE` effects, so these watchers do not fire on it. Whether that is correct for OP03-043 Gaimon's "When you deal damage" is an open rules question (OPT-892). The Gaimon FAQ only rules out Life moved to hand or trashed by another card's effect.
+Effect damage (OPT-892, decided 2026-11-08): `DEAL_DAMAGE` and `SELF_TAKE_DAMAGE` emit one `DAMAGE_DEALT` per point with `damageSource: "EFFECT"`. Rule 4-6-2 makes effect damage damage processing, and qa_op03.md OP03-043 only excludes Life moved to hand or trashed by an effect that deals no damage. So OP03-043 Gaimon (no `filter.attacker`) fires once per damage instruction that its controller deals to the opponent, after the instruction's [Trigger] window (rule 8-6-2). Attack-bound watchers (`filter.attacker: "SELF"`) never match effect damage.
 
 Sessions saved before OPT-796 still carry `LEADER_ATTACK_DEALS_DAMAGE` in their stored card schemas and trigger registry. `session/legacy-trigger-migration.ts` rewrites them at load to this encoding.
 

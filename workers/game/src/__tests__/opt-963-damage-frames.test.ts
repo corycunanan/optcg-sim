@@ -625,15 +625,16 @@ describe("OPT-996 committed chain prefix", () => {
     const r = rig({ p1Life: [life("prefix-trigger", TRIG_OPTIONAL.id)], dealer: card, p1Leader: ENEL });
     activate(r);
     expectWindow(r, "prefix-trigger");
-    expect(r.log().map(e => e.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
+    // OPT-887: effect damage raises DAMAGE_DEALT (dealer p0) per point, retained like the rest.
+    expect(r.log().map(e => e.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "DAMAGE_DEALT", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
     const retained = r.state.effectStack.flatMap(f => f.accumulatedEvents);
-    expect(retained).toHaveLength(4);
+    expect(retained).toHaveLength(5);
     expect(retained.every(e => e.propagation?.eventLogEmitted && !e.propagation?.triggerScanned)).toBe(true);
     expect(r.log().filter(e => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(0);
     await r.reload();
     reveal(r, false);
     expect(r.log().map(e => [e.type, e.playerIndex])).toEqual([
-      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["LIFE_COUNT_BECOMES_ZERO", 1], ["TRIGGER_ACTIVATED", 1],
+      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["DAMAGE_DEALT", 0], ["LIFE_COUNT_BECOMES_ZERO", 1], ["TRIGGER_ACTIVATED", 1],
       ["CARD_ADDED_TO_HAND_FROM_LIFE", 1], ["CARD_REMOVED_FROM_LIFE", 1],
       ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["CARD_DRAWN", 1], ["DRAW_OUTSIDE_DRAW_PHASE", 1],
     ]);
@@ -685,9 +686,10 @@ describe("OPT-1005 successive damage windows", () => {
       expect(r.act(damaged, { type: "REVEAL_TRIGGER", reveal: child })).toBeNull();
       if (child) { expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT"); await r.reload(); expect(r.act(damaged, { type: "PASS" })).toBeNull(); }
       expect(effectTriggerWindow(r.state)?.lifeCard.instanceId).toBe("reopen-second");
-      const prefix = [["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["TRIGGER_ACTIVATED", damaged],
+      // OPT-887: each effect damage point raises DAMAGE_DEALT, owned by the dealer (p0 in both types).
+      const prefix = [["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["DAMAGE_DEALT", 0], ["TRIGGER_ACTIVATED", damaged],
         ...(child ? [["TRIGGER_ACTIVATED", damaged], ["CARD_REMOVED_FROM_LIFE", damaged]] : [["CARD_ADDED_TO_HAND_FROM_LIFE", damaged], ["CARD_REMOVED_FROM_LIFE", damaged]]),
-        ["LIFE_COUNT_BECOMES_ZERO", damaged], ["TRIGGER_ACTIVATED", damaged]];
+        ["DAMAGE_DEALT", 0], ["LIFE_COUNT_BECOMES_ZERO", damaged], ["TRIGGER_ACTIVATED", damaged]];
       expect(r.log().map(event => [event.type, event.playerIndex])).toEqual(prefix);
       const owners = r.state.effectStack.filter(frame => frame.accumulatedEvents.some(event => event.type === "LIFE_COUNT_BECOMES_ZERO"));
       expect(owners).toHaveLength(1);
@@ -709,14 +711,14 @@ describe("OPT-1005 successive damage windows", () => {
     const { parentFrameId: _parent, ...window } = frame.effectDamage!;
     r.state.effectStack = [{ ...frame, effectDamage: window }];
     await r.reload(); reveal(r, false); expectWindow(r, "legacy-second");
-    expect(r.log().map(event => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
+    expect(r.log().map(event => event.type)).toEqual(["DAMAGE_DEALT", "TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "DAMAGE_DEALT", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
     const owner = r.state.effectStack.find(candidate => candidate.phase === "INTERRUPTED_BY_TRIGGERS")!;
-    expect(owner.pausedAction).toBeNull(); expect(owner.accumulatedEvents).toHaveLength(4);
+    expect(owner.pausedAction).toBeNull(); expect(owner.accumulatedEvents).toHaveLength(5);
     expect(owner.accumulatedEvents.every(event => event.propagation?.eventLogEmitted && !event.propagation?.triggerScanned)).toBe(true);
     expect(r.state.effectStack.at(-1)?.accumulatedEvents).toEqual([]);
     await checkReaderReplay(r, "parentless");
     await r.reload(); reveal(r, false);
-    expect(r.log().map(event => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE"]);
+    expect(r.log().map(event => event.type)).toEqual(["DAMAGE_DEALT", "TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "DAMAGE_DEALT", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE"]);
     expect(r.state.effectStack).toEqual([]); expect(r.state.pendingPrompt).toBeNull();
   });
 });

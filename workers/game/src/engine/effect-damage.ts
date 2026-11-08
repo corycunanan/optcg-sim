@@ -221,6 +221,23 @@ export function continueEffectDamageSequence(
     }
     if (!popResult.lifeCard) break;
     nextState = popResult.state;
+    // OPT-887 / OPT-892: effect damage is damage (4-6-2), so it raises the
+    // same DAMAGE_DEALT as battle damage, owned by the effect's controller
+    // and naming the damaged player. Its watchers ("when you take damage",
+    // "when you deal damage to your opponent's Life") wait until the whole
+    // instruction completes (8-6-2): the events are retained to the issuing
+    // chain's end, after any [Trigger] window.
+    events.push({
+      type: "DAMAGE_DEALT",
+      playerIndex: controllerIndex,
+      payload: {
+        amount: 1,
+        damageSource: "EFFECT",
+        damagedPlayerIndex,
+        sourceCardInstanceId,
+        firstDamageOfEffect: dealt === 0,
+      },
+    });
     dealt += 1;
     events.push(...popResult.events);
     const lifeCard = popResult.lifeCard;

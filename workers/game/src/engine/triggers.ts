@@ -1,4 +1,5 @@
 import { getBattleOpponentInstanceId } from "./events.js";
+import { damagedPlayerOf } from "../../../../shared/game-types.js";
 import { isHandTrashByEffect } from "./hand-trash.js";
 /**
  * M4 Trigger System
@@ -668,12 +669,18 @@ function matchesCustomTrigger(
     if (target?.zone !== "CHARACTER") return false;
   }
   if (trigger.event === "ATTACK_DEALS_DAMAGE" && !matchesAttackDamage(trigger, event, sourceCard)) return false;
-  // OPT-973: battle damage emits one event per point, but taking damage
-  // fulfills this timing once per attack. Match the first point; the existing
-  // damage frame / pipeline defers activation until all points finish (8-6-2).
-  // Check explicit false so legacy events without the marker keep their semantics.
-  if (trigger.event === "DAMAGE_TAKEN" && event.type === "DAMAGE_DEALT" &&
-      event.payload.firstDamageOfAttack === false) return false;
+  if (trigger.event === "DAMAGE_TAKEN" && !matchesDamageTaken(trigger, event, sourceCard)) return false;
+  // OPT-881: DON_DETACHED also marks the Refresh Phase return of attached
+  // DON!! to the cost area (phases.ts, rule 6-2-3), which is not a return to
+  // the DON!! deck. Every DON!!-deck return (field return, identity return,
+  // unattached RETURN_DON_TO_DECK, DON!! −N cost) carries a positive `count`;
+  // the Refresh event carries none.
+  if (trigger.event === "DON_RETURNED_TO_DON_DECK" && !(event.type === "DON_DETACHED" &&
+      typeof event.payload.count === "number" && event.payload.count > 0)) return false;
+  // OPT-902: "When this Character battles / battles and K.O.'s" is bound to
+  // the host's own battle, never a bystander's.
+  if ((trigger.event === "COMBAT_VICTORY" || trigger.event === "CHARACTER_BATTLES") &&
+      !matchesHostBattle(trigger, event, state, sourceCard, _cardDb)) return false;
   if (trigger.filter?.target === "SELF") {
     const payload = event.payload as { targetInstanceId?: string; cardInstanceId?: string };
     if ((payload.targetInstanceId ?? payload.cardInstanceId) !== sourceCard.instanceId) return false;
@@ -718,6 +725,14 @@ function matchesCustomTrigger(
       if (filter.cause === "BY_OPPONENT_EFFECT" && (!isEffect || payload.causingController === undefined || payload.causingController === sourceCard.controller)) return false;
       if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
       filter = { ...filter, controller: undefined, cause: undefined };
+    }
+    if (trigger.event === "DAMAGE_TAKEN") {
+      // Controller was compared against the damaged player in matchesDamageTaken.
+      filter = { ...filter, controller: undefined };
+    }
+    if (trigger.event === "COMBAT_VICTORY" || trigger.event === "CHARACTER_BATTLES") {
+      // Applied to the opposing combatant in matchesHostBattle.
+      filter = { ...filter, battle_target_type: undefined, target_filter: undefined, attribute: undefined };
     }
     if (trigger.event === "END_OF_BATTLE" && filter.battle_target_type) {
       if (!matchesBattleParticipantFilter(filter, event, state, sourceCard, _cardDb)) return false;
@@ -792,12 +807,19 @@ function getSourceFilteredAttackCardId(
 }
 
 /**
- * OPT-796: an attack by the host's controller dealt damage to the opponent's
- * Life. DAMAGE_DEALT is emitted only by battle damage (DEAL_DAMAGE effects
- * emit none today; whether Gaimon should see them is OPT-892), once per Life
- * card; the watcher binds to the attack's first damage so [Double Attack]
- * fires it once (qa_op03.md OP03-043). A lethal DAMAGE_DEALT checks no Life
- * card, so it matches no watcher ([Double Attack] vs 1 Life: OPT-886).
+ * OPT-796: the host's controller dealt damage to the opponent's Life.
+ * DAMAGE_DEALT is emitted once per Life card, by battle damage and (OPT-892)
+ * by effect damage; `playerIndex` is the dealer. The watcher binds to the
+ * first point of an attack or of a damage instruction, so [Double Attack] or
+ * "deal 2 damage" fires it once (qa_op03.md OP03-043). A lethal DAMAGE_DEALT
+ * checks no Life card, so it matches no watcher ([Double Attack] vs 1 Life:
+ * OPT-886).
+ *
+ * Effect damage only fulfils "When you deal damage to your opponent's Life"
+ * (OP03-043, no `filter.attacker`): rule 4-6-2 makes effect damage damage
+ * processing, and qa_op03.md OP03-043 excludes only Life cards moved to hand
+ * or trashed by an effect, which deals no damage. "When this card's attack
+ * deals damage" (`filter.attacker: "SELF"`) stays limited to attacks.
  */
 function matchesAttackDamage(
   trigger: CustomTrigger,
@@ -806,8 +828,36 @@ function matchesAttackDamage(
 ): boolean {
   if (event.type !== "DAMAGE_DEALT") return false;
   if (event.playerIndex !== sourceCard.controller) return false;
-  if (event.payload.lethal === true || event.payload.firstDamageOfAttack !== true) return false;
+  if (damagedPlayerOf(event) === sourceCard.controller) return false;
+  if (event.payload.lethal === true) return false;
+  if (event.payload.damageSource === "EFFECT") {
+    return trigger.filter?.attacker === undefined && event.payload.firstDamageOfEffect === true;
+  }
+  if (event.payload.firstDamageOfAttack !== true) return false;
   if (trigger.filter?.attacker === "SELF" && event.payload.attackerInstanceId !== sourceCard.instanceId) return false;
+  return true;
+}
+
+/**
+ * OPT-887: "When you take damage" (OP13-002). DAMAGE_DEALT is owned by the
+ * dealer, so `filter.controller` is compared against the damaged player, never
+ * `playerIndex`: "SELF" means the host's controller took the damage. Battle
+ * and effect damage both qualify (rule 4-6-2). The timing is fulfilled once
+ * per attack (OPT-973) or per damage instruction: only the first point
+ * matches, and the damage frame / issuing chain defers activation until all
+ * points finish, after any [Trigger] (8-6-2; qa_op13.md OP13-002). Explicit
+ * `false` checks keep legacy events without the markers matching.
+ */
+function matchesDamageTaken(
+  trigger: CustomTrigger,
+  event: GameEvent,
+  sourceCard: CardInstance,
+): boolean {
+  if (event.type !== "DAMAGE_DEALT") return false;
+  if (event.payload.firstDamageOfAttack === false || event.payload.firstDamageOfEffect === false) return false;
+  const damaged = damagedPlayerOf(event);
+  if (trigger.filter?.controller === "SELF" && damaged !== sourceCard.controller) return false;
+  if (trigger.filter?.controller === "OPPONENT" && damaged === sourceCard.controller) return false;
   return true;
 }
 
@@ -846,6 +896,65 @@ function matchesBattleParticipantFilter(
     if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
   }
   return true;
+}
+
+/**
+ * OPT-902: COMBAT_VICTORY ("When this Character battles and K.O.'s your
+ * opponent's Character": OP02-094, OP04-086) and CHARACTER_BATTLES ("When /
+ * If this Character battles [your opponent's / Strike attribute]
+ * Characters": ST02-010, ST05-010) watch the host's own battle.
+ * - The host must be a combatant of the event's battle, from the payload, not
+ *   the live `turn.battle` (the END_OF_BATTLE gate of OPT-797).
+ * - COMBAT_VICTORY is emitted only when the attacker K.O.s the target
+ *   Character (rule 7-1-4-2: a defender never K.O.s the attacker), so the host
+ *   must be the attacker.
+ * - CHARACTER_BATTLES is emitted at the Damage Step only when both
+ *   combatants are still on the field (OPT-243; qa_st-01-st-04.md ST02-010:
+ *   an aborted battle never "battles"), for either seat (qa_st-05.md
+ *   ST05-010: Zephyr gains power each time it is attacked).
+ * - `battle_target_type`, `attribute` and `target_filter` describe the
+ *   opposing combatant ("battles your opponent's Character", "battles Strike
+ *   attribute Characters"), never the attacker named in the payload.
+ */
+function matchesHostBattle(
+  trigger: CustomTrigger,
+  event: GameEvent,
+  state: GameState,
+  sourceCard: CardInstance,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (event.type !== "COMBAT_VICTORY" && event.type !== "CHARACTER_BATTLES") return false;
+  if (event.type === "COMBAT_VICTORY" && event.payload.cardInstanceId !== sourceCard.instanceId) return false;
+  const opposingId = getBattleOpponentInstanceId(event, sourceCard.instanceId);
+  if (!opposingId) return false;
+  const filter = trigger.filter;
+  if (!filter) return true;
+  const opposingIsLeader = state.players.some((p) => p.leader.instanceId === opposingId);
+  if (filter.battle_target_type && (opposingIsLeader ? "LEADER" : "CHARACTER") !== filter.battle_target_type) return false;
+  if (filter.attribute) {
+    // The attribute it battled with: the K.O.'d loser has left the field by
+    // the time the event is scanned, so read its last known card.
+    const cardId = lastKnownCardId(state, opposingId);
+    const want = filter.attribute.toUpperCase();
+    if (!cardId || !cardDb.get(cardId)?.attribute?.some((a) => a.toUpperCase() === want)) return false;
+  }
+  if (filter.target_filter) {
+    const opposing = findCardInstance(state, opposingId);
+    if (!opposing || (opposing.zone !== "CHARACTER" && opposing.zone !== "LEADER")) return false;
+    if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
+  }
+  return true;
+}
+
+/** A card's id from the field, else from the latest logged event that named that instance (CARD_KO, CARD_TRASHED, …). */
+function lastKnownCardId(state: GameState, instanceId: string): string | undefined {
+  const onField = findCardInstance(state, instanceId);
+  if (onField) return onField.cardId;
+  for (let i = state.eventLog.length - 1; i >= 0; i--) {
+    const payload = state.eventLog[i].payload as { cardInstanceId?: unknown; cardId?: unknown };
+    if (payload.cardInstanceId === instanceId && typeof payload.cardId === "string") return payload.cardId;
+  }
+  return undefined;
 }
 
 function containsRemovalTrigger(trigger: Trigger): boolean {
