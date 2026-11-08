@@ -209,7 +209,7 @@ Stand-in: p1 Leader `SYN-TAKE-DAMAGE` (custom trigger `DAMAGE_TAKEN`, `filter.co
 | F12a | guard (flipped by OPT-963) | Base: the `REVEAL_TRIGGER` prompt surfaces with p0 Life already 1. OPT-963: `DEAL_DAMAGE` pauses on its EFFECT_DAMAGE frame with the chain parked below; p0 Life stays 2 until the window closes, then `LIFE_TO_HAND`. |
 | F12b | guard (flipped by OPT-963) | Base: same as F12a, decline path. OPT-963: as F12a. |
 | F12c | guard (flipped by OPT-963) | Base: same as F12a across a reload. OPT-963: the EFFECT_DAMAGE frame and its parent chain reload through the version 3 reader; as F12a. |
-| F12d | ratchet (OPT-970) | With p1 at 2 Life the `DEAL_DAMAGE` condition is false, yet the `THEN`-chained `LIFE_TO_HAND` still moved p0's top Life to hand. FAQ qa_op06.md:367-371 says it cannot. |
+| F12d | guard (flipped by OPT-970) | Base: with p1 at 2 Life the `DEAL_DAMAGE` condition is false, yet the `THEN`-chained `LIFE_TO_HAND` still moved p0's top Life to hand. OPT-970: a failed inline condition also skips the following `THEN` run (rule 4-10-1); p0 Life and hand unchanged. |
 
 | F12d control | guard | p1 at exactly 1 Life: damage and add both happen (p1 Life 0, p0 Life 1, p0 hand +1). |
 | F9 control | guard | p0 plays a vanilla Character: Sugar stays and its effect resolves (`CARD_DRAWN` p1). |

@@ -238,9 +238,9 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
     expect(count(rig.state.players[1].trash, SYN_TRIGGER_LIFE.id)).toBe(1);
   });
 
-  // Engine: the DEAL_DAMAGE condition is false, yet the chained LIFE_TO_HAND still moves p0's top Life
-  // to hand (p0 Life 2 -> 1). FAQ qa_op06.md:367-371: "No, you cannot" add from your Life.
-  it.fails("F12d option 2 while the opponent has 2 Life: no damage, no add from Life (ratchet OPT-970)", () => {
+  // Rule 4-10-1: the DEAL_DAMAGE "if" clause is false, so the chained "Then" LIFE_TO_HAND cannot resolve
+  // either. FAQ qa_op06.md:367-371: "No, you cannot" add from your Life.
+  it("F12d option 2 while the opponent has 2 Life: no damage, no add from Life (flipped by OPT-970)", () => {
     const rig = setup([life("p1-a", CARDS.VANILLA.id), life("p1-b", CARDS.VANILLA.id)]);
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     playOptionTwo(rig);

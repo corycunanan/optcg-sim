@@ -1083,6 +1083,12 @@ function executeActionChainCore(
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
   let lastActionSucceeded = priorActionSucceeded ?? true;
+  // OPT-970, rule 4-10-1: when an "if" clause (an inline condition) cannot
+  // be resolved, the clause that follows it ("Then, ...") cannot be resolved
+  // either. A failed *action* does not set this (rule 4-10-2: the next "Then"
+  // still resolves). Skipped THEN actions keep it set, so the whole "Then"
+  // tail of that sentence is skipped (OP10-058).
+  let ifClauseFailed = false;
   // OPT-960: a terminal checkpoint earlier in this resolution ends play.
   if (isGameTerminated(state)) return { state, events };
 
@@ -1102,6 +1108,14 @@ function executeActionChainCore(
         i = simultaneousGroupEnd(actions, i);
       continue;
     }
+
+    if (action.chain === "THEN" && ifClauseFailed) {
+      lastActionSucceeded = false;
+      if (isSimultaneousGroupStart(actions, i))
+        i = simultaneousGroupEnd(actions, i);
+      continue;
+    }
+    ifClauseFailed = false;
 
     if (isSimultaneousGroupStart(actions, i)) {
       const end = simultaneousGroupEnd(actions, i);
@@ -1149,6 +1163,7 @@ function executeActionChainCore(
       };
       if (!evaluateCondition(state, action.conditions, condCtx)) {
         lastActionSucceeded = false;
+        ifClauseFailed = true;
         continue;
       }
     }

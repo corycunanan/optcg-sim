@@ -116,7 +116,10 @@ describe("OPT-806 schema sweep B", () => {
     );
 
     expect(getEffectivePower(nami, namiData, result.state, cardDb)).toBe(5000);
-    expect(result.state.players[0].deck.at(-1)?.instanceId).toBe(
+    // Rule 4-10-1 (OPT-970): the failed "if" also cancels "Then, place the
+    // revealed card at the bottom", so it stays on top (as the EB01-029 FAQ
+    // rules for the same template).
+    expect(result.state.players[0].deck[0]?.instanceId).toBe(
       revealedEvent.instanceId,
     );
   });
