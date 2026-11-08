@@ -1101,28 +1101,24 @@ export const EB02_030_AND_THATS_WHEN_SOMEBODY: EffectSchema = {
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
-          type: "APPLY_ONE_TIME_MODIFIER",
+          type: "APPLY_REPLACEMENT",
           params: {
-            modification: {
-              type: "REPLACEMENT_EFFECT",
-              params: {
-                replaces: "WOULD_BE_KO",
-                cause: "IN_BATTLE",
-                replacement_action: {
-                  type: "TRASH_FROM_HAND",
-                  params: { amount: 1 },
-                },
+            replaces: {
+              event: "WOULD_BE_KO",
+              cause_filter: { by: "BATTLE" },
+              target_filter: { controller: "SELF", card_type: "CHARACTER" },
+            },
+            replacement_actions: [
+              {
+                type: "TRASH_FROM_HAND",
+                params: { amount: 1 },
               },
-            },
-            applies_to: {
-              controller: "SELF",
-              card_type: "CHARACTER",
-            },
+            ],
+            optional: true,
           },
           duration: { type: "THIS_TURN" },
         },
       ],
-      flags: { optional: true },
     },
     {
       id: "trigger_draw",

@@ -411,6 +411,12 @@ function visitAction(action: Action, tags: Set<EffectFacetTag>): void {
       for (const nestedAction of option) visitAction(nestedAction, tags);
     }
   }
+  // OPT-874: a granted replacement's substitute is part of the card's effect.
+  if (action.type === "APPLY_REPLACEMENT") {
+    for (const nestedAction of action.params?.replacement_actions ?? []) {
+      visitAction(nestedAction, tags);
+    }
+  }
 }
 
 function visitCost(cost: Cost, tags: Set<EffectFacetTag>): void {
@@ -541,7 +547,15 @@ function visitBlock(
   }
   if (block.flags?.once_per_turn) addTag(tags, "flag:once_per_turn");
   // OPT-799: a clause-level "you may" (Action.optional) is optional too.
-  if (block.flags?.optional || block.actions?.some((a) => a.optional === true))
+  // OPT-874: so is a granted replacement's "you may ... instead".
+  if (
+    block.flags?.optional ||
+    block.actions?.some(
+      (a) =>
+        a.optional === true ||
+        (a.type === "APPLY_REPLACEMENT" && a.params?.optional === true)
+    )
+  )
     addTag(tags, "flag:optional");
   if (block.flags?.lock_on_decline) addTag(tags, "flag:lock_on_decline");
 
