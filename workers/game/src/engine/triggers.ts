@@ -1028,6 +1028,10 @@ function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent, 
   if (event.type === "CARD_KO" && event.payload.cardType === "STAGE" &&
       ["CHARACTER_REMOVED_FROM_FIELD", "OPPONENT_CHARACTER_KO", "ANY_CHARACTER_KO"].includes(custom)) return false;
   if (custom === "CARD_TRASHED_FROM_HAND") return isHandTrashByEffect(event);
+  // OPT-1030: "When you play a Character". Event and Stage plays also emit
+  // CARD_PLAYED (zone TRASH / STAGE); only a card that entered the Character
+  // area is a Character play, whatever its source (hand, effect, Life, deck).
+  if (custom === "CHARACTER_PLAYED") return event.type === "CARD_PLAYED" && event.payload.zone === "CHARACTER";
   if (["ANY_CHARACTER_TRASHED", "OPPONENT_CHARACTER_TRASHED"].includes(custom) && event.type === "CARD_TRASHED" && event.payload.from === "HAND") return false;
   if (custom === "CHARACTER_REMOVED_FROM_FIELD") {
     if (!["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"].includes(event.type)) return false;

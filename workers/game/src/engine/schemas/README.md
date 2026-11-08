@@ -178,7 +178,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When your opponent activates an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } }` |
 | A Character resolved an Event's [Main] from trash (EB03-031); not "activates an Event" per the EB03-031 FAQ, so no printed watcher uses it | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
 | "When an Event's [Trigger] resolves from Life" | `{ event: "EVENT_TRIGGER_RESOLVED" }` |
-| "When you play a Character" | `{ event: "CHARACTER_PLAYED", filter: { controller: "SELF" } }` |
+| "When you play a Character" | `{ event: "CHARACTER_PLAYED", filter: { controller: "SELF" } }` — the engine matches only cards that entered the Character area, from any source (hand, effect, Life, deck); Event and Stage plays never fire it, so no `card_type` filter needed |
 | "When a card is removed from Life" | `{ event: "CARD_REMOVED_FROM_LIFE" }` |
 | "When [Trigger] is activated" | `{ event: "TRIGGER_ACTIVATED" }` |
 | "When this Character battles and K.O.'s" | `{ event: "COMBAT_VICTORY" }` |
