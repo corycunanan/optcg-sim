@@ -4,6 +4,7 @@ import { promoteStateToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
 import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
+import { admitPreContextTerminalSave } from "./pre-context-terminal-admission.js";
 import { liftVersion3 } from "./version4-lift.js";
 import { isVersion4Lowering } from "./version4-reader.js";
 import type {
@@ -947,8 +948,11 @@ export function convertPersistedGameState(
       return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
     }
   }
-  const converted = convertToCurrentShape(raw, location);
-  const validated = parseStoredGameState(converted, location);
+  const admitted = admitPreContextTerminalSave(raw, location);
+  const converted = convertToCurrentShape(admitted, location);
+  const parsed = parseStoredGameState(converted, location);
+  // OPT-1013: the admitted legacy context starts at id counter 0.
+  const validated = admitted === raw ? parsed : reconcileExecutionContextIdCounter(parsed);
   validateContinuationReferences(validated, location);
   const migrated = migrateLegacyTriggerRegistry(liftLegacyPrompt(liftVersion3(validated), location));
   validateContinuationReferences(migrated, location);

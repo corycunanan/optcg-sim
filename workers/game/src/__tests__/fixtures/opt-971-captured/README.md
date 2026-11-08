@@ -1,4 +1,6 @@
-# OPT-971 actual captured, known-rejected sessions
+# OPT-971 actual captured sessions (rejected at capture, admitted read-only by OPT-1013)
+
+> **OPT-1013 update (2026-11-08):** both captures are now admitted read-only as terminal pre-context saves ([Compatibility §4.2](../../../../../../docs/game-engine/SAVED-STATE-COMPATIBILITY.md#42-captured-unversioned-admission-gaps-opt-971)); see `opt-1013-pre-context-terminal-admission.test.ts`. The bytes and `manifest.json` are unchanged: the manifest's `rawDisposition`, `rawError` and `rawReaderAcceptedCaptures` record the reader deployed at capture time. The text below is the original capture record.
 
 These two JSON files are **actual sanitized Durable Object storage exports**, retained byte-for-byte. They are not synthetic engine fixtures and are not accepted reader inputs. `manifest.json` records their hashes, export/deployment provenance, safe structural metadata, exact raw rejection and the explicitly separate scratch-context diagnostic.
 
