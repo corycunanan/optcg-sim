@@ -184,6 +184,15 @@ export function filterEventForRecipient(
   }
 
   if (policy.audience === "OWNER_ONLY") {
+    // OPT-933: a face-down Life card is secret to its owner as well (rule
+    // 3-10-2), so its departure to the deck names no identity to anyone.
+    if (
+      event.type === "CARD_RETURNED_TO_DECK" &&
+      event.payload.sourceZone === "LIFE" &&
+      event.payload.sourceFace === "DOWN"
+    ) {
+      return redactEventIdentities(event);
+    }
     return recipient.kind === "PLAYER" &&
       event.playerIndex === recipient.playerIndex
       ? event

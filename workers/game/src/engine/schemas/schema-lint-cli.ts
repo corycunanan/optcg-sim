@@ -33,6 +33,7 @@ import { findDonGivenIntentViolations } from "../schema-don-given-lint.js";
 import { findWholeHandTrashIntentViolations } from "../schema-hand-trash-amount-lint.js";
 import { findDrawProhibitionIntentViolations } from "../schema-draw-prohibition-lint.js";
 import { findThisWaySourceIntentViolations } from "../schema-this-way-source-lint.js";
+import { findSearchAndPlayRevealIntentViolations } from "../schema-search-reveal-lint.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -285,6 +286,7 @@ async function main(): Promise<void> {
     ...findDonGivenIntentViolations(loadCanonicalCardBlocks(), schemas),
     ...findDrawProhibitionIntentViolations(schemas),
     ...findThisWaySourceIntentViolations(schemas),
+    ...findSearchAndPlayRevealIntentViolations(loadCanonicalCardBlocks(), schemas),
     // Full runs walk the generated registry; a single-file run checks only
     // that file's schemas and skips the missing-card disposition check.
     ...findWholeHandTrashIntentViolations(

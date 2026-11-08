@@ -323,7 +323,8 @@ export interface GameEventPayloadMap {
     reason: string;
     diagnostic?: EngineLimitDiagnostic;
   };
-  CARD_RETURNED_TO_DECK: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId?: string; position?: string };
+  /** `sourceFace: "DOWN"` marks a face-down Life card, secret to its owner too (OPT-933). */
+  CARD_RETURNED_TO_DECK: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId?: string; position?: string; sourceFace?: "UP" | "DOWN" };
   DON_SET_ACTIVE: { count: number };
   DON_RESTED: { count: number };
   CARDS_REVEALED: {

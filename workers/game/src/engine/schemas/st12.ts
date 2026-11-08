@@ -251,6 +251,7 @@ export const ST12_010_EMPORIO_IVANKOV: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
             rest_destination: "TOP_OR_BOTTOM",
           },
@@ -349,6 +350,7 @@ export const ST12_013_ZEFF: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
             rest_destination: "TOP_OR_BOTTOM",
             entry_state: "RESTED",
@@ -452,6 +454,7 @@ export const ST12_017_PLASTIC_SURGERY_SHOT: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
             rest_destination: "TOP_OR_BOTTOM",
           },

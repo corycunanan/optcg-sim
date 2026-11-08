@@ -30,7 +30,9 @@ export const ACTION_TARGET_PROMPT_KIND = {
   PLAY_CARD: "TARGET_COUNT",
   ADD_TO_LIFE: "TARGET_COUNT",
   MILL: "OTHER",
-  REVEAL: "OTHER",
+  // A CARD_IN_HAND target (OP10-058) prompts from its count (OPT-999); deck
+  // and Life reveals read params.amount and carry no target type.
+  REVEAL: "TARGET_COUNT",
   FULL_DECK_SEARCH: "OTHER",
   DECK_SCRY: "OTHER",
   SEARCH_TRASH_THE_REST: "OTHER",

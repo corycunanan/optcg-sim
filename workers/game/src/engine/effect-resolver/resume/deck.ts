@@ -516,9 +516,13 @@ export function handleArrangeReorderLife(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[targetController] = { ...p, life: newLife };
 
+  // OPT-933: the new order is private to the chooser who looked at the Life
+  // cards, not to the Life owner (rule 3-10-2). When an opponent's effect
+  // (EB01-052 Viola) reorders your Life, your copy of this event carries only
+  // the count of hidden ids.
   events.push({
     type: "LIFE_REORDERED",
-    playerIndex: targetController,
+    playerIndex: controller,
     payload: { orderedInstanceIds: ordered },
   });
 

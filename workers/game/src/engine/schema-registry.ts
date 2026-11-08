@@ -1149,9 +1149,10 @@ function collectConsumedResultRefs(
     if ((key === "target_ref" || key.endsWith("_ref")) && typeof nested === "string") {
       consumed.add(nested);
     }
-    // OPT-826: an attacker-bound Blocker prohibition consumes its ref.
+    // OPT-826: an attacker-bound Blocker prohibition consumes its ref, and
+    // OPT-999: so does a SELECTED_CARDS action target (OP10-058's plays).
     if (
-      key === "when_attacking" &&
+      (key === "when_attacking" || key === "target") &&
       nested &&
       typeof nested === "object" &&
       (nested as { type?: unknown }).type === "SELECTED_CARDS" &&

@@ -190,6 +190,22 @@ export type PlayCardResumeFrame = {
   queuedTriggers?: QueuedTrigger[];
 };
 
+/**
+ * OPT-999: a card named by an earlier result (a SELECTED_CARDS target or an
+ * action-level target_ref) is playable only while it is still in the play's
+ * printed source zone. OP10-058 must never play a deck card for its "from
+ * your hand" play, and its second play must not reselect the card the first
+ * play already put on the field. Zone-searching targets (CHARACTER_CARD, …)
+ * already draw candidates from their own `target.source_zone`, so they are
+ * left alone. Returns null when the action is unrestricted.
+ */
+function referencedPlaySourceZones(action: ActionOf<"PLAY_CARD">): Set<string> | null {
+  const sourceZone = action.params?.source_zone;
+  if (!sourceZone) return null;
+  if (action.target?.type !== "SELECTED_CARDS" && !action.target_ref) return null;
+  return new Set(sourceZone.toUpperCase().split("_OR_"));
+}
+
 export function executePlayCard(
   state: GameState,
   action: ActionOf<"PLAY_CARD">,
@@ -213,7 +229,11 @@ export function executePlayCard(
     // source zone. Filter at target gate so the player isn't prompted with
     // ineligible cards. Manual hand-play (cost-paid PLAY_CARD via execute.ts)
     // bypasses this code path entirely.
-    const eligibleIds = allValidIds.filter((id) => !isCardPlayProhibitedByEffect(state, id, cardDb));
+    const referencedSourceZones = referencedPlaySourceZones(action);
+    const eligibleIds = allValidIds.filter((id) =>
+      !isCardPlayProhibitedByEffect(state, id, cardDb) &&
+      (!referencedSourceZones ||
+        referencedSourceZones.has(findCardInstance(state, id)?.zone ?? "")));
     if (!preselectedTargets && needsPlayerTargetSelection(action.target, eligibleIds)) {
       return buildSelectTargetPrompt(state, action, eligibleIds, sourceCardInstanceId, controller, cardDb, resultRefs);
     }

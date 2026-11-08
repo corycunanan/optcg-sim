@@ -655,6 +655,7 @@ const EventPayloadSchemas = {
     newCardInstanceId: z.string().optional(),
     cardId: z.string().optional(),
     position: z.string().optional(),
+    sourceFace: z.enum(["UP", "DOWN"]).optional(),
   }),
   DON_SET_ACTIVE: z.strictObject({ count: FiniteNumber }),
   DON_RESTED: z.strictObject({ count: FiniteNumber }),
