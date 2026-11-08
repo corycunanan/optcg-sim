@@ -493,7 +493,7 @@ export function executeCopyPower(
   };
 }
 
-type SourceResolution =
+export type SourceResolution =
   | { directIds: string[]; target?: undefined }
   | { target: Target; directIds?: undefined };
 
@@ -502,7 +502,7 @@ type SourceResolution =
  * direct instance IDs or a Target for the resolver. String shorthands
  * ("OPPONENT_LEADER", "ATTACKING_CARD") are handled here.
  */
-function resolveSourceTarget(
+export function resolveSourceTarget(
   params: ActionParamsMap["COPY_POWER"],
   state: GameState
 ): SourceResolution | undefined {

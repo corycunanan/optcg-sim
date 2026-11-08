@@ -13,12 +13,13 @@ import { retainEventParent } from "../event-activation.js";
  *                      using the shared events accumulator
  */
 
-import type { EffectResult } from "../../effect-types.js";
+import type { Action, EffectResult } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
   GameAction,
   PendingEvent,
+  PendingPromptState,
   ResumeContext,
 } from "../../../types.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
@@ -27,7 +28,9 @@ import { trashCharacter } from "../card-mutations.js";
 import {
   validateTargetConstraints,
   buildSelectTargetPrompt,
+  computeAllValidTargets,
 } from "../target-resolver.js";
+import { resolveSourceTarget } from "../actions/modifiers.js";
 import {
   applyRedistributeDonTransfers,
   fieldSideOf,
@@ -455,30 +458,53 @@ export function handleSelectTarget(
       };
     }
   }
-  // Validate — all selected ids must be in validTargets
-  if (selected.some((id) => !validTargets.includes(id))) {
-    const reprompt = buildSelectTargetPrompt(
-      nextState,
-      pausedAction,
-      validTargets,
-      effectSourceInstanceId,
-      controller,
-      cardDb,
-      resultRefs
-    );
-    return {
+  // OPT-880: the saved validTargets were computed when the prompt was issued.
+  // Re-resolve the prompt's target against the current state so a candidate
+  // that stopped matching while the prompt was pending is no longer accepted.
+  const currentTargets = currentPromptTargets(
+    nextState,
+    pausedAction,
+    validTargets,
+    controller,
+    cardDb,
+    effectSourceInstanceId,
+    resultRefs,
+  );
+  const candidatesChanged = currentTargets.length !== validTargets.length;
+  const rejectReply = (): TargetBranchResult =>
+    (candidatesChanged
+      ? repromptWithCurrentCandidates(
+          nextState,
+          resumeCtx,
+          currentTargets,
+          resultRefs,
+          cardDb,
+          events,
+          services
+        )
+      : null) ?? {
       kind: "handled",
       result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
-        pendingPrompt: reprompt.pendingPrompt
-          ? withChainDescription(reprompt.pendingPrompt, effectDescription)
-          : undefined,
+        pendingPrompt: withPromptDescription(
+          buildSelectTargetPrompt(
+            nextState,
+            pausedAction,
+            validTargets,
+            effectSourceInstanceId,
+            controller,
+            cardDb,
+            resultRefs
+          ).pendingPrompt,
+          effectDescription
+        ),
         rejected: true,
       },
     };
-  }
+  // Validate — all selected ids must be current candidates of the prompt
+  if (selected.some((id) => !currentTargets.includes(id))) return rejectReply();
   // Validate target constraints (aggregate sum, uniqueness, named distribution, dual_targets)
   if (
     pausedAction.target &&
@@ -488,30 +514,14 @@ export function handleSelectTarget(
       nextState,
       cardDb,
       resultRefs,
-      { controller, sourceCardInstanceId: effectSourceInstanceId }
+      {
+        controller,
+        sourceCardInstanceId: effectSourceInstanceId,
+        offeredIds: currentTargets,
+      }
     )
   ) {
-    const reprompt = buildSelectTargetPrompt(
-      nextState,
-      pausedAction,
-      validTargets,
-      effectSourceInstanceId,
-      controller,
-      cardDb,
-      resultRefs
-    );
-    return {
-      kind: "handled",
-      result: { kind: "waiting",
-        state: nextState,
-        events,
-        resolved: false,
-        pendingPrompt: reprompt.pendingPrompt
-          ? withChainDescription(reprompt.pendingPrompt, effectDescription)
-          : undefined,
-        rejected: true,
-      },
-    };
+    return rejectReply();
   }
 
   const childStart = nextState.effectStack.length;
@@ -610,6 +620,137 @@ export function handleSelectTarget(
     state: nextState,
     succeeded: actionResult.succeeded,
   };
+}
+
+function isPausedActionContext(
+  context: PendingPromptState["resumeContext"]
+): context is ResumeContext {
+  return (
+    typeof context === "object" &&
+    context !== null &&
+    !("type" in context) &&
+    "pausedAction" in context
+  );
+}
+
+function withPromptDescription(
+  prompt: PendingPromptState | undefined,
+  effectDescription: string | undefined
+): PendingPromptState | undefined {
+  return prompt ? withChainDescription(prompt, effectDescription) : undefined;
+}
+
+/**
+ * OPT-880: ask a SELECT_TARGET whose candidates changed while it was pending
+ * again, without applying the stale reply. The paused action runs with no
+ * preselection, so its own handler builds the prompt from the current state
+ * (keeping any handler-specific shape such as a blind hand selection); the
+ * paused chain's resume context is kept and only its candidates refresh. When
+ * the handler would no longer prompt, the generic prompt over the current
+ * candidates is asked, whose minimums never exceed what it offers. Returns
+ * null when no re-prompt can be built, leaving the prompt unchanged.
+ */
+function repromptWithCurrentCandidates(
+  state: GameState,
+  resumeCtx: ResumeContext,
+  currentTargets: string[],
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[],
+  services: EffectResolverServices
+): TargetBranchResult {
+  const { pausedAction, controller, effectSourceInstanceId, effectDescription } =
+    resumeCtx;
+  if (!pausedAction) return null;
+  const fresh = services.executeEffectAction(
+    state,
+    pausedAction,
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    new Map(resultRefs)
+  );
+  const handlerPrompt =
+    fresh.events.length === 0 &&
+    !fresh.nestedEventActivation &&
+    !fresh.pendingBatchTriggers &&
+    fresh.pendingPrompt?.options.promptType === "SELECT_TARGET" &&
+    isPausedActionContext(fresh.pendingPrompt.resumeContext)
+      ? fresh.pendingPrompt
+      : undefined;
+  const prompt =
+    handlerPrompt ??
+    buildSelectTargetPrompt(
+      state,
+      pausedAction,
+      currentTargets,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    ).pendingPrompt;
+  if (!prompt || !isPausedActionContext(prompt.resumeContext)) return null;
+  const refreshedTargets = prompt.resumeContext.validTargets;
+  return {
+    kind: "handled",
+    result: { kind: "waiting",
+      state: handlerPrompt ? fresh.state : state,
+      events,
+      resolved: false,
+      pendingPrompt: withChainDescription(
+        { ...prompt, resumeContext: { ...resumeCtx, validTargets: refreshedTargets } },
+        effectDescription
+      ),
+      rejected: true,
+      reprompted: true,
+    },
+  };
+}
+
+/**
+ * Actions whose handler re-checks a preselected reply against the live state
+ * and re-asks its own prompt shape when it went stale (OPT-861): REVEAL_HAND
+ * asks a blind hand selection that the generic prompt must not replace.
+ */
+const SELF_REVALIDATING_SELECTIONS: ReadonlySet<Action["type"]> = new Set<Action["type"]>([
+  "REVEAL_HAND",
+]);
+
+/**
+ * OPT-880: the saved prompt candidates that are still candidates now. The
+ * prompt's target (COPY_POWER prompts for its power source, every other
+ * action for `action.target`) is resolved against the current state and
+ * intersected with the saved list, which keeps any handler-specific narrowing
+ * applied when the prompt was issued. An action with no resolvable target
+ * (a target_ref selection), or whose handler revalidates its own reply, keeps
+ * the saved list.
+ */
+function currentPromptTargets(
+  state: GameState,
+  action: Action,
+  validTargets: string[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+  resultRefs: Map<string, EffectResult>,
+): string[] {
+  if (SELF_REVALIDATING_SELECTIONS.has(action.type)) return validTargets;
+  const target =
+    action.type === "COPY_POWER"
+      ? resolveSourceTarget(action.params ?? {}, state)?.target
+      : action.target;
+  if (!target) return validTargets;
+  const live = new Set(
+    computeAllValidTargets(
+      state,
+      target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs,
+    ),
+  );
+  return validTargets.filter((id) => live.has(id));
 }
 
 /**
