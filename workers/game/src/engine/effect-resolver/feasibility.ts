@@ -80,3 +80,46 @@ export function isActionBranchFeasible(
     ),
   );
 }
+
+/**
+ * Target types that name one fixed card from the effect's context rather than
+ * a pool the player picks from. Empty means the referenced card is gone
+ * (Rule 3-1-6), and nothing else can stand in for it.
+ */
+const FIXED_REFERENCE_TARGETS: ReadonlySet<string> = new Set([
+  "BATTLE_TARGET",
+  "TRIGGERING_CARD",
+  "TRIGGERING_CARD_IN_TRASH",
+  "REPLACED_CARD",
+]);
+
+/**
+ * OPT-904: true when an action chain can have no effect at all: its first
+ * action acts on a fixed context reference that resolves to nothing, and
+ * every later action is an IF_DO that depends on it ("you may K.O. the
+ * Character you battled with. If you do, …"). An optional block with such a
+ * chain and no cost is not offered, since accepting could change nothing.
+ */
+export function isFixedReferenceChainVacuous(
+  state: GameState,
+  actions: readonly Action[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): boolean {
+  const [first, ...rest] = actions;
+  const target = first?.target;
+  if (!first || !target?.type || first.target_ref) return false;
+  if (!FIXED_REFERENCE_TARGETS.has(target.type)) return false;
+  if (target.mixed_pool || target.dual_targets?.length) return false;
+  if (!rest.every((action) => action.chain === "IF_DO")) return false;
+  return computeAllValidTargets(
+    state,
+    target,
+    controller,
+    cardDb,
+    sourceCardInstanceId,
+    resultRefs,
+  ).length === 0;
+}

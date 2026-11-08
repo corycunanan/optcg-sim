@@ -486,8 +486,9 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
     f.choose("accept");
     f.roundTrip();
     f.select(chars.slice(0, n).map((c) => c.instanceId));
-    // "Up to 1 of your Leader or Character cards" — pick the Leader.
-    f.select([leader.instanceId]);
+    // "Up to 1 of your Leader or Character cards" — pick the Leader. With 0
+    // returned the bonus is +0, so no target is asked for (OPT-930).
+    if (n > 0) f.select([leader.instanceId]);
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.players[1].characters.filter(Boolean)).toHaveLength(2 - n);
     expect(f.power(leader)).toBe(5000 + 2000 * n);
@@ -546,8 +547,13 @@ describe("OPT-885 re-authored no-colon \"trash any number\" cards (were ANY_NUMB
       f.choose("accept");
       f.roundTrip();
       f.select(hand.slice(0, n).map((c) => c.instanceId));
-      // "Your Leader or 1 of your Characters" — pick the source.
-      if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET") f.select([source.instanceId]);
+      // "Your Leader or 1 of your Characters" — pick the source. P-051 and
+      // OP03-001 target themselves; with 0 trashed nobody is asked to take
+      // +0 (OPT-930).
+      if (n > 0 && id !== "OP03-001" && id !== "P-051") {
+        expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+        f.select([source.instanceId]);
+      }
       expect(f.state.pendingPrompt).toBeNull();
       expect(f.state.players[owner].trash).toHaveLength(n);
       expect(f.power(source)).toBe(5000 + 1000 * n);
