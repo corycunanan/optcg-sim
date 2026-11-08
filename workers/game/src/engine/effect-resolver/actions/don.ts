@@ -97,15 +97,21 @@ export function executeGiveDon(
   }
 
   let nextState = state;
+  let given = 0;
   for (const targetId of targetIds) {
     for (let i = 0; i < amount; i++) {
       const result = attachDonToCard(nextState, controller, targetId, donState);
       if (!result) break;
       nextState = result;
+      given++;
     }
   }
 
-  events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: amount } });
+  // A give with no DON!! in the requested state moves nothing, so it must not
+  // fire "when DON!! is given" watchers such as OP02-002 Garp.
+  if (given > 0) {
+    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: given } });
+  }
 
   return { state: nextState, events, succeeded: true };
 }

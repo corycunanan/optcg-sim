@@ -3,6 +3,7 @@ import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { executeGiveDon } from "../engine/effect-resolver/actions/don.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { executeSetRest } from "../engine/effect-resolver/actions/play.js";
 import { executeModifyCost } from "../engine/effect-resolver/actions/modifiers.js";
@@ -210,5 +211,17 @@ describe("EB-05 FAQ rulings", () => {
     const result = runPipeline(f.state, { type: "PLAY_CARD", cardInstanceId: other.instanceId }, f.db, 0);
     expect(result.valid).toBe(false);
     expect(f.state.players[0].hand.some((c) => c.instanceId === other.instanceId)).toBe(true);
+  });
+});
+
+describe("GIVE_DON event", () => {
+  it.each([[false, 0], [true, 1]])("emits DON_GIVEN_TO_CARD only when a DON!! moves (rested available=%s)", (rested, count) => {
+    const f = fixture();
+    if (rested) f.state.players[0].donCostArea[0].state = "RESTED";
+    const leader = f.state.players[0].leader.instanceId;
+    const result = executeGiveDon(f.state, { type: "GIVE_DON", target: { type: "YOUR_LEADER" }, params: { amount: 1, don_state: "RESTED" } }, leader, 0, f.db, new Map(), [leader]);
+    const events = result.events.filter((e) => e.type === "DON_GIVEN_TO_CARD");
+    expect(events).toHaveLength(count);
+    expect(result.state.players[0].leader.attachedDon).toHaveLength(count);
   });
 });
