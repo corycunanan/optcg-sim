@@ -25,6 +25,7 @@ import {
   type EffectBlock,
   type Action,
   type ActionOf,
+  type ActionParamsMap,
   type Controller,
   type Cost,
   type Target,
@@ -1260,30 +1261,55 @@ function countAllowsZero(count: unknown): boolean {
  * exactly that many), and action-level `optional` is the only decline.
  */
 function zeroAllowingTargetCounts(action: Action): string[] {
-  const target = action.target;
+  // OPT-928: COPY_POWER prompts for its power source, with the source
+  // target's count (`executeCopyPower`); `action.target` is the fixed
+  // recipient and never prompts.
+  if (action.type === "COPY_POWER") {
+    const params = action.params as ActionParamsMap["COPY_POWER"] | undefined;
+    const source = params?.source_target
+      ? { target: params.source_target, path: "params.source_target" }
+      : params?.source && typeof params.source === "object"
+        ? { target: params.source, path: "params.source" }
+        : undefined;
+    return source
+      ? zeroAllowingCountsFor(source.target, source.path, true)
+      : [];
+  }
+  return zeroAllowingCountsFor(
+    action.target,
+    "target",
+    promptsFromTargetCount(action.type),
+  );
+}
+
+function zeroAllowingCountsFor(
+  target: Target | undefined,
+  path: string,
+  promptsFromCount: boolean,
+): string[] {
   if (!target) return [];
   const paths: string[] = [];
   const perTypeZero = countAllowsZero(target.per_type_selection?.count_per_type);
-  if (perTypeZero) paths.push("target.per_type_selection.count_per_type");
+  if (perTypeZero) paths.push(`${path}.per_type_selection.count_per_type`);
   if (target.dual_targets?.length) {
     if (targetPromptCountMin(target) === 0) {
       target.dual_targets.forEach((_slot, index) =>
-        paths.push(`target.dual_targets[${index}].count`),
+        paths.push(`${path}.dual_targets[${index}].count`),
       );
     }
     return paths;
   }
-  if (countAllowsZero(target.count)) paths.push("target.count");
+  if (countAllowsZero(target.count)) paths.push(`${path}.count`);
   if (countAllowsZero(target.mixed_pool?.total_count))
-    paths.push("target.mixed_pool.total_count");
+    paths.push(`${path}.mixed_pool.total_count`);
   const hasCount = !!(target.mixed_pool?.total_count ?? target.count);
-  if (hasCount || perTypeZero || !promptsFromTargetCount(action.type)) return paths;
+  if (hasCount || perTypeZero || !promptsFromCount) return paths;
   // Probe with the largest pool this target type can produce (capped), so
   // the predicate reports whether a multi-candidate prompt is possible.
   const poolMax = Math.min(targetCandidatePoolMax(target), 1000);
   const probe = Array.from({ length: poolMax }, (_, i) => `probe-${i}`);
   if (needsPlayerTargetSelection(target, probe) && targetPromptCountMin(target) === 0) {
-    paths.push("target (omits count, so the multi-candidate prompt defaults to choosing 0 or 1)");
+    paths.push(`${path} (omits count, so the multi-candidate prompt defaults to choosing 0 or 1)`);
   }
   return paths;
 }

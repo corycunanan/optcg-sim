@@ -910,8 +910,12 @@ export function buildSelectTargetPrompt(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  // OPT-928: the target this prompt selects for, when it is not
+  // `action.target` (COPY_POWER selects its power source). Its count sets the
+  // prompt bounds; the paused action stays the original.
+  promptTarget: Target | undefined = action.target,
 ): ActionResult {
-  const target = action.target;
+  const target = promptTarget;
 
   // Compute dual_targets metadata for the prompt
   const authoritativeValidIds = new Set(allValidIds);

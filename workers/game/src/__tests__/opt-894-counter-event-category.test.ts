@@ -836,7 +836,9 @@ describe("OPT-894 — Life / deck / bounce Counters", () => {
     const kept = [a, b, c].slice(n);
     const leaderBase = f.power(f.p1Leader());
     const don = f.activeDon();
-    f.counter("P-059", ["accept", ids(...returned), ids(f.p1Leader())]);
+    // OPT-930: with 0 returned the bonus is +0, so no Leader/Character
+    // target is asked for.
+    f.counter("P-059", ["accept", ids(...returned), ...(n > 0 ? [ids(f.p1Leader())] : [])]);
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.power(f.p1Leader())).toBe(leaderBase + bonus);
     expect(f.state.players[1].characters.filter(Boolean).map((x) => x!.cardId)).toEqual(
