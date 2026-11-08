@@ -401,6 +401,40 @@ describe("OPT-866 OP06-111 Braham — place 1 cost-1 Stage (either player's) at 
   });
 });
 
+describe("OPT-866 review — a Stage cost fills CARDS_PLACED_TO_DECK_THIS_WAY", () => {
+  function synthetic(controller: "SELF" | "EITHER"): EffectSchema {
+    return {
+      card_id: "STAGE-COUNTER",
+      card_name: "Stage counter",
+      card_type: "Character",
+      effects: [{
+        id: "activate",
+        category: "activate",
+        trigger: { keyword: "ACTIVATE_MAIN" },
+        costs: [{ type: "PLACE_STAGE_TO_DECK", amount: 1, position: "BOTTOM", ...(controller === "EITHER" ? { controller } : {}) }],
+        actions: [{
+          type: "MODIFY_POWER",
+          target: { type: "SELF" },
+          params: { amount: { type: "PER_COUNT", source: "CARDS_PLACED_TO_DECK_THIS_WAY", multiplier: 1000 } },
+          duration: { type: "THIS_TURN" },
+        }],
+      }],
+    } as unknown as EffectSchema;
+  }
+
+  it.each(["SELF", "EITHER"] as const)("%s form: +1000 per Stage placed", (controller) => {
+    const f = fixture();
+    const schema = synthetic(controller);
+    const source = f.put("STAGE-COUNTER", 0, "CHARACTER", { effectSchema: schema, power: 4000 });
+    const stage = f.put(controller === "SELF" ? "own-stage" : "opp-stage", controller === "SELF" ? 0 : 1, "STAGE", { cost: 1 });
+    f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+    if (f.promptType() === "SELECT_TARGET") f.act({ type: "SELECT_TARGET", selectedInstanceIds: [stage.instanceId] });
+    expect(f.state.pendingPrompt).toBeNull();
+    const live = f.state.players[0].characters.find((c) => c?.instanceId === source.instanceId)!;
+    expect(getEffectivePower(live, f.db.get(live.cardId)!, f.state, f.db)).toBe(5000);
+  });
+});
+
 describe.each([
   ["OP06-102", "OP06-102_effect_1"],
   ["OP06-114", "OP06-114_effect_1"],

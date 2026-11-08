@@ -471,6 +471,7 @@ function payCostsUnreleased(
         if (!moved) return null;
         nextState = moved.state;
         events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId, sourceZone: "STAGE", sourceController: stage.controller, causingController: controller, movementCause: "COST" } });
+        costResult.cardsPlacedToDeckCount += 1;
         break;
       }
 
