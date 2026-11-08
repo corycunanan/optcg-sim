@@ -28,6 +28,7 @@ import {
 import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isOncePerTurnBlock } from "./effect-types.js";
 import { transitionCard } from "./zone-transition.js";
+import { findBlockByKeyword } from "./trigger-keywords.js";
 
 export function execute(
   state: GameState,
@@ -140,9 +141,7 @@ function executePlayCard(
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema;
     if (schema?.effects) {
-      const mainBlock = schema.effects.find(
-        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
-      );
+      const mainBlock = findBlockByKeyword(schema.effects, "MAIN_EVENT");
       if (mainBlock) {
         const result = resolveEffectWork(nextState, mainBlock, newEventInstanceId, pi, cardDb);
         nextState = result.state;
