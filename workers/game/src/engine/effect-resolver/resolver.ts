@@ -199,6 +199,7 @@ const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
   APPLY_PROHIBITION: effects.executeApplyProhibition,
   SCHEDULE_ACTION: effects.executeScheduleAction,
   APPLY_ONE_TIME_MODIFIER: effects.executeApplyOneTimeModifier,
+  APPLY_REPLACEMENT: effects.executeApplyReplacement,
   SET_COST: effects.executeSetCost,
   WIN_GAME: effects.executeWinGame,
   NEGATE_TRIGGER_TYPE: effects.executeNegateTriggerType,

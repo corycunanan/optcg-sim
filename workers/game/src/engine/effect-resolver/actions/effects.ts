@@ -1,8 +1,8 @@
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
 /**
- * Action handlers: APPLY_PROHIBITION, APPLY_ONE_TIME_MODIFIER, SCHEDULE_ACTION,
- * SET_COST, WIN_GAME, NEGATE_TRIGGER_TYPE, EXTRA_TURN
+ * Action handlers: APPLY_PROHIBITION, APPLY_ONE_TIME_MODIFIER, APPLY_REPLACEMENT,
+ * SCHEDULE_ACTION, SET_COST, WIN_GAME, NEGATE_TRIGGER_TYPE, EXTRA_TURN
  */
 
 import type {
@@ -17,6 +17,7 @@ import type {
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { terminateGame } from "../../terminal.js";
+import { matchesFilterInBattle } from "../../conditions.js";
 import {
   resolveAmount,
   computeExpiry,
@@ -192,6 +193,91 @@ export function executeApplyOneTimeModifier(
     },
     events,
     succeeded: true,
+  };
+}
+
+// ─── APPLY_REPLACEMENT (OPT-874) ─────────────────────────────────────────────
+
+/**
+ * Register a replacement granted by a resolving effect, such as EB02-030's
+ * [Counter] "If any of your Characters would be K.O.'d in battle during this
+ * turn, you may trash 1 card from your hand instead."
+ *
+ * The replacement joins `activeEffects` with the same REPLACEMENT_EFFECT
+ * modifier shape that `registerReplacementsForCard` gives a printed
+ * replacement block, so the shared scan in `replacements.ts` finds it with no
+ * special case. It differs in three ways:
+ * - It lasts for the action's duration (default THIS_TURN), not while a source
+ *   stays on the field. It uses the resolved-output signature (category
+ *   "auto", no block id), so later negation of the source and the source
+ *   moving zones do not remove it (rule 8-2-3).
+ * - Its protected cards are frozen when it resolves: the field cards matching
+ *   `replaces.target_filter` from the controller's side. A Character played
+ *   afterwards is not protected (qa_eb02 EB02-030). A protected card that
+ *   leaves the field drops out of `appliesTo`, and the effect ends with the
+ *   last one.
+ * - With no matching card, nothing is registered.
+ */
+export function executeApplyReplacement(
+  state: GameState,
+  action: ActionOf<"APPLY_REPLACEMENT">,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  _resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = getActionParams(action, "APPLY_REPLACEMENT");
+  const duration = action.duration ?? { type: "THIS_TURN" as const };
+  const replaces = params.replaces;
+  if (!replaces?.event || !replaces.target_filter) return { state, events, succeeded: false };
+
+  const filter = replaces.target_filter;
+  const includesStage = Array.isArray(filter.card_type)
+    ? filter.card_type.includes("STAGE")
+    : filter.card_type === "STAGE";
+  const fieldCards = state.players.flatMap((player) => [
+    ...player.characters.filter((card): card is NonNullable<typeof card> => card != null),
+    ...(includesStage && player.stage ? [player.stage] : []),
+  ]);
+  const protectedIds = fieldCards
+    // Same battle-power read as the shared scan (OPT-909).
+    .filter((card) => matchesFilterInBattle(card, filter, cardDb, state, controller))
+    .map((card) => card.instanceId);
+  if (protectedIds.length === 0) return { state, events, succeeded: true };
+
+  const allocated = allocateEngineRecord(state, "active-effect");
+  const effect: RuntimeActiveEffect = {
+    id: allocated.id,
+    sourceCardInstanceId,
+    sourceEffectBlockId: "",
+    category: "auto",
+    modifiers: [{
+      type: "REPLACEMENT_EFFECT",
+      params: {
+        trigger: replaces.event,
+        cause_filter: replaces.cause_filter ?? null,
+        target_filter: filter,
+        replacement_actions: params.replacement_actions ?? [],
+        optional: params.optional ?? false,
+        once_per_turn: params.once_per_turn ?? false,
+      },
+    }],
+    duration,
+    expiresAt: computeExpiry(duration, state, controller),
+    controller,
+    appliesTo: protectedIds,
+    timestamp: allocated.timestamp,
+  };
+
+  return {
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: protectedIds, count: protectedIds.length },
   };
 }
 
