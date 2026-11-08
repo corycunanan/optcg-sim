@@ -222,7 +222,7 @@ Two actual sanitized persisted terminal sessions were exported on 2026-10-28 Pac
 
 Before OPT-1013, strict core validation failed first, so no `classifyLegacyShapes` classification was emitted. The required core fields already existed at the PR1 baseline `03071b69`; strict core admission was introduced earlier by `d244a3b3` (OPT-102). The observed shapes are structurally older than that baseline, but their original writer revisions were not captured. This was an inherited historical admission gap, not an OPT-971 regression.
 
-**Disposition (OPT-1013): read-only admission of terminal pre-context saves.** Absent version still permanently means v1 (§1.1); no version is retired and no reader is removed. The rule, implemented in `session/pre-context-terminal-admission.ts` and called by `convertPersistedGameState` before conversion:
+**Disposition (OPT-1013, owner decision by Cory, 2026-11-08): read-only admission of terminal pre-context saves.** Absent version still permanently means v1 (§1.1); no version is retired and no reader is removed. The rule, implemented in `session/pre-context-terminal-admission.ts` and called by `convertPersistedGameState` before conversion:
 
 | Condition | Treatment |
 |---|---|
