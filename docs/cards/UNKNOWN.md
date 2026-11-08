@@ -693,3 +693,40 @@ Under the rules of this game, you can only include {East Blue} type cards in you
 [On Play] Rest up to 1 of your opponent's Characters with a cost of 5 or less.
 
 ---
+
+## Edward.Newgate
+**P-152** · Character · Red
+
+[On Play] Your Leader and all of your Characters gain +2000 power during this turn. Then, K.O. up to 1 of your opponent's Characters with 3000 power or less.
+
+---
+
+## Portgas.D.Ace
+**P-153** · Character · Red
+
+[On Play] Give up to 2 of your opponent's Characters −3000 power during this turn.
+
+---
+
+## Monkey.D.Luffy
+**P-154** · Character · Red
+
+[On Play] You may rest 3 of your DON!! cards: If your Leader is [Portgas.D.Ace], play up to 1 [Portgas.D.Ace] with 8000 power or less from your hand.
+
+---
+
+## Trafalgar Law
+**P-155** · Character · Yellow
+
+[When Attacking] You may trash 1 card with a [Trigger] from your hand: Give up to 1 of your opponent's Characters −2000 power during this turn.
+
+**Trigger:** [Trigger] If your opponent has 3 or less Life cards, play this card.
+
+---
+
+## Monkey.D.Luffy
+**P-157** · Character · Black
+
+[On Play] You may trash 1 card from your hand: Play up to 1 {Elbaph} type Character card with a cost of 4 or less from your trash.
+
+---

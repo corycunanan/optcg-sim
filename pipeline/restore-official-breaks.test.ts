@@ -68,4 +68,35 @@ describe("official cardlist formatting restoration", () => {
       'OP99-001 effect wording differs: pulled "[On Play] Draw 2 cards. Then, discard 1 card."; official "[On Play] Draw 1 card. Then, discard 1 card."'
     );
   });
+
+  describe("attribute tokens", () => {
+    const modal = (body: string) =>
+      `<dl class="modalCol" id="OP99-003"><dd><div class="text"><h3>Effect</h3>${body}</div></dd></dl>`;
+    const pulled: RawVegapullCard = {
+      ...({} as RawVegapullCard),
+      id: "OP99-003",
+      effect: "If your <Slash> Character would be K.O.'d, rest this instead. [Blocker]",
+      trigger: null,
+    };
+
+    it.each([
+      ["raw", "If your <Slash> Character would be K.O.'d, rest this instead.<br>[Blocker]"],
+      ["entity-encoded", "If your &lt;Slash&gt; Character would be K.O.&#39;d, rest this instead.<br>[Blocker]"],
+    ])("treats %s attribute tokens as text", (_form, body) => {
+      const result = restoreOfficialFormatting(
+        [pulled],
+        parseOfficialCardlist(modal(body))
+      );
+
+      expect(result.cards[0].effect).toBe(
+        "If your <Slash> Character would be K.O.'d, rest this instead.<br>[Blocker]"
+      );
+    });
+
+    it("still rejects other official markup", () => {
+      expect(() =>
+        parseOfficialCardlist(modal("Draw <span>1</span> card."))
+      ).toThrowError("OP99-003 text: unsupported official markup <span>");
+    });
+  });
 });
