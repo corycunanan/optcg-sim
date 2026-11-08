@@ -576,12 +576,9 @@ export interface PregameState {
   startOfGameEffectsResolved: [boolean, boolean];
 }
 
-export interface EngineExecutionContext {
-  version: 1;
-  /** Persisted seed used to reproduce every pseudo-random outcome. */
+interface EngineExecutionContextBase {
+  /** Persisted server-side seed used to reproduce every pseudo-random outcome. Never projected. */
   seed: string;
-  /** Current deterministic PRNG state. */
-  rngState: number;
   /** Monotonic namespace shared by cards, frames, prompts, and runtime effects. */
   idCounter: number;
   /** Persisted logical clock origin and monotonic offset. */
@@ -592,6 +589,39 @@ export interface EngineExecutionContext {
   /** Replay/diagnostic correlation metadata. */
   trace: { gameId: string; traceId: string };
 }
+
+/**
+ * Version 1 (OPT-477): one Mulberry32 stream over a 32-bit state shared by
+ * every random draw. Retained so games created under it resume and replay
+ * byte-for-byte (OPT-888).
+ */
+export interface EngineExecutionContextV1 extends EngineExecutionContextBase {
+  version: 1;
+  /** Current deterministic PRNG state. */
+  rngState: number;
+}
+
+/**
+ * Independent random streams of a version 2 context (OPT-888). Each deck has
+ * its own stream so a player's view of their own shuffles reveals nothing
+ * about any other draw.
+ */
+export type EngineRandomStream = "pregame" | "deck0" | "deck1" | "blindHand";
+
+/** Words consumed from each version 2 stream. */
+export type EngineRandomStreamCounters = Record<EngineRandomStream, number>;
+
+/**
+ * Version 2 (OPT-888): ChaCha20 keyed by SHA-256 of the seed, one stream
+ * (nonce) per purpose. The persisted state is only the per-stream word
+ * counters; the key is re-derived from the seed and never stored or sent.
+ */
+export interface EngineExecutionContextV2 extends EngineExecutionContextBase {
+  version: 2;
+  rngCounters: EngineRandomStreamCounters;
+}
+
+export type EngineExecutionContext = EngineExecutionContextV1 | EngineExecutionContextV2;
 
 // ─── Game State ───────────────────────────────────────────────────────────────
 

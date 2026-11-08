@@ -17,7 +17,7 @@ import {
 import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
-import { shuffleWithEngineContext } from "../../execution-context.js";
+import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 import { createBlindHandSlots } from "../blind-hand-slots.js";
 import {
   autoSelectTargets,
@@ -214,7 +214,7 @@ export function executeShuffleDeck(
         : 0
       : controller;
   const p = state.players[targetController];
-  const shuffled = shuffleWithEngineContext(state, p.deck);
+  const shuffled = shuffleWithEngineContext(state, p.deck, deckRandomStream(targetController));
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[targetController] = { ...p, deck: shuffled.values };
 
@@ -520,7 +520,7 @@ export function executeSearchAndPlay(
     }
     if (shuffleAfter) {
       const pp = nextState.players[controller];
-      const shuffled = shuffleWithEngineContext(nextState, pp.deck);
+      const shuffled = shuffleWithEngineContext(nextState, pp.deck, deckRandomStream(controller));
       nextState = shuffled.state;
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
       newPlayers[controller] = { ...pp, deck: shuffled.values };

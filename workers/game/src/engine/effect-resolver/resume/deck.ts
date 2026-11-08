@@ -18,7 +18,7 @@ import type {
   PendingEvent,
 } from "../../../types.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { shuffleWithEngineContext } from "../../execution-context.js";
+import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 import { executeReturnToDeck } from "../actions/removal.js";
 import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
@@ -472,7 +472,7 @@ export function handleArrangeSearchAndPlay(
   }
 
   if (shuffleAfter) {
-    const shuffled = shuffleWithEngineContext(nextState, newDeck);
+    const shuffled = shuffleWithEngineContext(nextState, newDeck, deckRandomStream(controller));
     nextState = shuffled.state;
     newDeck = shuffled.values;
   }
