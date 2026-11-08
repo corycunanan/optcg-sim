@@ -357,7 +357,12 @@ describe("OPT-902 target_filter on the defeated combatant (last known card)", ()
     expect(f.state.players[0].hand).toHaveLength(hand + drawn);
   });
 
-  it.each([[true, 1], [false, 0]] as const)("COMBAT_VICTORY attribute filter on a K.O.'d Character granted Strike %s draws %i", (grant, drawn) => {
+  it.each([
+    ["attribute", true, 1],
+    ["attribute", false, 0],
+    ["target_filter", true, 1],
+    ["target_filter", false, 0],
+  ] as const)("COMBAT_VICTORY %s Strike filter on a K.O.'d Character (granted: %s) draws %i", (where, grant, drawn) => {
     const f = setup();
     f.def("OPT902-STRIKE-VICTOR", { cost: 4, power: 5000 }, {
       card_id: "OPT902-STRIKE-VICTOR",
@@ -366,7 +371,10 @@ describe("OPT-902 target_filter on the defeated combatant (last known card)", ()
       effects: [{
         id: "victory_draw",
         category: "auto",
-        trigger: { event: "COMBAT_VICTORY", filter: { attribute: "STRIKE" } },
+        trigger: {
+          event: "COMBAT_VICTORY",
+          filter: where === "attribute" ? { attribute: "STRIKE" } : { target_filter: { attribute: "STRIKE" } },
+        },
         actions: [{ type: "DRAW", params: { amount: 1 } }],
       }],
     } as EffectSchema);

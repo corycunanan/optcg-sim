@@ -960,15 +960,34 @@ function matchesHostBattle(
     // "K.O.'s your opponent's Character [with …]" describes the card as it
     // battled. A K.O.'d loser is gone by scan time, so use its last known
     // card as a base-stat snapshot on its former field seat.
+    // The snapshot keeps the attributes the event recorded as granted while
+    // it battled (they expired when it left the field).
     const onField = findCardInstance(state, opposingId);
     let opposing = onField && (onField.zone === "CHARACTER" || onField.zone === "LEADER") ? onField : undefined;
+    let filterState = state;
     if (!opposing) {
       const cardId = lastKnownCardId(state, opposingId);
       if (!cardId) return false;
       const seat: 0 | 1 = sourceCard.controller === 0 ? 1 : 0;
       opposing = { instanceId: opposingId, cardId, zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: seat, owner: seat };
+      const recordedGrants = event.payload.grantedAttributes?.[opposingId] ?? [];
+      if (recordedGrants.length > 0) {
+        const snapshotGrant: RuntimeActiveEffect = {
+          id: `battle-snapshot:${opposingId}`,
+          sourceCardInstanceId: opposingId,
+          sourceEffectBlockId: "",
+          category: "auto",
+          modifiers: recordedGrants.map((attribute) => ({ type: "GRANT_ATTRIBUTE", params: { attribute } })),
+          duration: { type: "THIS_TURN" },
+          expiresAt: { wave: "END_OF_TURN", turn: state.turn.number, player: seat },
+          controller: seat,
+          appliesTo: [opposingId],
+          timestamp: 0,
+        };
+        filterState = { ...state, activeEffects: [...state.activeEffects, snapshotGrant] };
+      }
     }
-    if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
+    if (!matchesFilter(opposing, filter.target_filter, cardDb, filterState)) return false;
   }
   return true;
 }
