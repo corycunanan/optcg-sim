@@ -1666,7 +1666,7 @@ interface ApplyReplacementParams {
 
 | Field | Value |
 |-------|-------|
-| **Target** | None. The protected cards are the field cards matching `replaces.target_filter` (controller relative to the effect's controller) when the action resolves. Cards that enter the field later are not protected (qa_eb02 EB02-030). |
+| **Target** | None. The protected cards are the field cards (Leader, Characters, Stage) matching `replaces.target_filter` (controller relative to the effect's controller) when the action resolves. That membership is fixed: cards that enter the field later are not protected (qa_eb02 EB02-030), and a protected card that later stops matching a mutable filter (power, cost) stays protected. Only the filter's `card_type` is re-read at each event. |
 | **Duration** | `duration` on the action; defaults to `THIS_TURN`. Source negation or the source changing zones does not end it (rule 8-2-3). |
 | **Failure mode** | With no matching card on the field, nothing is registered. |
 | **Fired events** | None |

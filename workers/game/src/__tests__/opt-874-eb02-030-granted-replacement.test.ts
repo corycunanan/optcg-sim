@@ -27,6 +27,10 @@ import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
+import { executeApplyReplacement } from "../engine/effect-resolver/actions/effects.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import { scanReplacementsForBatch } from "../engine/replacements.js";
+import type { ActionOf } from "../engine/effect-types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const EB02_030 = "EB02-030";
@@ -219,7 +223,8 @@ describe("EB02-030 — the [Counter] registers a battle K.O. replacement", () =>
     expect(effect.modifiers[0].params).toMatchObject({
       trigger: "WOULD_BE_KO",
       cause_filter: { by: "BATTLE" },
-      target_filter: { controller: "SELF", card_type: "CHARACTER" },
+      // Membership is fixed in appliesTo; only the card type is re-read.
+      target_filter: { card_type: "CHARACTER" },
       optional: true,
       once_per_turn: false,
     });
@@ -444,5 +449,56 @@ describe("EB02-030 — not offered", () => {
     }
     f.playEb02030(f.state.players[0].leader);
     expect(f.granted()).toHaveLength(0);
+  });
+});
+
+describe("APPLY_REPLACEMENT — grant-time membership", () => {
+  const services = {
+    executeEffectAction: resolverExecutionServices.executeEffectAction,
+    executeActionChain: resolverExecutionServices.executeActionChain,
+  };
+
+  function grant(f: Fixture, action: ActionOf<"APPLY_REPLACEMENT">) {
+    const r = executeApplyReplacement(f.state, action, f.state.players[0].leader.instanceId, 0, f.db, new Map());
+    expect(r.succeeded).toBe(true);
+    return r.state;
+  }
+
+  it("a Leader-scoped grant protects the Leader", () => {
+    const f = fixture();
+    const next = grant(f, {
+      type: "APPLY_REPLACEMENT",
+      params: {
+        replaces: { event: "WOULD_BE_RESTED", target_filter: { controller: "SELF", card_type: "LEADER" } },
+        replacement_actions: [],
+      },
+    });
+    const effect = next.activeEffects.at(-1)!;
+    expect(effect.appliesTo).toEqual([f.state.players[0].leader.instanceId]);
+  });
+
+  it("a card that matched a power filter when granted stays protected after its power drops", () => {
+    const f = fixture();
+    f.data("OPT874-BIG", { cost: 4, power: 6000 });
+    const big = f.put("OPT874-BIG", 0);
+    f.data("OPT874-SMALL", { cost: 2, power: 3000 });
+    const small = f.put("OPT874-SMALL", 0);
+    const next = grant(f, {
+      type: "APPLY_REPLACEMENT",
+      params: {
+        replaces: {
+          event: "WOULD_BE_KO",
+          target_filter: { controller: "SELF", card_type: "CHARACTER", power_min: 5000 },
+        },
+        replacement_actions: [],
+      },
+    });
+    const effect = next.activeEffects.at(-1)!;
+    expect(effect.appliesTo).toEqual([big.instanceId]);
+
+    // Base power now below the filter's power_min.
+    f.db.set("OPT874-BIG", { ...f.db.get("OPT874-BIG")!, power: 4000 });
+    const matches = scanReplacementsForBatch(next, [big.instanceId, small.instanceId], "WOULD_BE_KO", "effect", 1, f.db, services);
+    expect(matches.find((m) => m.effectId === effect.id)?.matchedTargetIds).toEqual([big.instanceId]);
   });
 });

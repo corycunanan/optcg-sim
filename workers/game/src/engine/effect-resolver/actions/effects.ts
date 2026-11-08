@@ -211,8 +211,9 @@ export function executeApplyOneTimeModifier(
  *   stays on the field. It uses the resolved-output signature (category
  *   "auto", no block id), so later negation of the source and the source
  *   moving zones do not remove it (rule 8-2-3).
- * - Its protected cards are frozen when it resolves: the field cards matching
- *   `replaces.target_filter` from the controller's side. A Character played
+ * - Its protected cards are frozen when it resolves: the field cards (Leader,
+ *   Characters, Stage) matching `replaces.target_filter` from the controller's
+ *   side. Only the filter's card type is re-read at each event. A Character played
  *   afterwards is not protected (qa_eb02 EB02-030). A protected card that
  *   leaves the field drops out of `appliesTo`, and the effect ends with the
  *   last one.
@@ -233,12 +234,12 @@ export function executeApplyReplacement(
   if (!replaces?.event || !replaces.target_filter) return { state, events, succeeded: false };
 
   const filter = replaces.target_filter;
-  const includesStage = Array.isArray(filter.card_type)
-    ? filter.card_type.includes("STAGE")
-    : filter.card_type === "STAGE";
+  // Every field card: the filter's card_type decides between Leader,
+  // Character and Stage (a WOULD_BE_RESTED grant may protect a Leader).
   const fieldCards = state.players.flatMap((player) => [
+    player.leader,
     ...player.characters.filter((card): card is NonNullable<typeof card> => card != null),
-    ...(includesStage && player.stage ? [player.stage] : []),
+    ...(player.stage ? [player.stage] : []),
   ]);
   const protectedIds = fieldCards
     // Same battle-power read as the shared scan (OPT-909).
@@ -257,7 +258,11 @@ export function executeApplyReplacement(
       params: {
         trigger: replaces.event,
         cause_filter: replaces.cause_filter ?? null,
-        target_filter: filter,
+        // Membership is fixed at grant time in `appliesTo`. Re-checking the
+        // full filter at each event would drop a card that matched then but
+        // lost a mutable property (power, cost) since. Only the card type
+        // survives, because the shared scan reads it to admit Stage K.O.s.
+        target_filter: filter.card_type !== undefined ? { card_type: filter.card_type } : null,
         replacement_actions: params.replacement_actions ?? [],
         optional: params.optional ?? false,
         once_per_turn: params.once_per_turn ?? false,
