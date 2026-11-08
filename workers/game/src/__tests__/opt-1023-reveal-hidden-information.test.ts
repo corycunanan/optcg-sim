@@ -93,8 +93,13 @@ const SMALL = "OPT999-DRESSROSA-3";
 const FOUR = "OPT999-DRESSROSA-4";
 const OTHER = "OPT999-NOT-DRESSROSA";
 const DECK_TOP = "OPT999-DECK-TOP";
+const EIGHT = "OPT999-COST-8";
 
-function rebeccaSetup(hand: [string, string][]) {
+// Rebecca's "Then, reveal…" follows "If there is a Character with a cost of
+// 8 or more, draw 1 card." (rule 4-10-1, OPT-970), so the default setup puts
+// a cost-8 Character on the opponent's field and the reveal tests expect
+// Rebecca's draw of DECK_TOP first.
+function rebeccaSetup(hand: [string, string][], { costEight = true } = {}) {
   const db = createTestCardDb();
   registerAuthored(db, REBECCA);
   const dressrosa = (id: string, cost: number) =>
@@ -104,11 +109,17 @@ function rebeccaSetup(hand: [string, string][]) {
   dressrosa(FOUR, 4);
   db.set(OTHER, { ...CARDS.VANILLA, id: OTHER, name: OTHER, cost: 2, types: ["Navy"] });
   db.set(DECK_TOP, { ...CARDS.VANILLA, id: DECK_TOP, name: DECK_TOP, cost: 2 });
+  db.set(EIGHT, { ...CARDS.VANILLA, id: EIGHT, name: EIGHT, cost: 8 });
 
   const state = createBattleReadyState(db);
   for (const p of state.players) {
     p.characters = padChars([]);
     p.hand = [];
+  }
+  if (costEight) {
+    state.players[1].characters = padChars([
+      { ...card(EIGHT, "opp-eight", "CHARACTER"), controller: 1, owner: 1 },
+    ]);
   }
   state.players[0].hand = [
     card(REBECCA, "rebecca", "HAND"),
@@ -136,7 +147,7 @@ function fieldCardIds(state: GameState): { cardId: string; state: string }[] {
 }
 
 describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
-  it("offers only eligible hand cards, up to 2, and never reads the deck", () => {
+  it("offers only eligible hand cards, up to 2, and reads the deck only for the draw", () => {
     const { db, state } = rebeccaSetup([[BIG, "big"], [SMALL, "small"], [OTHER, "other"]]);
     const deckBefore = state.players[0].deck.map((c) => c.instanceId);
     const afterPlay = play(state, db, "rebecca");
@@ -144,7 +155,7 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
     expect([...prompt.validTargets].sort()).toEqual(["big", "small"]);
     expect(prompt.countMin).toBe(0);
     expect(prompt.countMax).toBe(2);
-    expect(afterPlay.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore);
+    expect(afterPlay.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore.slice(1));
     expect(reveals(afterPlay)).toHaveLength(0);
   });
 
@@ -169,8 +180,8 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
       { cardId: BIG, state: "ACTIVE" },
       { cardId: SMALL, state: "RESTED" },
     ]);
-    expect(next.players[0].hand.map((c) => c.instanceId)).toEqual(["other"]);
-    expect(next.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore);
+    expect(next.players[0].hand.map((c) => c.cardId)).toEqual([OTHER, DECK_TOP]);
+    expect(next.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore.slice(1));
 
     // Both picks are public through every projection, and the reveal
     // precedes both plays in the history.
@@ -202,7 +213,7 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
     next = respond(next, db, { type: "SELECT_TARGET", selectedInstanceIds: ["small"] }).state;
     expect(next.pendingPrompt).toBeNull();
     expect(fieldCardIds(next)).toEqual([{ cardId: SMALL, state: "ACTIVE" }]);
-    expect(next.players[0].hand.map((c) => c.instanceId)).toEqual(["big"]);
+    expect(next.players[0].hand.map((c) => c.cardId)).toEqual([BIG, DECK_TOP]);
   });
 
   it("plays a single revealed cost-4 card active (qa_op10)", () => {
@@ -225,7 +236,7 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
     expect(reveals(r.state)).toHaveLength(0);
   });
 
-  it("revealing nothing plays nothing and leaves the deck alone", () => {
+  it("revealing nothing plays nothing and leaves the deck alone after the draw", () => {
     const { db, state } = rebeccaSetup([[BIG, "big"]]);
     const deckBefore = state.players[0].deck.map((c) => c.instanceId);
     const next = respond(play(state, db, "rebecca"), db, { type: "SELECT_TARGET", selectedInstanceIds: [] });
@@ -233,7 +244,18 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
     expect(next.state.pendingPrompt).toBeNull();
     expect(fieldCardIds(next.state)).toEqual([]);
     expect(reveals(next.state)).toHaveLength(0);
-    expect(next.state.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore);
+    expect(next.state.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore.slice(1));
+  });
+
+  it("without a cost-8 Character neither draws nor reveals (rule 4-10-1, OPT-970)", () => {
+    const { db, state } = rebeccaSetup([[BIG, "big"], [SMALL, "small"]], { costEight: false });
+    const deckBefore = state.players[0].deck.map((c) => c.instanceId);
+    const next = play(state, db, "rebecca");
+    expect(next.pendingPrompt).toBeNull();
+    expect(fieldCardIds(next)).toEqual([]);
+    expect(reveals(next)).toHaveLength(0);
+    expect(next.players[0].hand.map((c) => c.instanceId)).toEqual(["big", "small"]);
+    expect(next.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore);
   });
 
   it("is the only authored REVEAL with a hand target", () => {

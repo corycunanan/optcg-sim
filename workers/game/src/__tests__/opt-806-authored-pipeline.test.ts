@@ -135,10 +135,19 @@ describe("OPT-806 authored card pipeline", () => {
     expect(getEffectivePower(nami, f.db.get(nami.cardId)!, f.state, f.db)).toBe(
       boosts ? 8000 : 5000
     );
-    expect(f.state.players[0].deck.at(-1)?.cardId).toBe(top.cardId);
-    expect(
-      f.state.players[0].deck.slice(0, -1).map((c) => c.instanceId)
-    ).toEqual(remaining);
+    if (boosts) {
+      expect(f.state.players[0].deck.at(-1)?.cardId).toBe(top.cardId);
+      expect(
+        f.state.players[0].deck.slice(0, -1).map((c) => c.instanceId)
+      ).toEqual(remaining);
+    } else {
+      // Rule 4-10-1 (OPT-970): the failed "if" also cancels "Then, place the
+      // revealed card at the bottom"; it stays on top (EB01-029 FAQ).
+      expect(f.state.players[0].deck[0]?.cardId).toBe(top.cardId);
+      expect(
+        f.state.players[0].deck.slice(1).map((c) => c.instanceId)
+      ).toEqual(remaining);
+    }
     expect(f.state.pendingPrompt).toBeNull();
   });
   it("Trueno selects one branch before Laboon's K.O. trigger raises trash to15", () => {
