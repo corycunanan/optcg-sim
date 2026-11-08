@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  ALL_ACTION_TYPES,
   getNestedActions,
   type Action,
   type EffectSchema,
@@ -214,6 +215,98 @@ function findPickDestinationViolations(
   return violations;
 }
 
+// OPT-802: an authored `params` key that no runtime code reads is dead
+// encoding (cost_override, mandatory and life_controller were). The consumer
+// scan reads engine runtime source with comments stripped and requires each
+// authored key name to appear as a word in it. Type declarations, the schema
+// validator, lint modules, tests and generated files do not count as readers.
+// The match is per key name, not per action type, so it proves "something
+// reads this name", which is the failure mode this rule exists for.
+const PARAM_CONSUMER_ROOTS = ["workers/game/src", "shared"];
+const NON_CONSUMER_SOURCE = [
+  /(^|\/)__tests__\//,
+  /(^|\/)schemas\//,
+  /\.generated\./,
+  /\.test\.ts$/,
+  /(^|\/)effect-types\.ts$/,
+  /(^|\/)schema-registry\.ts$/,
+  /(^|\/)schema-[a-z-]*lint[a-z-]*\.ts$/,
+];
+
+function loadParamConsumerSource(): string {
+  const chunks: string[] = [];
+  const visit = (path: string): void => {
+    for (const entry of readdirSync(path).sort()) {
+      if (entry === "node_modules") continue;
+      const child = join(path, entry);
+      if (statSync(child).isDirectory()) {
+        visit(child);
+        continue;
+      }
+      const rel = relative(repoRoot, child);
+      if (!rel.endsWith(".ts") || NON_CONSUMER_SOURCE.some((re) => re.test(rel))) continue;
+      chunks.push(
+        readFileSync(child, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/(^|[^:"'`])\/\/.*$/gm, "$1"),
+      );
+    }
+  };
+  for (const root of PARAM_CONSUMER_ROOTS) visit(resolve(repoRoot, root));
+  return chunks.join("\n");
+}
+
+function findUnreadActionParamViolations(
+  schemas: Record<string, EffectSchema>,
+  consumerSource: string,
+): string[] {
+  const actionTypes = new Set<string>(ALL_ACTION_TYPES);
+  const usages = new Map<string, Set<string>>();
+  const visit = (value: unknown, cardId: string): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, cardId);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    const params = record.params;
+    if (
+      typeof record.type === "string" &&
+      actionTypes.has(record.type) &&
+      params &&
+      typeof params === "object" &&
+      !Array.isArray(params)
+    ) {
+      for (const key of Object.keys(params)) {
+        const usage = `${record.type}.params.${key}`;
+        const cards = usages.get(usage) ?? new Set<string>();
+        cards.add(cardId);
+        usages.set(usage, cards);
+      }
+    }
+    for (const child of Object.values(record)) visit(child, cardId);
+  };
+  for (const [cardId, schema] of Object.entries(schemas)) visit(schema, cardId);
+
+  const readKeys = new Map<string, boolean>();
+  const isRead = (key: string): boolean => {
+    let read = readKeys.get(key);
+    if (read === undefined) {
+      read = new RegExp(`\\b${key}\\b`).test(consumerSource);
+      readKeys.set(key, read);
+    }
+    return read;
+  };
+
+  return [...usages.entries()]
+    .filter(([usage]) => !isRead(usage.slice(usage.lastIndexOf(".") + 1)))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([usage, cards]) => {
+      const sample = [...cards].sort();
+      return `${usage}: no engine code reads this param (${sample.length} card(s): ${sample.slice(0, 5).join(", ")}${sample.length > 5 ? ", ..." : ""}); implement it or remove it (OPT-802)`;
+    });
+}
+
 async function discoverSchemaSources(): Promise<SchemaSourceModule[]> {
   const directory = __dirname;
   const files = readdirSync(directory)
@@ -299,6 +392,7 @@ async function main(): Promise<void> {
     ),
     ...findStartOfGameEffectRuleCountViolations(modules),
     ...findPickDestinationViolations(modules),
+    ...findUnreadActionParamViolations(schemas, loadParamConsumerSource()),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
   ];
   if (diagnostics.length > 0) {

@@ -132,7 +132,7 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const result = executePlayCard(
@@ -180,7 +180,7 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 2 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     };
@@ -234,7 +234,7 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 2 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     };

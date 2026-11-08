@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui";
 import { useEffectAvailability } from "@/contexts/effect-availability-context";
-import type { ActivateMainState } from "@/lib/game/activate-main";
 import {
   BLOCKED_REASON_COPY,
   parseEffectBlocks,
@@ -18,8 +17,6 @@ import {
 interface CardActionMenuContentProps {
   card: CardInstance;
   cardDb: CardDb;
-  activation: ActivateMainState | null;
-  canActivateNow: boolean;
   onAction: (action: GameAction) => void;
   onClose: () => void;
 }

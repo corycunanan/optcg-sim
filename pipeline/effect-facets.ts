@@ -349,7 +349,6 @@ function visitHandAction(action: Action, tags: Set<EffectFacetTag>): void {
     TRASH_FROM_HAND: "discard",
     PLACE_HAND_TO_DECK: "to_deck",
     RETURN_HAND_TO_DECK: "to_deck",
-    HAND_WHEEL: "wheel",
     ACTIVATE_EVENT_FROM_HAND: "event_reuse",
     ACTIVATE_EVENT_FROM_TRASH: "event_reuse",
     REUSE_EFFECT: "event_reuse",

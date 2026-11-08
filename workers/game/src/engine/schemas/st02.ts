@@ -410,7 +410,7 @@ export const ST02_017_STRAW_SWORD: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Supernovas"], cost_max: 2 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },

@@ -380,7 +380,7 @@ export const ST22_015_I_AM_WHITEBEARD: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Edward.Newgate" },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
         {
           // "Then, you may add 1 card ... to your hand." (OPT-919)

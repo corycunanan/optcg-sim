@@ -198,7 +198,7 @@ export const OP17_007_KOUZUKI_ODEN: EffectSchema = {
               ],
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -360,7 +360,7 @@ export const OP17_012_BLENHEIM: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_exact: 1, traits_contains: ["Whitebeard Pirates"] },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -490,7 +490,7 @@ export const OP17_015_MARCO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELF" },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
       flags: { optional: true },
@@ -1701,7 +1701,6 @@ export const OP17_047_SHIKI: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "RETURN_TO_DECK",
               target: {
@@ -1778,7 +1777,6 @@ export const OP17_049_CHARLOTTE_LINLIN: EffectSchema = {
           // effect); exact-2 with <=2 candidates auto-trashes them all.
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             labels: ["Draw 2 cards", "Trash 2 cards from hand"],
             options: [
               [{ type: "DRAW", params: { amount: 2 } }],
@@ -1786,7 +1784,6 @@ export const OP17_049_CHARLOTTE_LINLIN: EffectSchema = {
                 {
                   type: "OPPONENT_ACTION",
                   params: {
-                    mandatory: true,
                     action: {
                       type: "TRASH_CARD",
                       target: {
@@ -1882,7 +1879,6 @@ export const OP17_053_BARBELL: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "RETURN_TO_DECK",
               target: {
@@ -2065,7 +2061,7 @@ export const OP17_061_LEAD_PERFORMERS: EffectSchema = {
             count: { up_to: 1 },
             filter: { name_any_of: ["King", "Queen", "Jack"] },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },
@@ -2963,7 +2959,6 @@ export const OP17_085_DORRY: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Brogy", cost_max: 5 },
           },
-          params: { cost_override: "FREE" },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -3145,7 +3140,6 @@ export const OP17_091_BROOK: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: { type: "TRASH_FROM_HAND", params: { amount: 1 } },
           },
         },
@@ -3187,7 +3181,6 @@ export const OP17_092_BROGY: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Dorry", cost_max: 5 },
           },
-          params: { cost_override: "FREE" },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -3237,7 +3230,7 @@ export const OP17_093_MONKEY_D_LUFFY: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 2 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           chain: "THEN",
         },
       ],
@@ -3457,7 +3450,6 @@ export const OP17_099_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             labels: ["Trash 1 card; add 1 Life", "Trash 1 card from hand"],
             options: [
               [
@@ -3550,7 +3542,7 @@ export const OP17_102_CHARLOTTE_OVEN: EffectSchema = {
             count: { up_to: 1 },
             filter: { power_max: 4000, exclude_name: "Charlotte Oven" },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -3684,7 +3676,6 @@ export const OP17_106_CHARLOTTE_SMOOTHIE: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_CARD",
               target: {
@@ -3806,7 +3797,7 @@ export const OP17_110_CHARLOTTE_PEROSPERO: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Big Mom Pirates"], cost_max: 6 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
         {
           type: "GRANT_KEYWORD",
@@ -3896,7 +3887,6 @@ export const OP17_112_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "PLAYER_CHOICE",
           params: {
-            mandatory: true,
             labels: ["Add your top deck card to Life", "Take opponent's top Life"],
             options: [
               [
@@ -4115,14 +4105,12 @@ export const OP17_117_MASER_SABER: EffectSchema = {
         {
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             labels: ["Trash 3 cards from hand", "K.O. a Character"],
             options: [
               [
                 {
                   type: "OPPONENT_ACTION",
                   params: {
-                    mandatory: true,
                     action: {
                       type: "TRASH_CARD",
                       requires: { type: "FULL_TARGET_COUNT" },
@@ -4210,7 +4198,7 @@ export const OP17_118_ROCKS_D_XEBEC: EffectSchema = {
             uniqueness_constraint: { field: "name" },
             aggregate_constraint: { property: "cost", operator: "<=", value: 9 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],

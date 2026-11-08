@@ -1069,7 +1069,7 @@ describe("OPT-792 prompt-resume catch-all (review D)", () => {
           {
             type: "PLAY_CARD",
             target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 1 } },
-            params: { source_zone: "TRASH", cost_override: "FREE" },
+            params: { source_zone: "TRASH" },
           },
         ],
       },

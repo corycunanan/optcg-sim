@@ -66,7 +66,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
         source_zone: "TRASH",
         count: { up_to: 4 },
       },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const preselected = trashCards.map((c) => c.instanceId);
@@ -126,7 +126,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
         source_zone: "TRASH",
         count: { up_to: 5 },
       },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const preselected = trashCards.map((c) => c.instanceId);
@@ -161,7 +161,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
-      params: { source_zone: "TRASH", cost_override: "FREE", entry_state: "RESTED" },
+      params: { source_zone: "TRASH", entry_state: "RESTED" },
     };
 
     const result = executePlayCard(
@@ -187,7 +187,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 4 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const result = executePlayCard(
@@ -234,7 +234,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 3 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const result = executePlayCard(

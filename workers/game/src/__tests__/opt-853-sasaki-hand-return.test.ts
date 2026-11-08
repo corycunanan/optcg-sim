@@ -164,7 +164,7 @@ describe("OPT-853 OP04-048 Sasaki returns the hand to deck, shuffles and redraws
   });
 });
 
-// ─── Authored HAND_WHEEL / return-hand consumer inventory ─────────────────────
+// ─── Authored return-hand consumer inventory ─────────────────────
 // Walks every generated schema recursively (nested OPPONENT_ACTION, choices,
 // replacements) for the hand-return primitives.
 function findActions(value: unknown, type: string, path: string, out: string[]) {
@@ -184,10 +184,6 @@ describe("OPT-853 hand-return consumer inventory", () => {
     }
     return out.sort();
   };
-
-  it("HAND_WHEEL has no authored consumers", () => {
-    expect(inventory("HAND_WHEEL")).toEqual([]);
-  });
 
   it("RETURN_HAND_TO_DECK consumers", () => {
     expect(inventory("RETURN_HAND_TO_DECK")).toEqual([
