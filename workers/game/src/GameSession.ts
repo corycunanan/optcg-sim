@@ -38,6 +38,7 @@ import {
 import { createResultCallbackFetch } from "./session/result-callback.js";
 import { consumePlayerUpgradeBudget } from "./session/player-rate-limit-policy.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
+import { attemptEngineStep, ENGINE_ERROR_REJECTION } from "./session/engine-error.js";
 import { handleSessionExportRequest } from "./session/export.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
@@ -628,6 +629,7 @@ export class GameSession implements DurableObject {
       status,
       winner,
       reason,
+      cause: "REJOIN_TIMEOUT",
     });
 
     await this.persist();
@@ -649,13 +651,12 @@ export class GameSession implements DurableObject {
     if (!this.gameState || !this.cardDb) return;
     const previousState = this.gameState;
     const previousUndoHistory = this.undoHistory;
-    const result = this.coordinator.executeAction(
-      this.gameState,
-      this.undoHistory,
-      playerIndex,
-      action,
-      this.cardDb
-    );
+    const cardDb = this.cardDb;
+    // OPT-929: a throw leaves state and history untouched; the sender is told.
+    const attempt = attemptEngineStep(previousState.id, action, () =>
+      this.coordinator.executeAction(previousState, previousUndoHistory, playerIndex, action, cardDb));
+    if (!attempt.ok) return this.rejectAction(ws, action, ENGINE_ERROR_REJECTION);
+    const result = attempt.value;
     this.gameState = result.state;
     this.undoHistory = result.undoHistory;
 
@@ -737,15 +738,21 @@ export class GameSession implements DurableObject {
     if (!this.gameState || !this.cardDb) return;
     const previousState = this.gameState;
     const previousUndoHistory = this.undoHistory;
-    this.undoHistory = [];
-    const result = resumePromptLifecycle(this.gameState, action, this.cardDb, {
-      drainPregame: (state) => this.drainPregame(state),
-      advanceStartOfTurn: (state) => this.runStartOfTurnAutoPhases(state),
+    const cardDb = this.cardDb;
+    // OPT-929: the reply and the durable REVEAL_TRIGGER prompt surfacing
+    // (OPT-963; survives reconnects) run as one engine step. On a throw the
+    // prompt state and undo history are kept; history clears only on success.
+    const attempt = attemptEngineStep(previousState.id, action, () => {
+      const resumed = resumePromptLifecycle(previousState, action, cardDb, {
+        drainPregame: (state) => this.drainPregame(state),
+        advanceStartOfTurn: (state) => this.runStartOfTurnAutoPhases(state),
+      });
+      return { ...resumed, state: this.coordinator.surfaceRevealTrigger(resumed.state, cardDb) };
     });
+    if (!attempt.ok) return this.rejectAction(ws, action, ENGINE_ERROR_REJECTION);
+    const result = attempt.value;
     this.gameState = result.state;
-
-    // Surface REVEAL_TRIGGER as a durable prompt before persisting
-    this.surfaceRevealTriggerIfNeeded();
+    this.undoHistory = [];
 
     try {
       await this.persist();
@@ -810,22 +817,6 @@ export class GameSession implements DurableObject {
   private sendPendingPrompts(): void {
     if (!this.gameState || !this.cardDb) return;
     this.transport.sendPendingPrompts(this.gameState, this.cardDb);
-  }
-
-  /**
-   * If no prompt is pending, check whether a [Trigger] Life card reveal is
-   * awaiting a decision on the top BATTLE_DAMAGE or EFFECT_DAMAGE frame
-   * (OPT-963; effect damage was OPT-259 F6). Surfacing it as a durable
-   * pendingPrompt on the game state makes it survive reconnections and
-   * prevents a race between game:update (clears activePrompt) and
-   * game:prompt (sets it again).
-   */
-  private surfaceRevealTriggerIfNeeded(): void {
-    if (!this.gameState || !this.cardDb) return;
-    this.gameState = this.coordinator.surfaceRevealTrigger(
-      this.gameState,
-      this.cardDb
-    );
   }
 
   // ─── Token validation ──────────────────────────────────────────────────────
@@ -976,6 +967,7 @@ export class GameSession implements DurableObject {
       status: "FINISHED",
       winner,
       reason,
+      cause: "PREGAME_LEAVE",
       clearPregame: true,
     });
     this.undoHistory = [];

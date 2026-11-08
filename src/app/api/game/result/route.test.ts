@@ -119,6 +119,37 @@ describe("POST /api/game/result", () => {
     });
   });
 
+  // OPT-978: every structured end reason the worker's terminal writer emits.
+  it.each([
+    "LEADER_KO",
+    "DECK_OUT",
+    "LIFE_LOSS",
+    "CONCEDE",
+    "DISCONNECT_TIMEOUT",
+    "FALLBACK_CONCEDE",
+    "UNKNOWN",
+    "JOINT_DRAW",
+    "CARD_EFFECT_WIN",
+    "DECK_OUT_WIN_INSTEAD",
+    "PREGAME_LEAVE",
+    "ENGINE_LIMIT",
+    "ENGINE_CONTRACT",
+  ])("accepts and stores reason code %s", async (reasonCode) => {
+    const res = await POST(buildRequest({ body: { ...validBody, reasonCode } }));
+    expect(res.status).toBe(200);
+    expect(finalizeGameResultMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reasonCode })
+    );
+  });
+
+  it("rejects an unrecognized reason code", async () => {
+    const res = await POST(
+      buildRequest({ body: { ...validBody, reasonCode: "SOMETHING_ELSE" } })
+    );
+    expect(res.status).toBe(400);
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
+  });
+
   it("rejects non-terminal result payloads", async () => {
     const res = await POST(
       buildRequest({ body: { ...validBody, status: "IN_PROGRESS" } })

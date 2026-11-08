@@ -263,6 +263,35 @@ export interface EngineTerminalOutcome {
   diagnostic: EngineLimitDiagnostic;
 }
 
+/**
+ * Structured end-of-game reason (OPT-978). The terminal writer stores it on
+ * the state and the result path reads it instead of parsing `winReason` text.
+ * The first seven values are the historical codes; stored rows keep them.
+ */
+export const GAME_END_REASON_CODES = [
+  "LEADER_KO",
+  "DECK_OUT",
+  "LIFE_LOSS",
+  "CONCEDE",
+  "DISCONNECT_TIMEOUT",
+  "FALLBACK_CONCEDE",
+  "UNKNOWN",
+  /** Rule 9-2-1: both players met a defeat condition at one checkpoint. */
+  "JOINT_DRAW",
+  /** A WIN_GAME card effect. */
+  "CARD_EFFECT_WIN",
+  /** OP03-040 / P-117 Nami: the winner's deck reached 0 and they won instead of losing. */
+  "DECK_OUT_WIN_INSTEAD",
+  /** A player left during pre-game setup. */
+  "PREGAME_LEAVE",
+  /** A bounded engine guard stopped resolution (not a rules draw). */
+  "ENGINE_LIMIT",
+  /** An engine contract failure ended the game in a draw. */
+  "ENGINE_CONTRACT",
+] as const;
+
+export type GameEndReasonCode = (typeof GAME_END_REASON_CODES)[number];
+
 // ─── Game Events (Event Bus) ──────────────────────────────────────────────────
 
 /**
@@ -688,6 +717,8 @@ export interface GameState {
   winReason: string | null;
   /** Present when the engine, not a rule, ended the game (engine limit or contract failure). */
   engineOutcome?: EngineTerminalOutcome | null;
+  /** Structured end reason written by the terminal writer (OPT-978); absent on older saves. */
+  endReasonCode?: GameEndReasonCode | null;
   /** Actions executed in the current resolver sequence, persisted across prompts. */
   engineActionCount?: number;
   effectAvailability?: Record<string, EffectAvailability[]>;

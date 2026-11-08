@@ -10,7 +10,7 @@
  */
 
 import type { CardData, GameState } from "../types.js";
-import { terminateGame } from "./terminal.js";
+import { terminateGame, type RulesDefeatCause } from "./terminal.js";
 import { isCardNegated } from "./modifiers.js";
 
 /**
@@ -31,6 +31,8 @@ export interface DefeatResult {
   gameOver: boolean;
   winner: 0 | 1 | null; // null = draw
   reason: string;
+  /** How the loser lost (OPT-978); null for a joint draw. */
+  cause: RulesDefeatCause | null;
 }
 
 /**
@@ -128,8 +130,16 @@ export function checkDefeat(
   if (p1LifeOut) reasons.push("Player 2's life reached 0");
   const reason = reasons.join("; ");
 
-  if (p0Loses && p1Loses) return { gameOver: true, winner: null, reason: `${reason} — draw` };
-  return { gameOver: true, winner: p0Loses ? 1 : 0, reason };
+  if (p0Loses && p1Loses) {
+    return { gameOver: true, winner: null, reason: `${reason} — draw`, cause: null };
+  }
+  const winner: 0 | 1 = p0Loses ? 1 : 0;
+  const winnerWonInstead = winner === 0 ? p0WinInstead : p1WinInstead;
+  const loserDeckOut = winner === 0 ? p1DeckOut : p0DeckOut;
+  const cause: RulesDefeatCause = winnerWonInstead
+    ? "DECK_OUT_WIN_INSTEAD"
+    : loserDeckOut ? "DECK_OUT" : "LIFE_LOSS";
+  return { gameOver: true, winner, reason, cause };
 }
 
 /**
@@ -201,7 +211,7 @@ export function runRuleProcessing(
   if (!defeat) return flagged;
   return terminateGame(
     flagged,
-    { kind: "RULES", winner: defeat.winner, reason: defeat.reason },
+    { kind: "RULES", winner: defeat.winner, reason: defeat.reason, cause: defeat.cause },
     actorIndex,
   );
 }
