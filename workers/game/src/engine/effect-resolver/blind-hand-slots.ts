@@ -36,7 +36,7 @@ export function createBlindHandSlots(
   candidates: readonly CardInstance[],
   handOwner: 0 | 1,
 ): BlindHandSlotPrompt {
-  const shuffled = shuffleWithEngineContext(state, candidates);
+  const shuffled = shuffleWithEngineContext(state, candidates, "blindHand");
   const nonce = allocateEngineId(shuffled.state, "blind");
   const blindSlots = shuffled.values.map((card, index) => ({
     token: `${nonce.id}-${index + 1}`,

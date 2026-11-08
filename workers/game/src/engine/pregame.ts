@@ -63,7 +63,7 @@ export function startPregame(
     fixedFirstPlayerIndex = 1;
   }
   if (mode === "RANDOM_FIXED" || mode === "SOLITAIRE_RANDOM") {
-    const random = takeEngineRandom(current);
+    const random = takeEngineRandom(current, "pregame");
     current = random.state;
     fixedFirstPlayerIndex = random.value < 0.5 ? 0 : 1;
   }
@@ -355,7 +355,7 @@ function runPriorityRoll(
   let current = state;
   const nextRoll = (): number => {
     if (queue.length > 0) return queue.shift()!;
-    const random = takeEngineRandom(current);
+    const random = takeEngineRandom(current, "pregame");
     current = random.state;
     return Math.floor(random.value * 6) + 1;
   };

@@ -13,7 +13,7 @@ import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { isStartOfTurnAutoPhase } from "../engine/phases.js";
 import { takeEngineRandom } from "../engine/execution-context.js";
-import { createTestPayload, CARDS } from "./helpers.js";
+import { createTestPayload, CARDS, v1RngState } from "./helpers.js";
 import type { GameAction, GameState, PregameMode } from "../types.js";
 
 function buildPregameState(
@@ -118,7 +118,7 @@ describe("OPT-366 pregame flow", () => {
     it("RANDOM_FIXED uses one private coin flip without roll or choice phases", () => {
       const payload = createTestPayload();
       const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
-      const expectedFirstPlayer = takeEngineRandom(prepared).value < 0.5 ? 0 : 1;
+      const expectedFirstPlayer = takeEngineRandom(prepared, "pregame").value < 0.5 ? 0 : 1;
       const state = startPregame(prepared, "RANDOM_FIXED");
 
       expect(state.pregame?.phase).toBe("START_OF_GAME_FX");
@@ -140,7 +140,7 @@ describe("OPT-366 pregame flow", () => {
       payload.mode = "SOLITAIRE";
       payload.pregameMode = "SOLITAIRE_RANDOM";
       const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
-      const random = takeEngineRandom(prepared);
+      const random = takeEngineRandom(prepared, "pregame");
       const expectedFirstPlayer = random.value < 0.5 ? 0 : 1;
       const started = startPregame(prepared, "SOLITAIRE_RANDOM");
 
@@ -149,8 +149,8 @@ describe("OPT-366 pregame flow", () => {
       expect(started.pregame?.priorityDeciderIndex).toBe(expectedFirstPlayer);
       expect(started.pregame?.firstPlayerIndex).toBe(expectedFirstPlayer);
       expect(started.turn.activePlayerIndex).toBe(expectedFirstPlayer);
-      expect(started.executionContext.rngState).toBe(
-        random.state.executionContext.rngState,
+      expect(v1RngState(started.executionContext)).toBe(
+        v1RngState(random.state.executionContext),
       );
       expect(
         started.eventLog.some(

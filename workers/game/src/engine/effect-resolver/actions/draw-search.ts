@@ -21,7 +21,7 @@ import {
 import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
-import { shuffleWithEngineContext } from "../../execution-context.js";
+import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 
 export function executeDraw(
   state: GameState,
@@ -267,7 +267,7 @@ export function executeFullDeckSearch(
   if (validTargets.length === 0) {
     // No matching cards — still shuffle if required
     if (shuffleAfter) {
-      const shuffled = shuffleWithEngineContext(state, p.deck);
+      const shuffled = shuffleWithEngineContext(state, p.deck, deckRandomStream(controller));
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, deck: shuffled.values };
       return { state: { ...shuffled.state, players: newPlayers }, events, succeeded: false };
