@@ -8,6 +8,8 @@
  * Black: P-025 to P-105 (8 cards)
  * Yellow: P-034 to P-115 (8 cards)
  *
+ * 2026-11 promos: P-152 to P-155 and P-157 (the pull has no P-156).
+ *
  * Deferred: P-106 End of Turn effect (LIFE_FACE_COST)
  */
 
@@ -3102,6 +3104,170 @@ export const P_088_TRAFALGAR_LAW: EffectSchema = {
   ],
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2026-11 promotion cards (P-152 to P-157)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── P-152 Edward.Newgate (Character) ───────────────────────────────────────
+
+export const P_152_EDWARD_NEWGATE: EffectSchema = {
+  card_id: "P-152",
+  card_name: "Edward.Newgate",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_team_buff_then_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 2000 },
+          duration: { type: "THIS_TURN" },
+        },
+        {
+          type: "MODIFY_POWER",
+          chain: "THEN",
+          target: { type: "ALL_YOUR_CHARACTERS", controller: "SELF" },
+          params: { amount: 2000 },
+          duration: { type: "THIS_TURN" },
+        },
+        {
+          type: "KO",
+          chain: "THEN",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { power_max: 3000 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── P-153 Portgas.D.Ace (Character) ────────────────────────────────────────
+
+export const P_153_PORTGAS_D_ACE: EffectSchema = {
+  card_id: "P-153",
+  card_name: "Portgas.D.Ace",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_debuff_two",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 2 } },
+          params: { amount: -3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── P-154 Monkey.D.Luffy (Character) ───────────────────────────────────────
+
+export const P_154_MONKEY_D_LUFFY: EffectSchema = {
+  card_id: "P-154",
+  card_name: "Monkey.D.Luffy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_rest_don_play_ace",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      flags: { optional: true },
+      costs: [{ type: "REST_DON", amount: 3 }],
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Portgas.D.Ace" },
+      },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "HAND",
+            count: { up_to: 1 },
+            filter: { name: "Portgas.D.Ace", power_max: 8000 },
+          },
+          params: { source_zone: "HAND" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── P-155 Trafalgar Law (Character) ────────────────────────────────────────
+
+export const P_155_TRAFALGAR_LAW: EffectSchema = {
+  card_id: "P-155",
+  card_name: "Trafalgar Law",
+  card_type: "Character",
+  effects: [
+    {
+      id: "when_attacking_trash_trigger_debuff",
+      category: "auto",
+      trigger: { keyword: "WHEN_ATTACKING" },
+      flags: { optional: true },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1, filter: { has_trigger: true } }],
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { amount: -2000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: { type: "LIFE_COUNT", controller: "OPPONENT", operator: "<=", value: 3 },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+// ─── P-157 Monkey.D.Luffy (Character) ───────────────────────────────────────
+
+export const P_157_MONKEY_D_LUFFY: EffectSchema = {
+  card_id: "P-157",
+  card_name: "Monkey.D.Luffy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_trash_play_elbaph",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      flags: { optional: true },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { traits: ["Elbaph"], cost_max: 4 },
+          },
+          params: { source_zone: "TRASH" },
+        },
+      ],
+    },
+  ],
+};
+
 export const P_SCHEMAS: Record<string, EffectSchema> = {
   "P-042": P_042_RORONOA_ZORO,
   "P-088": P_088_TRAFALGAR_LAW,
@@ -3197,4 +3363,9 @@ export const P_SCHEMAS: Record<string, EffectSchema> = {
   "P-115": P_115_BOA_HANCOCK,
   "P-117": P_117_NAMI,
   "P-135": P_135_MONKEY_D_LUFFY,
+  "P-152": P_152_EDWARD_NEWGATE,
+  "P-153": P_153_PORTGAS_D_ACE,
+  "P-154": P_154_MONKEY_D_LUFFY,
+  "P-155": P_155_TRAFALGAR_LAW,
+  "P-157": P_157_MONKEY_D_LUFFY,
 };

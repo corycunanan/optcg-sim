@@ -54,3 +54,11 @@ cohort remains deferred.
 | Card     | Verdict             | Evidence                                                                                                                                                                                              |
 | -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OP17-109 | Incorrect — corrected | The detector correctly flagged the missing official Trigger encoding (its pattern matches bottom-the-rest searches and clears on `SEARCH_DECK`). OPT-733 added the `SEARCH_DECK` Trigger block: look at five, add up to one exact {Big Mom Pirates} type card to hand, bottom the rest. |
+
+## EB-05 / ST-31 to ST-36 authoring — 2026-11-08
+
+| Card     | Verdict                      | Evidence |
+| -------- | ---------------------------- | -------- |
+| ST33-004 | Partial — deferred           | Only [Blocker] is encoded. The hand-zone −3 cost needs a per-turn hand-trash record; see [DEFERRED-CARD-EFFECTS.md](DEFERRED-CARD-EFFECTS.md). |
+| ST34-004 | Implemented / false positive | "Base power becomes 0" is `SET_BASE_POWER` with value 0, so a higher competing base-power setter wins (`qa_st-34.md`). `SET_POWER_TO_ZERO` would be a total-power reduction, which the card does not say. |
+| ST36-005 | Implemented / false positive | Both "top or bottom" Life-face costs are `CHOICE` costs over `TOP` and `BOTTOM` `TURN_LIFE_FACE_*` branches. The detector reads only top-level cost types. |

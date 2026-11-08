@@ -15,6 +15,7 @@ import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { computeCostTargets, isFixedCostMovementProhibited, isOpponentLifePlacement } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
+import { lifeFaceCostIndices } from "./payability.js";
 
 /**
  * Pay every fixed cost in order and aggregate the resources paid across steps.
@@ -318,10 +319,9 @@ function payCostsUnreleased(
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
         const p = nextState.players[controller];
         // Find face-down life cards (from top)
-        const faceDownIndices: number[] = [];
-        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceDownIndices.length < amount; i++) {
-          if (p.life[i].face === "DOWN") faceDownIndices.push(i);
-        }
+        const faceDownIndices = lifeFaceCostIndices(p.life.length, cost.position, amount)
+          .filter((i) => p.life[i].face === "DOWN")
+          .slice(0, amount);
         if (faceDownIndices.length < amount) return null;
 
         const newLife = p.life.map((card, i) =>
@@ -338,10 +338,9 @@ function payCostsUnreleased(
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
         const p = nextState.players[controller];
         // Find face-up life cards
-        const faceUpIndices: number[] = [];
-        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceUpIndices.length < amount; i++) {
-          if (p.life[i].face === "UP") faceUpIndices.push(i);
-        }
+        const faceUpIndices = lifeFaceCostIndices(p.life.length, cost.position, amount)
+          .filter((i) => p.life[i].face === "UP")
+          .slice(0, amount);
         if (faceUpIndices.length < amount) return null;
 
         const newLife = p.life.map((card, i) =>

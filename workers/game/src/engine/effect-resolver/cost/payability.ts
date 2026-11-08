@@ -204,14 +204,12 @@ export function isCostPayable(
 
     case "TURN_LIFE_FACE_UP": {
       const amt = resolveAmount(cost);
-      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
-      return candidates.filter((l) => l.face === "DOWN").length >= amt;
+      return lifeFaceCostCandidates(player.life, cost.position, amt).filter((l) => l.face === "DOWN").length >= amt;
     }
 
     case "TURN_LIFE_FACE_DOWN": {
       const amt = resolveAmount(cost);
-      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
-      return candidates.filter((l) => l.face === "UP").length >= amt;
+      return lifeFaceCostCandidates(player.life, cost.position, amt).filter((l) => l.face === "UP").length >= amt;
     }
 
     case "LEADER_POWER_REDUCTION":
@@ -265,6 +263,22 @@ export function isCostPayable(
     default:
       return assertNever(cost);
   }
+}
+
+/**
+ * Life cards a TURN_LIFE_FACE_* cost may turn: the top or bottom `amount`
+ * cards for a TOP / BOTTOM position ("turn 1 card from the top or bottom of
+ * your Life cards", ST36-005, is a CHOICE of the two), otherwise any card.
+ */
+export function lifeFaceCostIndices(lifeCount: number, position: string | undefined, amount: number): number[] {
+  const all = Array.from({ length: lifeCount }, (_, i) => i);
+  if (position === "TOP") return all.slice(0, amount);
+  if (position === "BOTTOM") return all.slice(Math.max(0, lifeCount - amount)).reverse();
+  return all;
+}
+
+function lifeFaceCostCandidates<T>(life: readonly T[], position: string | undefined, amount: number): T[] {
+  return lifeFaceCostIndices(life.length, position, amount).map((i) => life[i]);
 }
 
 function assertNever(value: never): never {
