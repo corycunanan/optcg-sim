@@ -18,18 +18,6 @@ import type { EffectSchema } from "./effect-types.js";
 /** Categories the `executeUseCounterEvent` consumer runs. */
 export const COUNTER_EVENT_EXECUTED_CATEGORIES: readonly string[] = ["auto"];
 
-/**
- * Deliberately deferred (OPT-912): Counter Events whose COUNTER_EVENT block is
- * kept `activate` (non-executing) because running it today would be harmful.
- * P-059 "return any number of Characters ... +2000 for every returned
- * Character": `count: { any_number }` auto-selects EVERY own Character (no
- * subset prompt) and PER_COUNT CHARACTERS_RETURNED_THIS_WAY reads only cost
- * refs, so the boost is +0. Doing nothing is safer until OPT-912 lands.
- * Two-way ratchet: a listed card MUST still have a non-auto COUNTER_EVENT block
- * (flipping it to `auto` while listed is a violation, forcing its removal here).
- */
-export const KNOWN_DEFERRED_COUNTER_EVENT: readonly string[] = ["P-059"];
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -41,24 +29,19 @@ function isCounterEventTrigger(trigger: unknown): boolean {
   return Array.isArray(trigger.any_of) && trigger.any_of.some(isCounterEventTrigger);
 }
 
-function collect(node: unknown, path: string, found: string[], cardId: string): void {
+function collect(node: unknown, path: string, found: string[]): void {
   if (Array.isArray(node)) {
-    node.forEach((child, index) => collect(child, `${path}[${index}]`, found, cardId));
+    node.forEach((child, index) => collect(child, `${path}[${index}]`, found));
     return;
   }
   if (!node || typeof node !== "object") return;
   const record = node as Record<string, unknown>;
-  if ("category" in record) {
-    const deferred = KNOWN_DEFERRED_COUNTER_EVENT.includes(cardId);
-    const executes = COUNTER_EVENT_EXECUTED_CATEGORIES.includes(String(record.category));
-    if (deferred && isCounterEventTrigger(record.trigger) && executes) {
-      found.push(`${path} category "${String(record.category)}": card is listed in KNOWN_DEFERRED_COUNTER_EVENT (OPT-912) but its COUNTER_EVENT block now executes; remove it from the list`);
-    } else if (!deferred && isCounterEventTrigger(record.trigger) && !executes) {
-      found.push(`${path} category "${String(record.category)}": COUNTER_EVENT blocks are only executed when category is "auto" (battle.ts executeUseCounterEvent); the [Counter] effect would never resolve`);
-    }
+  if ("category" in record && isCounterEventTrigger(record.trigger)
+    && !COUNTER_EVENT_EXECUTED_CATEGORIES.includes(String(record.category))) {
+    found.push(`${path} category "${String(record.category)}": COUNTER_EVENT blocks are only executed when category is "auto" (battle.ts executeUseCounterEvent); the [Counter] effect would never resolve`);
   }
   for (const [key, value] of Object.entries(record)) {
-    collect(value, path ? `${path}.${key}` : key, found, cardId);
+    collect(value, path ? `${path}.${key}` : key, found);
   }
 }
 
@@ -66,7 +49,7 @@ function collect(node: unknown, path: string, found: string[], cardId: string): 
 export function findCounterEventCategoryViolations(schema: EffectSchema): string[] {
   const found: string[] = [];
   const cardId = schema.card_id ?? "UNKNOWN";
-  collect(schema, "", found, cardId);
+  collect(schema, "", found);
   return found.map((message) => `${cardId} ${message}`);
 }
 
