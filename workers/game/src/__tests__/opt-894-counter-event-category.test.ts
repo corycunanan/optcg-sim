@@ -7,9 +7,9 @@ import { scriptedDonPayment } from "./scripted-don-payment.js";
  * `category === "auto"` and `trigger.keyword === "COUNTER_EVENT"`; 40 Counter
  * Events were authored `activate`, so DON!! was paid and the card trashed but
  * the [Counter] effect never resolved. Convention (this ticket): every
- * COUNTER_EVENT block is `category: "auto"`. 39 are re-authored `auto`; P-059
- * is deliberately kept `activate` (non-executing) until OPT-912, because as
- * `auto` it would return every own Character for +0 power.
+ * COUNTER_EVENT block is `category: "auto"`. 39 were re-authored `auto` here;
+ * P-059 followed in OPT-912 once its 0..N subset prompt and returned-count
+ * bonus were in place (OPT-885).
  *
  * Every card here is played from hand through `runPipeline` during a real
  * battle (declare attack -> USE_COUNTER_EVENT with real DON!! payment) and every
@@ -818,48 +818,100 @@ describe("OPT-894 — Life / deck / bounce Counters", () => {
     expect(f.trashCount("P-059")).toBe(1);
   });
 
-  it("P-059 (deferred, OPT-912): with [Uta], the Counter stays non-executing: no Character returns, no power", () => {
+  // OPT-912: P-059 "you may return ANY NUMBER of Characters ... +2000 for
+  // every returned Character". The player picks 0..N of their Characters and
+  // the bonus counts the Characters actually returned.
+  it.each([
+    [0, 0],
+    [1, 2000],
+    [2, 4000],
+  ])("P-059 (OPT-912): with [Uta], returning %i of 3 Characters gives the Leader +%i", (n, bonus) => {
     const f = fixture();
     f.state.players.forEach((p) => (p.characters = padChars([])));
     f.leaderData({ name: "Uta" });
     const a = f.put("RET-A", 1, "CHARACTER", { cost: 2, power: 3000 });
     const b = f.put("RET-B", 1, "CHARACTER", { cost: 2, power: 3000 });
     const c = f.put("STAY-C", 1, "CHARACTER", { cost: 2, power: 3000 });
+    const returned = [a, b].slice(0, n);
+    const kept = [a, b, c].slice(n);
     const leaderBase = f.power(f.p1Leader());
     const don = f.activeDon();
-    f.counter("P-059", []);
+    f.counter("P-059", ["accept", ids(...returned), ids(f.p1Leader())]);
     expect(f.state.pendingPrompt).toBeNull();
-    expect(f.state.players[1].characters.filter(Boolean).map((x) => x!.instanceId)).toEqual(
-      [a, b, c].map((x) => x.instanceId),
+    expect(f.power(f.p1Leader())).toBe(leaderBase + bonus);
+    expect(f.state.players[1].characters.filter(Boolean).map((x) => x!.cardId)).toEqual(
+      kept.map((x) => x.cardId),
     );
-    expect(f.state.players[1].hand.some((x) => x.cardId.startsWith("RET-") || x.cardId === "STAY-C")).toBe(false);
-    expect(f.power(f.p1Leader())).toBe(leaderBase);
+    expect(f.state.players[1].hand.map((x) => x.cardId).filter((id) => /^(RET|STAY)-/.test(id)).sort()).toEqual(
+      returned.map((x) => x.cardId).sort(),
+    );
     expectPaidAndTrashed(f, "P-059", don);
   });
+});
 
-  // GAP (OPT-912): P-059 "you may return ANY NUMBER of Characters ... +2000 for
-  // every returned Character". Its Counter block is kept `activate` (see
-  // KNOWN_DEFERRED_COUNTER_EVENT) because flipping it to `auto` today is
-  // harmful: (1) a `count: { any_number }` target auto-selects EVERY valid card
-  // instead of letting the player choose how many (target-resolver.ts
-  // resolveTargets / needsPlayerTargetSelection); (2) PER_COUNT
-  // CHARACTERS_RETURNED_THIS_WAY reads only the `__cost_cards_returned` ref,
-  // which a costs[] entry fills, so the action-based return yields +0
-  // (dynamic-values.ts THIS_WAY_TO_COST_REF). Ratchet: when OPT-912 lands, flip
-  // P-059 to `auto`, drop it from KNOWN_DEFERRED_COUNTER_EVENT, drop `.fails`,
-  // and delete the deferred test above.
-  it.fails("P-059 (GAP, OPT-912): with [Uta], returning 2 of 3 Characters gives the Leader +4000 and keeps the third", () => {
+// ─── OP08-116 "you may add 1 Life card ... If you do" (OPT-919) ─────────────
+
+describe("OPT-919 — OP08-116 Burn Bazooka: optional Life add gates the Life placement", () => {
+  function setup() {
     const f = fixture();
     f.state.players.forEach((p) => (p.characters = padChars([])));
-    f.leaderData({ name: "Uta" });
-    const a = f.put("RET-A", 1, "CHARACTER", { cost: 2, power: 3000 });
-    const b = f.put("RET-B", 1, "CHARACTER", { cost: 2, power: 3000 });
-    f.put("STAY-C", 1, "CHARACTER", { cost: 2, power: 3000 });
+    const warrior = f.put("SW-A", 1, "HAND", { types: ["Shandian Warrior"] });
     const leaderBase = f.power(f.p1Leader());
-    f.counter("P-059", ["accept", ids(a, b), ids(f.p1Leader())]);
+    const life = f.state.players[1].life.map((c) => c.instanceId);
+    return { f, warrior, leaderBase, life };
+  }
+  const handIds = (f: Fixture) => f.state.players[1].hand.map((c) => c.instanceId);
+
+  it("accept: a Life card goes to hand, then up to 1 {Shandian Warrior} goes to the top of Life face-up", () => {
+    const { f, warrior, leaderBase, life } = setup();
+    const lifeCardId = f.state.players[1].life[0].cardId;
+    // "top or bottom" asks the end (OPT-1014); top takes life[0].
+    f.counter("OP08-116", [ids(f.p1Leader()), "accept", { choice: "life-to-hand:TOP" }, ids(warrior)]);
     expect(f.power(f.p1Leader())).toBe(leaderBase + 4000);
-    expect(f.state.players[1].characters.filter(Boolean).map((c) => c!.cardId)).toEqual(["STAY-C"]);
-    expect(f.state.players[1].hand.map((c) => c.cardId).sort()).toEqual(["RET-A", "RET-B"]);
+    // Zone moves re-key instance ids (hidden information), so compare card ids.
+    const after = f.state.players[1].life;
+    expect(after).toHaveLength(life.length);
+    expect(after[0]).toMatchObject({ cardId: "SW-A", face: "UP" });
+    expect(after.slice(1).every((c) => c.face === "DOWN")).toBe(true);
+    expect(f.state.players[1].hand.map((c) => c.cardId)).toEqual([lifeCardId]);
+  });
+
+  it("decline: Life is unchanged and the If-you-do placement is skipped", () => {
+    const { f, warrior, leaderBase, life } = setup();
+    f.counter("OP08-116", [ids(f.p1Leader()), "skip"]);
+    expect(f.power(f.p1Leader())).toBe(leaderBase + 4000);
+    expect(f.state.players[1].life.map((c) => c.instanceId)).toEqual(life);
+    expect(handIds(f)).toEqual([warrior.instanceId]);
+  });
+
+  it("0 Life: accepting adds nothing, so the If-you-do placement is skipped", () => {
+    const { f, warrior, leaderBase } = setup();
+    f.state.players[1].life = [];
+    f.counter("OP08-116", [ids(f.p1Leader()), "accept"]);
+    expect(f.power(f.p1Leader())).toBe(leaderBase + 4000);
+    expect(f.state.players[1].life).toEqual([]);
+    expect(handIds(f)).toEqual([warrior.instanceId]);
+  });
+
+  // Same "Then, you may add ... If you do" shape found by the OPT-919 scan.
+  it.each([
+    ["accept", 2000, 1],
+    ["skip", 0, 0],
+  ] as const)("ST22-015 [Main]: %s the Life add → Leader +%i, %i Life card to hand", (answer, bonus, taken) => {
+    const f = fixture();
+    f.state.players.forEach((p) => (p.characters = padChars([])));
+    f.state.players[1].hand = [];
+    f.leaderData({ types: ["Whitebeard Pirates"] });
+    const leaderBase = f.power(f.p1Leader());
+    const lifeBefore = f.state.players[1].life.length;
+    f.state.turn.activePlayerIndex = 1;
+    const ev = f.put("ST22-015", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: canonicalText("ST22-015") });
+    f.act({ type: "PLAY_CARD", cardInstanceId: ev.instanceId }, 1);
+    // Accepting asks top or bottom (OPT-1014).
+    f.drive(answer === "accept" ? [answer, { choice: "life-to-hand:BOTTOM" }] : [answer]);
+    expect(f.state.players[1].life).toHaveLength(lifeBefore - taken);
+    expect(f.state.players[1].hand).toHaveLength(taken);
+    expect(f.power(f.p1Leader())).toBe(leaderBase + bonus);
   });
 });
 
@@ -887,18 +939,19 @@ describe("OPT-894 — compound [Main]/[Counter] triggers (fixed in OPT-911)", ()
   });
 });
 
-// ─── The 39 re-authored cards: block inventory (P-059 deferred, OPT-912) ───────────────────────────────
+// ─── The 40 re-authored cards: block inventory ───────────────────────────────
 
-// 39 cards; P-059 is deferred (OPT-912) and ratcheted in opt-894-counter-event-lint.test.ts.
+// 39 cards re-authored in OPT-894, plus P-059 (OPT-912).
 const REAUTHORED = [
   "OP16-020", "OP16-038", "OP16-040", "OP16-057", "OP16-059", "OP16-076", "OP16-099", "OP16-100",
   "OP17-017", "OP17-018", "OP17-036", "OP17-037", "OP17-038", "OP17-055", "OP17-056", "OP17-076",
   "OP17-077", "OP17-078", "OP17-096", "OP17-097", "OP17-098", "OP17-115", "OP17-116", "OP17-117",
   "ST01-014", "ST02-015", "ST02-016", "ST03-016", "ST03-017", "ST04-016", "ST06-014",
   "ST06-016", "ST07-016", "ST09-014", "ST10-015", "ST12-017", "ST13-017", "ST13-018", "ST14-014",
+  "P-059",
 ];
 
-describe("OPT-894 — the 39 re-authored Counter Events", () => {
+describe("OPT-894 — the 40 re-authored Counter Events", () => {
   it.each(REAUTHORED)("%s: exactly one auto COUNTER_EVENT block; [Main]/[Trigger] blocks untouched", (id) => {
     const schema = getAllAuthoredSchemas()[id];
     const text = canonicalText(id);
