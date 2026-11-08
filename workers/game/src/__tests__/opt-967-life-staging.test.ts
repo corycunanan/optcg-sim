@@ -35,7 +35,6 @@ const play: Action = {
   target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 } },
   params: {
     source_zone: "TRASH",
-    cost_override: "FREE",
     entry_state: "RESTED",
   },
 };

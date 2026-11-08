@@ -146,13 +146,11 @@ export const ST20_005_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             options: [
               [
                 {
                   type: "OPPONENT_ACTION",
                   params: {
-                    mandatory: true,
                     action: {
                       type: "TRASH_CARD",
                       target: {

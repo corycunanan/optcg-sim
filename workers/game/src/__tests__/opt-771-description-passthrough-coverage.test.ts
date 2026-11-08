@@ -264,7 +264,6 @@ describe("OPT-771 effectDescription pass-through coverage", () => {
       },
       params: {
         source_zone: "TRASH",
-        cost_override: "FREE",
         entry_state: "PLAYER_CHOICE",
         state_distribution: { ACTIVE: 1, RESTED: 1 },
       },
@@ -319,7 +318,7 @@ describe("OPT-771 effectDescription pass-through coverage", () => {
         source_zone: "TRASH",
         count: { exact: 1 },
       },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const started = resolveEffect(
@@ -360,7 +359,7 @@ describe("OPT-771 effectDescription pass-through coverage", () => {
         source_zone: "TRASH",
         count: { exact: 1 },
       },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const started = resolveEffect(
@@ -542,7 +541,6 @@ describe("OPT-771 effectDescription pass-through coverage", () => {
       },
       params: {
         source_zone: "TRASH",
-        cost_override: "FREE",
         entry_state: "PLAYER_CHOICE",
         state_distribution: { ACTIVE: 1, RESTED: 1 },
       },

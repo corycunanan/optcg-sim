@@ -85,7 +85,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
           source_zone: "TRASH",
           count: { exact: 1 },
         },
-        params: { source_zone: "TRASH", cost_override: "FREE" },
+        params: { source_zone: "TRASH" },
       }],
     };
 
@@ -125,7 +125,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
           source_zone: "TRASH",
           count: { exact: 1 },
         },
-        params: { source_zone: "TRASH", cost_override: "FREE" },
+        params: { source_zone: "TRASH" },
       }],
     };
 
@@ -209,7 +209,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
           source_zone: "TRASH",
           count: { exact: 1 },
         },
-        params: { source_zone: "TRASH", cost_override: "FREE" },
+        params: { source_zone: "TRASH" },
       }],
     };
 
@@ -283,7 +283,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
           source_zone: "TRASH",
           count: { exact: 1 },
         },
-        params: { source_zone: "TRASH", cost_override: "FREE" },
+        params: { source_zone: "TRASH" },
       }],
     };
     const result = resolveEffect(state, block, "opponent-source", 0, cardDb);

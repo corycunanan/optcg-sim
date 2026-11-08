@@ -190,7 +190,6 @@ const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
   // Hand / deck
   PLACE_HAND_TO_DECK: handDeck.executePlaceHandToDeck,
   RETURN_HAND_TO_DECK: handDeck.executeReturnHandToDeck,
-  HAND_WHEEL: handDeck.executeHandWheel,
   SHUFFLE_DECK: handDeck.executeShuffleDeck,
   REVEAL: handDeck.executeReveal,
   REVEAL_HAND: handDeck.executeRevealHand,

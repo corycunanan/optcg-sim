@@ -110,7 +110,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 2 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
     const first = executePlayCard(
       state, action, "batch-source", 0, cardDb, new Map<string, EffectResult>(),
@@ -144,7 +144,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     const first = executePlayCard(
@@ -203,7 +203,6 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
       params: {
         source_zone: "TRASH",
-        cost_override: "FREE",
         entry_state: "PLAYER_CHOICE",
         state_distribution: { ACTIVE: 1, RESTED: 1 },
       },
@@ -265,7 +264,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 3 } },
-      params: { source_zone: "TRASH", cost_override: "FREE" },
+      params: { source_zone: "TRASH" },
     };
 
     // Preselect list includes a bogus instanceId between the two real ones.

@@ -665,7 +665,6 @@ export type ActionType =
   | "SEARCH_TRASH_THE_REST"
   | "SEARCH_AND_PLAY"
   | "PLACE_HAND_TO_DECK"
-  | "HAND_WHEEL"
   | "REVEAL_HAND"
   | "SHUFFLE_DECK"
   // Power & Stats
@@ -748,7 +747,7 @@ export const ALL_ACTION_TYPES = [
   // Card Movement
   "DRAW", "SEARCH_DECK", "TRASH_CARD", "KO", "RETURN_TO_HAND", "RETURN_TO_DECK",
   "PLAY_CARD", "ADD_TO_LIFE", "MILL", "REVEAL", "FULL_DECK_SEARCH", "DECK_SCRY",
-  "SEARCH_TRASH_THE_REST", "SEARCH_AND_PLAY", "PLACE_HAND_TO_DECK", "HAND_WHEEL",
+  "SEARCH_TRASH_THE_REST", "SEARCH_AND_PLAY", "PLACE_HAND_TO_DECK",
   "REVEAL_HAND", "SHUFFLE_DECK",
   // Power & Stats
   "MODIFY_POWER", "SET_BASE_POWER", "MODIFY_COST", "SET_POWER_TO_ZERO",
@@ -826,7 +825,6 @@ export interface ActionParamsMap {
   RETURN_TO_DECK: { position?: "TOP" | "BOTTOM" };
   PLAY_CARD: {
     source_zone?: string;
-    cost_override?: string;
     entry_state?: CardState | "PLAYER_CHOICE";
     state_distribution?: { ACTIVE?: number; RESTED?: number };
   };
@@ -877,17 +875,11 @@ export interface ActionParamsMap {
     reveal?: boolean;
     entry_state?: CardState;
     pick?: CountMode;
-    cost_override?: string;
     destination?: string;
   };
   PLACE_HAND_TO_DECK: {
     amount?: number;
     position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
-  };
-  HAND_WHEEL: {
-    trash_count?: number | DynamicValue;
-    draw_count?: number | DynamicValue;
-    amount?: number;
   };
   REVEAL_HAND: { amount?: number };
   SHUFFLE_DECK: Record<string, never>;
@@ -954,14 +946,12 @@ export interface ActionParamsMap {
     /** Eligibility evaluated once before choosing; must match options length. */
     option_conditions?: Condition[];
     labels?: string[];
-    mandatory?: boolean;
   };
   OPPONENT_CHOICE: {
     options: Action[][];
     /** Eligibility evaluated once before choosing; must match options length. */
     option_conditions?: Condition[];
     labels?: string[];
-    mandatory?: boolean;
   };
   CHOOSE_VALUE: {
     domain: "COST" | "POWER" | "NUMBER";
@@ -969,7 +959,7 @@ export interface ActionParamsMap {
     step?: number;
   };
   WIN_GAME: Record<string, never>;
-  OPPONENT_ACTION: { action: Action; mandatory?: boolean };
+  OPPONENT_ACTION: { action: Action };
   EXTRA_TURN: Record<string, never>;
   SCHEDULE_ACTION: {
     timing?: ScheduleTiming;
@@ -997,7 +987,6 @@ export interface ActionParamsMap {
     amount?: number;
     face?: "UP" | "DOWN";
     position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
-    life_controller?: Controller;
   };
   PLAY_FROM_LIFE: { position?: "TOP" | "BOTTOM"; entry_state?: CardState };
   LIFE_TO_HAND: {
@@ -1849,7 +1838,6 @@ export interface LossConditionMod {
   rule_type: "LOSS_CONDITION_MOD";
   trigger_event: "DECK_OUT";
   modification: "WIN_INSTEAD" | "DELAYED_LOSS";
-  delay?: { timing: "END_OF_TURN" };
 }
 
 export interface StartOfGameEffect {

@@ -517,8 +517,6 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
         <CardActionMenuContent
           card={card}
           cardDb={cardDb}
-          activation={activation}
-          canActivateNow={effectAction === "available"}
           onAction={onAction}
           onClose={() => setMenuOpen(false)}
         />

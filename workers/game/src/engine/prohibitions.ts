@@ -1041,7 +1041,7 @@ function findCardOnField(state: GameState, instanceId: string): CardInstance | n
 //   - BY_OPPONENT_EFFECT: causing controller !== drawer.
 //   - BY_EFFECT / ANY: every effect draw (still never the Draw Phase draw).
 //
-// Every effect-caused draw (DRAW, HAND_WHEEL's draw half) must call this
+// Every effect-caused draw (DRAW) must call this
 // before moving cards or emitting CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE.
 
 export const CANNOT_DRAW_CAUSES = [

@@ -197,11 +197,11 @@ An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: {
 | "Look at N cards from the top of your deck; reveal up to M ... and add to your hand. Then, place the rest at the bottom" | `{ "type": "SEARCH_DECK", "params": { "look_at": N, "pick": { "up_to": M }, "filter": {...}, "rest_destination": "BOTTOM" } }` |
 | Same but "trash the rest" | `{ "type": "SEARCH_TRASH_THE_REST", "params": { "look_at": N, "pick": { "up_to": M }, "filter": {...} } }` |
 | "Search your deck for up to 1 ... add to hand, then shuffle" | `{ "type": "FULL_DECK_SEARCH", "params": { "pick": { "up_to": 1 }, "filter": {...} } }` |
-| "Look at N cards...play up to 1...place the rest at the bottom" | `{ "type": "SEARCH_AND_PLAY", "params": { "look_at": N, "pick": { "up_to": 1 }, "filter": {...}, "cost_override": "FREE", "rest_destination": "BOTTOM" } }` |
+| "Look at N cards...play up to 1...place the rest at the bottom" | `{ "type": "SEARCH_AND_PLAY", "params": { "look_at": N, "pick": { "up_to": 1 }, "filter": {...}, "rest_destination": "BOTTOM" } }` |
 | "K.O. up to N of your opponent's Characters with cost X or less" | `{ "type": "KO", "target": { "type": "CHARACTER", "controller": "OPPONENT", "count": { "up_to": N }, "filter": { "cost_max": X } } }` |
 | "Return up to N of your opponent's Characters with cost X or less to the owner's hand" | `{ "type": "RETURN_TO_HAND", "target": { ..., "count": { "up_to": N }, "filter": { "cost_max": X } } }` |
 | "Place...at the bottom of the owner's deck" | `{ "type": "RETURN_TO_DECK", "params": { "position": "BOTTOM" }, "target": {...} }` |
-| "Play up to 1 {Trait} Character with cost X or less from your hand" | `{ "type": "PLAY_CARD", "target": { "type": "CHARACTER_CARD", "source_zone": "HAND", "count": { "up_to": 1 }, "filter": { "traits": ["Trait"], "cost_max": X } }, "params": { "source_zone": "HAND", "cost_override": "FREE" } }` |
+| "Play up to 1 {Trait} Character with cost X or less from your hand" | `{ "type": "PLAY_CARD", "target": { "type": "CHARACTER_CARD", "source_zone": "HAND", "count": { "up_to": 1 }, "filter": { "traits": ["Trait"], "cost_max": X } }, "params": { "source_zone": "HAND" } }` |
 | "Play...from your trash rested" | above with `"source_zone": "TRASH"` and `"play_state": "RESTED"` |
 | "Trash N cards from the top of your deck" | `{ "type": "MILL", "params": { "amount": N } }` |
 | "Trash cards from your hand until you have N cards in your hand" | `{ "type": "TRASH_FROM_HAND", "params": { "until_count": N } }` — trashes max(0, hand − N) counted at resolution; the hand owner chooses. "You and your opponent … until you each have N" adds `{ "type": "OPPONENT_ACTION", "params": { "action": { "type": "TRASH_FROM_HAND", "params": { "until_count": N } } }, "chain": "THEN" }` after your own clause (turn player first, OP05-058 FAQ) |
@@ -253,8 +253,8 @@ An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: {
 | Card Text | Action Encoding |
 |---|---|
 | "choose one:" (controller chooses) | `{ "type": "PLAYER_CHOICE", "params": { "options": [[branch1], [branch2]] } }` |
-| "Your opponent chooses one:" | `{ "type": "OPPONENT_CHOICE", "params": { "mandatory": true, "options": [[branch1], [branch2]] } }` |
-| "your opponent returns 1..." (opponent performs) | `{ "type": "OPPONENT_ACTION", "params": { "mandatory": true, "action": {...} } }` |
+| "Your opponent chooses one:" | `{ "type": "OPPONENT_CHOICE", "params": { "options": [[branch1], [branch2]] } }` |
+| "your opponent returns 1..." (opponent performs) | `{ "type": "OPPONENT_ACTION", "params": { "action": {...} } }` |
 | "[Trigger] Activate this card's [Counter] effect" | `{ "type": "REUSE_EFFECT", "params": { "target_effect": "COUNTER" } }` |
 | "[Trigger] Activate this card's [Main] effect" | `{ "type": "REUSE_EFFECT", "params": { "target_effect": "MAIN_EVENT" } }` |
 | "at the end of this turn, trash..." (deferred) | `{ "type": "SCHEDULE_ACTION", "params": { "timing": "END_OF_THIS_TURN", "action": {...} } }` |
