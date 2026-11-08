@@ -1110,11 +1110,21 @@ function validateAttackerBoundProhibition(
 ): string[] {
   const scope = action.params?.scope;
   const binding = scope?.when_attacking;
-  if (
-    binding?.type === "YOUR_LEADER" &&
-    action.params?.prohibition_type === "CANNOT_ACTIVATE_BLOCKER"
-  ) {
-    return validateLeaderAttackerBinding(action, prefix);
+  if (binding?.type === "YOUR_LEADER") {
+    const prohibitionType = action.params?.prohibition_type;
+    if (prohibitionType === "CANNOT_ACTIVATE_BLOCKER") {
+      return validateLeaderAttackerBinding(action, prefix);
+    }
+    // OPT-934: only CANNOT_ACTIVATE_BLOCKER freezes the Leader as the bound
+    // attacker. The other Blocker-family types would ignore the binding and
+    // lock Blocker for every attack this turn. CANNOT_ATTACK keeps its own
+    // meaning (the attack target) and stays accepted.
+    if (prohibitionType === "CANNOT_BLOCK" || prohibitionType === "CANNOT_USE_BLOCKER") {
+      return [
+        `${prefix}.params.scope.when_attacking: a YOUR_LEADER attacker binding is only supported on CANNOT_ACTIVATE_BLOCKER (found ${prohibitionType})`,
+      ];
+    }
+    return [];
   }
   if (binding?.type !== "SELECTED_CARDS") return [];
   const at = `${prefix}.params.scope.when_attacking`;
