@@ -26,12 +26,13 @@ const manifest = JSON.parse(
   }[];
 };
 
-// Actual sanitized stored terminal sessions. These pin an observed rejection,
-// not a newly approved rejection policy; update with a reviewed compatibility
-// disposition. They are not synthetic states, captured undo, or active pauses.
+// Actual sanitized stored terminal sessions. The manifest pins the rejection
+// observed by the capture-time reader; OPT-1013 (SAVED-STATE-COMPATIBILITY.md
+// §4.2) now admits them read-only, see opt-1013-pre-context-terminal-admission.
+// They are not synthetic states, captured undo, or active pauses.
 describe("OPT-971 captured unversioned admission gap", () => {
   it.each(manifest.cases)(
-    "$file retains immutable provenance and raw reader rejection",
+    "$file retains immutable provenance; the capture-time rejection is now a read-only admission",
     (entry) => {
       const bytes = readFileSync(new URL(entry.file, directory));
       expect(digest(bytes)).toBe(entry.sha256);
@@ -58,9 +59,8 @@ describe("OPT-971 captured unversioned admission gap", () => {
       expect(capture.state.pendingPrompt === null).toBe(true);
       expect(capture.state.effectStack.length).toBe(0);
       expect(capture.undoHistory.length).toBe(0);
-      expect(() => convertPersistedGameState(capture.state, "state")).toThrow(
-        entry.rawError
-      );
+      expect(entry.rawError).toContain("invalid core shape at executionContext");
+      expect(() => convertPersistedGameState(capture.state, "state")).not.toThrow();
       // Digest assertions avoid dumping hidden game structure on a failed test.
       expect(digest(JSON.stringify(capture))).toBe(before);
       expect(digest(readFileSync(new URL(entry.file, directory)))).toBe(
@@ -79,6 +79,8 @@ describe("OPT-971 captured unversioned admission gap", () => {
       const before = digest(JSON.stringify(capture));
       // Diagnostic only: production invokes this helper AFTER strict conversion,
       // so neither raw captured state reaches it. Never rewrite the fixture.
+      // A state that already carries a context is not a pre-context save, so
+      // the OPT-1013 admission does not fill its pregame either.
       const scratch = ensureExecutionContext(structuredClone(capture.state));
       expect(Object.hasOwn(scratch, "executionContext")).toBe(true);
       expect(() => convertPersistedGameState(scratch, "state")).toThrow(
@@ -96,6 +98,7 @@ describe("OPT-971 captured unversioned admission gap", () => {
     const valid = JSON.parse(golden.sessionJson).state;
     expect(readGameStateSchemaVersion(valid, "state")).toBe(1);
     expect(() => convertPersistedGameState(valid, "state")).not.toThrow();
+    // Capture-time provenance: the deployed reader accepted neither raw state.
     expect(manifest.rawReaderAcceptedCaptures).toBe(0);
     expect(manifest.cases.length).toBe(2);
   });
