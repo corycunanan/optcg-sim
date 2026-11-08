@@ -280,6 +280,7 @@ An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: {
 | "with different card names" (multi-select) | add `"uniqueness_constraint": { "field": "name" }` to target |
 | "a total power of N or less" (multi-select) | add `"aggregate_constraint": { "property": "power", "operator": "<=", "value": N }` |
 | "with a DON!! card given" | `filter: { "don_given_count": { "operator": ">=", "value": 1 } }` |
+| "Character without [Blocker]" (runtime keyword) | `filter: { "keywords_not": ["BLOCKER"] }` |
 | "Characters without a [When Attacking] effect" | `filter: { "lacks_effect_type": "WHEN_ATTACKING" }` |
 | "Character card with a [Trigger]" | `filter: { "has_trigger": true }` |
 | "Character with no base effect" | `filter: { "no_base_effect": true }` |

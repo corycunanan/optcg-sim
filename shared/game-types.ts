@@ -311,7 +311,7 @@ export interface GameEventPayloadMap {
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
-  CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; cardType?: "STAGE" };
+  CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; preKO_keywords?: string[]; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
   CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
   CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };

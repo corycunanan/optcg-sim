@@ -6,10 +6,6 @@
  *
  * Partial encodings (the missing clause is NOT approximated; see
  * docs/game-engine/DEFERRED-CARD-EFFECTS.md):
- * - EB05-010 Nico Robin (Leader): the "When one of your Characters with the
- *   Wisdom attribute and without [Blocker] is K.O.'d" auto effect needs a
- *   negation-aware "without [Blocker]" filter read from last-known
- *   information. Only the [Activate: Main] effect is encoded.
  * - EB05-052 Gloriosa: "If you would take damage, you may trash this
  *   Character instead" needs a damage replacement event. Only the [Trigger]
  *   is encoded.
@@ -416,7 +412,22 @@ export const EB05_010_NICO_ROBIN: EffectSchema = {
   card_name: "Nico Robin",
   card_type: "Leader",
   effects: [
-    // Partial: the Wisdom-without-[Blocker] K.O. watcher is deferred (header).
+    // "Without [Blocker]" reads the K.O.'d Character's runtime keywords at
+    // K.O. time (OPT-1033): a negated printed or self-granted [Blocker] is
+    // absent; one granted by another card's effect still counts.
+    {
+      id: "wisdom_without_blocker_ko_add_life",
+      category: "auto",
+      trigger: {
+        event: "ANY_CHARACTER_KO",
+        once_per_turn: true,
+        filter: {
+          controller: "SELF",
+          target_filter: { attribute: "WISDOM", keywords_not: ["BLOCKER"] },
+        },
+      },
+      actions: [ADD_TOP_DECK_TO_LIFE],
+    },
     {
       id: "activate_set_wisdom_active",
       category: "activate",

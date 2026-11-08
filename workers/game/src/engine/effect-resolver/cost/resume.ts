@@ -5,6 +5,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
 import { getEffectiveBasePower } from "../../modifiers.js";
+import { lastKnownKeywordsIfChanged } from "../../keywords.js";
 import { attachDonToCard, reattachDon, trashStage } from "../card-mutations.js";
 import { computeCostTargets, isOpponentLifePlacement, opponentRestedCostDon } from "./targets.js";
 
@@ -91,8 +92,9 @@ function applyCostSelectionUnreleased(
         const source = toRemove.find(card => card.instanceId === fact.oldInstanceId)!;
         const data = cardDb?.get(source.cardId);
         const preKO_basePower = data && cardDb ? getEffectiveBasePower(source, data, state, cardDb) : undefined;
+        const preKO_keywords = data && cardDb ? lastKnownKeywordsIfChanged(source, data, state, cardDb) : undefined;
         return cost.type === "KO_OWN_CHARACTER"
-          ? { type: "CARD_KO", playerIndex: fact.owner, payload: { ...provenance, cause: "EFFECT", preKO_donCount: fact.detachedDonInstanceIds.length, ...(preKO_basePower !== undefined ? { preKO_basePower } : {}) } }
+          ? { type: "CARD_KO", playerIndex: fact.owner, payload: { ...provenance, cause: "EFFECT", preKO_donCount: fact.detachedDonInstanceIds.length, ...(preKO_basePower !== undefined ? { preKO_basePower } : {}), ...(preKO_keywords !== undefined ? { preKO_keywords } : {}) } }
           : { type: "CARD_TRASHED", playerIndex: fact.owner, payload: { ...provenance, reason: "cost", count: 1, from: "CHARACTER" } };
       });
       return { state: moved.state, events };
