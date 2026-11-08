@@ -199,17 +199,15 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
     });
   });
 
-  it("OP10-112 with an empty opponent Life offers only 0 and trashes nothing", () => {
+  it("OP10-112 with an empty opponent Life asks nothing and trashes nothing (OPT-918)", () => {
     const f = fixture({ oppLife: 0 });
     f.register("OP10-112");
     f.state.players[0].hand = [inst("h", "OP10-112", 0, "HAND")];
     f.act({ type: "PLAY_CARD", cardInstanceId: "h" });
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
-    // Pins current behavior: CHOOSE_VALUE with max 0 still raises a
-    // single-choice "0" PLAYER_CHOICE. OPT-918 makes it auto-resolve; when
-    // that lands, replace this answer with `expect(pendingPrompt).toBeNull()`.
-    answerUpTo(f, 0, 0);
+    // OPT-918: "up to 1" with nothing available has one answer, 0, so no
+    // single-choice CHOOSE_VALUE prompt is raised.
     expect(f.state.players[1].life).toHaveLength(0);
     expect(f.state.players[1].trash).toHaveLength(0);
     expect(f.state.pendingPrompt).toBeNull();
@@ -268,6 +266,21 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
     // Printed "up to 1" and the player chose 1: exactly one card, the top.
     expectOppLife(f, before, 1);
     expect(f.state.players[1].life).toHaveLength(before.length - 1);
+    expect(f.state.players[0].life).toHaveLength(ownLife);
+  });
+
+  it("OP03-114 with an empty deck skips the add prompt and still asks the trash (OPT-918)", () => {
+    const f = fixture();
+    f.register("OP03-114", { types: ["Big Mom Pirates"] });
+    f.db.set("LEADER-T", { ...f.db.get("LEADER-T")!, types: ["Big Mom Pirates"] });
+    f.state.players[0].hand = [inst("h", "OP03-114", 0, "HAND")];
+    f.state.players[0].deck = [];
+    const before = structuredClone(f.state.players[1].life);
+    const ownLife = f.state.players[0].life.length;
+    f.act({ type: "PLAY_CARD", cardInstanceId: "h" });
+    // The first prompt is already the trash clause's 0-or-1 choice.
+    answerUpTo(f, 1, 1);
+    expectOppLife(f, before, 1);
     expect(f.state.players[0].life).toHaveLength(ownLife);
   });
 

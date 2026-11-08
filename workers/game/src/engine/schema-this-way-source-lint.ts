@@ -153,6 +153,15 @@ function walk(
   }
 }
 
+/**
+ * OPT-930: nested lists that run later or only conditionally. Their refs are
+ * visible inside the nested list but never to the actions after the parent.
+ */
+const DEFERRED_NESTED_ACTIONS: ReadonlySet<string> = new Set([
+  "SCHEDULE_ACTION",
+  "APPLY_PROHIBITION",
+]);
+
 function walkActionList(
   actions: unknown,
   path: string,
@@ -160,10 +169,12 @@ function walkActionList(
   found: string[],
 ): void {
   if (!Array.isArray(actions)) return;
-  const produced = new Map<string, string>();
-  // Pre-order: an action is checked before its nested actions, and a nested
-  // action sees the refs of everything visited before it.
-  const visit = (list: Action[], listPath: string): void => {
+  // Pre-order along one execution path: an action is checked before its
+  // nested actions and sees only refs produced earlier on the same path
+  // (OPT-930). A PLAYER_CHOICE option sees its own earlier actions, never a
+  // sibling option's; after the choice, only refs every option produces
+  // are certain. A SCHEDULE_ACTION body runs later, so its refs stay inside.
+  const visit = (list: Action[], listPath: string, produced: Map<string, string>): void => {
     list.forEach((action, index) => {
       if (!action || typeof action !== "object") return;
       const actionPath = `${listPath}[${index}]`;
@@ -178,10 +189,28 @@ function walkActionList(
       if (typeof action.result_ref === "string") {
         produced.set(action.result_ref, action.type);
       }
-      visit(nested, `${actionPath}.nested`);
+      if (action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") {
+        const options = (action.params?.options ?? []) as Action[][];
+        const branches = options.map((option, optionIndex) => {
+          const branch = new Map(produced);
+          visit(option, `${actionPath}.params.options[${optionIndex}]`, branch);
+          return branch;
+        });
+        if (branches.length === 0) return;
+        for (const [ref, type] of branches[0]) {
+          if (produced.has(ref)) continue;
+          if (branches.every((branch) => branch.get(ref) === type)) produced.set(ref, type);
+        }
+        return;
+      }
+      if (DEFERRED_NESTED_ACTIONS.has(action.type)) {
+        visit(nested, `${actionPath}.nested`, new Map(produced));
+        return;
+      }
+      visit(nested, `${actionPath}.nested`, produced);
     });
   };
-  visit(actions as Action[], path);
+  visit(actions as Action[], path, new Map());
 }
 
 function walkBlock(block: Record<string, unknown>, path: string, found: string[]): void {

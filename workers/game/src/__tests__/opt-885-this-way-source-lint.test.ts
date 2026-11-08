@@ -163,6 +163,55 @@ describe("OPT-885 *_THIS_WAY source lint", () => {
     })]))).toHaveLength(1);
   });
 
+  // OPT-930: a ref counts only when it was filled earlier on the same path.
+  const choice = (...options: unknown[][]) => ({ type: "PLAYER_CHOICE", params: { options } });
+
+  it("rejects a ref filled by an unselected sibling PLAYER_CHOICE option", () => {
+    const violations = findThisWaySourceViolations(schemaWith([block({
+      actions: [choice([trashAction("t")], [perCount("CARDS_TRASHED_THIS_WAY", "t")])],
+    })]));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("not the result_ref of an earlier action");
+  });
+
+  it("rejects a ref after the choice when only one option fills it", () => {
+    const violations = findThisWaySourceViolations(schemaWith([block({
+      actions: [
+        choice([trashAction("t")], [{ type: "DRAW", params: { amount: 1 } }]),
+        perCount("CARDS_TRASHED_THIS_WAY", "t"),
+      ],
+    })]));
+    expect(violations).toHaveLength(1);
+  });
+
+  it("accepts a ref filled earlier in the same option, or by every option", () => {
+    expect(findThisWaySourceViolations(schemaWith([block({
+      actions: [choice(
+        [trashAction("t"), perCount("CARDS_TRASHED_THIS_WAY", "t")],
+        [{ type: "DRAW", params: { amount: 1 } }],
+      )],
+    })]))).toEqual([]);
+    expect(findThisWaySourceViolations(schemaWith([block({
+      actions: [
+        choice([trashAction("t")], [trashAction("t")]),
+        perCount("CARDS_TRASHED_THIS_WAY", "t"),
+      ],
+    })]))).toEqual([]);
+    expect(findThisWaySourceViolations(schemaWith([block({
+      actions: [trashAction("t"), choice([perCount("CARDS_TRASHED_THIS_WAY", "t")], [])],
+    })]))).toEqual([]);
+  });
+
+  it("rejects a ref filled by an action scheduled for later", () => {
+    const violations = findThisWaySourceViolations(schemaWith([block({
+      actions: [
+        { type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: trashAction("t") } },
+        perCount("CARDS_TRASHED_THIS_WAY", "t"),
+      ],
+    })]));
+    expect(violations).toHaveLength(1);
+  });
+
   it("passes every authored card in the generated registry", () => {
     expect(findThisWaySourceIntentViolations(getAllAuthoredSchemas())).toEqual([]);
   });

@@ -63,6 +63,7 @@ import {
   pushBatchResumeFrame,
 } from "./resume-core.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
+import { isFixedReferenceChainVacuous } from "./feasibility.js";
 import {
   SIMULTANEOUS_ACTION_TYPES,
   isSimultaneousGroupStart,
@@ -551,6 +552,28 @@ function resolveEffectCore(
       return { state, events, resolved: false, effectNotActivated: true };
     }
 
+    const triggeringRef: [string, EffectResult][] = triggeringCardInstanceId
+      ? [[TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 }]]
+      : [];
+
+    // OPT-904: with no cost to pay, accepting an effect whose only action
+    // targets a context card that is already gone (ST08-013 Mr.2 after the
+    // battled Character was K.O.'d) can change nothing. Don't offer it.
+    if (
+      !block.costs?.length &&
+      isFixedReferenceChainVacuous(
+        state,
+        block.actions ?? [],
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        new Map([...sourceSnapshotRef, ...triggeringRef])
+      )
+    ) {
+      log("effect.skipped", { ...logCtx, reason: "no_legal_target" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
     const frameId = generateFrameId(state);
     state = frameId.state;
@@ -564,20 +587,7 @@ function resolveEffectCore(
       phase: "AWAITING_OPTIONAL_RESPONSE",
       pausedAction: null,
       remainingActions: block.actions ?? [],
-      resultRefs: [
-        ...sourceSnapshotRef,
-        ...(triggeringCardInstanceId
-          ? [
-              [
-                TRIGGERING_CARD_REF,
-                {
-                  targetInstanceIds: [triggeringCardInstanceId],
-                  count: 1,
-                },
-              ] as [string, EffectResult],
-            ]
-          : []),
-      ],
+      resultRefs: [...sourceSnapshotRef, ...triggeringRef],
       validTargets: [],
       costs: block.costs ?? [],
       currentCostIndex: 0,
@@ -807,7 +817,7 @@ function expandUpToResourceAction(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>
-): [ActionOf<"CHOOSE_VALUE">, Action] {
+): { actions: Action[]; resultRefs: Map<string, EffectResult> } {
   const resultRef = "__engine_up_to_amount";
   const max = availableUpToAmount(
     state,
@@ -816,12 +826,6 @@ function expandUpToResourceAction(
     cardDb,
     resultRefs
   );
-  const chooseAction: ActionOf<"CHOOSE_VALUE"> = {
-    type: "CHOOSE_VALUE",
-    params: { domain: "NUMBER", constraints: { min: 0, max } },
-    result_ref: resultRef,
-    chain: action.chain,
-  };
   const resumedAction = {
     ...action,
     chain: "IF_DO",
@@ -831,7 +835,25 @@ function expandUpToResourceAction(
       up_to: false,
     },
   } as Action;
-  return [chooseAction, resumedAction];
+  // OPT-918: "up to N" with nothing available has one answer, 0. Record it
+  // as if chosen and run the same 0-amount action under the original
+  // connector, so following clauses see the same outcome as after a prompt.
+  // "Up to 1" still prompts: choosing 0 there is a real choice.
+  if (max <= 0) {
+    const chosen = new Map(resultRefs);
+    chosen.set(resultRef, { targetInstanceIds: [], count: 1, value: 0 });
+    return {
+      actions: [{ ...resumedAction, chain: action.chain } as Action],
+      resultRefs: chosen,
+    };
+  }
+  const chooseAction: ActionOf<"CHOOSE_VALUE"> = {
+    type: "CHOOSE_VALUE",
+    params: { domain: "NUMBER", constraints: { min: 0, max } },
+    result_ref: resultRef,
+    chain: action.chain,
+  };
+  return { actions: [chooseAction, resumedAction], resultRefs };
 }
 
 function promptForSimultaneousSelection(
@@ -1160,11 +1182,11 @@ function executeActionChainCore(
         .withCommittedEvents(events)
         .executeActionChain(
           state,
-          [...expanded, ...actions.slice(i + 1)],
+          [...expanded.actions, ...actions.slice(i + 1)],
           sourceCardInstanceId,
           controller,
           cardDb,
-          resultRefs,
+          expanded.resultRefs,
           effectDescription,
           lastActionSucceeded
         );
