@@ -4162,9 +4162,12 @@ export const OP08_116_BURN_BAZOOKA: EffectSchema = {
           duration: { type: "THIS_BATTLE" },
         },
         {
+          // "Then, you may add 1 card ... to your hand." — a clause-level
+          // choice after the +4000 (OPT-919); the add below is "If you do".
           type: "LIFE_TO_HAND",
           params: { amount: 1, position: "TOP_OR_BOTTOM" },
           chain: "THEN",
+          optional: true,
         },
         {
           type: "ADD_TO_LIFE_FROM_HAND",
@@ -4178,7 +4181,6 @@ export const OP08_116_BURN_BAZOOKA: EffectSchema = {
           chain: "IF_DO",
         },
       ],
-      flags: { optional: true },
     },
   ],
 };
