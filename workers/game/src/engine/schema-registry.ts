@@ -1246,7 +1246,7 @@ function countAllowsZero(count: unknown): boolean {
  * action's handler builds its SELECT_TARGET from the target's count
  * (`promptsFromTargetCount`) and the target type can offer more than one
  * candidate (`targetCandidatePoolMax`). Otherwise no zero-choice prompt exists
- * (e.g. TRASH_FROM_LIFE never prompts; TRASH_FROM_HAND with an amount asks for
+ * (e.g. a TOP/BOTTOM TRASH_FROM_LIFE never prompts; TRASH_FROM_HAND with an amount asks for
  * exactly that many), and action-level `optional` is the only decline.
  */
 function zeroAllowingTargetCounts(action: Action): string[] {
@@ -1267,7 +1267,7 @@ function zeroAllowingTargetCounts(action: Action): string[] {
   if (countAllowsZero(target.mixed_pool?.total_count))
     paths.push("target.mixed_pool.total_count");
   const hasCount = !!(target.mixed_pool?.total_count ?? target.count);
-  if (hasCount || perTypeZero || !promptsFromTargetCount(action.type)) return paths;
+  if (hasCount || perTypeZero || !promptsFromTargetCount(action)) return paths;
   // Probe with the largest pool this target type can produce (capped), so
   // the predicate reports whether a multi-candidate prompt is possible.
   const poolMax = Math.min(targetCandidatePoolMax(target), 1000);

@@ -193,6 +193,15 @@ export function filterEventForRecipient(
     ) {
       return redactEventIdentities(event);
     }
+    // OPT-976: a card that enters Life face-down from the deck was never seen
+    // by anyone, its owner included.
+    if (
+      event.type === "CARD_ADDED_TO_LIFE" &&
+      event.payload.sourceZone === "DECK" &&
+      event.payload.face === "DOWN"
+    ) {
+      return redactEventIdentities(event);
+    }
     return recipient.kind === "PLAYER" &&
       event.playerIndex === recipient.playerIndex
       ? event

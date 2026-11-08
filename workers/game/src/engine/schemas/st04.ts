@@ -25,8 +25,10 @@ export const ST04_001_KAIDO: EffectSchema = {
       costs: [{ type: "DON_MINUS", amount: 7 }],
       actions: [
         {
+          // No "from the top": any Life position is legal (rule 3-10-2, OPT-917).
           type: "TRASH_FROM_LIFE",
-          params: { amount: 1, position: "TOP", controller: "OPPONENT", up_to: true },
+          target: { type: "OPPONENT_LIFE", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { position: "ANY" },
         },
       ],
       flags: { once_per_turn: true },

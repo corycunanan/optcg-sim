@@ -77,6 +77,25 @@ export function executeAddToLifeFromDeck(
     position,
     lifeFace: face,
   });
+  // OPT-976: each card that entered Life is on the event log, like the field
+  // and cost emitters. Watchers keyed on field removal ignore a DECK source.
+  const causingController = effectSourceController(state, _sourceCardInstanceId, controller, _resultRefs);
+  for (const { fact } of moved.transitions) {
+    events.push({
+      type: "CARD_ADDED_TO_LIFE",
+      playerIndex: fact.owner,
+      payload: {
+        cardInstanceId: fact.oldInstanceId,
+        newCardInstanceId: fact.newInstanceId,
+        cardId: fact.cardId,
+        sourceZone: fact.source,
+        sourceController: fact.controller,
+        causingController,
+        movementCause: "EFFECT",
+        face,
+      },
+    });
+  }
 
   return {
     state: moved.state,
@@ -109,6 +128,7 @@ export function executeTrashFromLife(
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -117,10 +137,26 @@ export function executeTrashFromLife(
 
   const pi = trashFromLifeOwner(action, controller);
   const p = state.players[pi];
-  const count = Math.min(amount, p.life.length);
+
+  let removed: typeof p.life;
+  if (position === "ANY") {
+    // OPT-917: the chooser picks Life cards by position (ST04-001). The
+    // prompt is built over Life instance ids; face-down identities are
+    // redacted in the prompt itself (buildSelectTargetPrompt).
+    const lifeIds = p.life.map((card) => card.instanceId);
+    if (lifeIds.length === 0) return { state, events, succeeded: false };
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, lifeIds)) {
+      return buildSelectTargetPrompt(state, action, lifeIds, _sourceCardInstanceId, controller, _cardDb, _resultRefs);
+    }
+    const chosen = new Set(preselectedTargets ?? autoSelectTargets(action.target, lifeIds));
+    removed = p.life.filter((card) => chosen.has(card.instanceId));
+  } else {
+    const count = Math.min(amount, p.life.length);
+    removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
+  }
+  const count = removed.length;
   if (count === 0) return { state, events, succeeded: false };
 
-  const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
   const moved = transitionCards(
     state,
     removed.map((card) => card.instanceId),
@@ -149,7 +185,8 @@ export function executeTrashFromLife(
   return {
     state: moved.state,
     events,
-    fullyExecuted: moved.transitions.length === amount, succeeded: true,
+    // An any-position pick is complete when the chosen cards all left Life.
+    fullyExecuted: moved.transitions.length === (position === "ANY" ? count : amount), succeeded: true,
   };
 }
 
@@ -240,6 +277,11 @@ export function executeTurnAllLifeFaceDown(
   return { state: { ...state, players: newPlayers }, events, succeeded: true };
 }
 
+/** OPT-1014: PLAYER_CHOICE ids of a paused TOP_OR_BOTTOM LIFE_TO_HAND. */
+export function lifeToHandChoiceId(end: "TOP" | "BOTTOM"): string {
+  return `life-to-hand:${end}`;
+}
+
 // OPT-259 (F6): non-damage Life→hand adds (e.g. OP05-107) do NOT fire [Trigger].
 // Damage-driven Life→hand goes through executeDealDamage / battle damage.
 export function executeLifeToHand(
@@ -271,7 +313,39 @@ export function executeLifeToHand(
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
 
-  const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
+  // OPT-1014: "top or bottom" is the controller's choice. When the amount
+  // covers every Life card both ends name the same cards, so no prompt.
+  if (position === "TOP_OR_BOTTOM" && count < p.life.length) {
+    const choices = (["TOP", "BOTTOM"] as const).map((end) => ({
+      id: lifeToHandChoiceId(end),
+      label: end === "TOP" ? "Top" : "Bottom",
+    }));
+    return {
+      state,
+      events,
+      succeeded: false,
+      pendingPrompt: {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          choices,
+          effectDescription: promptEffectDescription(state, _cardDb, _sourceCardInstanceId) ||
+            "Choose top or bottom of your Life cards to add to your hand",
+          source: "EFFECT",
+        },
+        respondingPlayer: controller,
+        resumeContext: {
+          effectSourceInstanceId: _sourceCardInstanceId,
+          controller,
+          pausedAction: action,
+          remainingActions: [],
+          resultRefs: [..._resultRefs.entries()],
+          validTargets: choices.map((choice) => choice.id),
+        } satisfies ResumeContext,
+      },
+    };
+  }
+
+  const removed = position === "BOTTOM" ? p.life.slice(-count) : p.life.slice(0, count);
   const moved = moveLifeToHand(state, removed, targetController, _cardDb);
 
   for (const transition of moved.transitions) {

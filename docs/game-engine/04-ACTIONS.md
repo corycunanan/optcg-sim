@@ -2243,19 +2243,18 @@ interface PlayFromLifeParams {
 
 ### LIFE_TO_HAND
 
-Add a Life card to the controller's hand via effect (not damage). The controller may choose which Life card (top or bottom) to add.
+Add a Life card to the controller's hand via effect (not damage). With `TOP_OR_BOTTOM` the controller chooses the end through a `PLAYER_CHOICE` prompt (`life-to-hand:TOP` / `life-to-hand:BOTTOM`, OPT-1014). No prompt is raised when Life is empty or when `amount` covers every Life card, since both ends then name the same cards.
 
 ```typescript
 interface LifeToHandParams {
-  position: "TOP" | "BOTTOM" | "CHOICE";
+  position: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
   amount: number;
-  controller?: Controller;
 }
 ```
 
 | Field | Value |
 |-------|-------|
-| **Target** | None (operates on a player's Life area) |
+| **Target** | None, or `OPPONENT_LIFE` / an `OPPONENT` controller for the opponent's Life |
 | **Failure mode** | If the Life area is empty, the action is ignored. |
 | **Fired events** | `CARD_REMOVED_FROM_LIFE`, `CARD_ADDED_TO_HAND_FROM_LIFE` |
 | **Example cards** | ST07-001, OP03-102, OP14-103, P-009 |
@@ -2276,14 +2275,17 @@ Trash a card directly from the Life area. Not damage — does not trigger Trigge
 ```typescript
 interface TrashFromLifeParams {
   amount: number;
-  position: "TOP" | "BOTTOM" | "CHOICE";
+  position: "TOP" | "BOTTOM" | "ANY";
   controller?: Controller;
+  up_to?: boolean;
 }
 ```
 
+`position: "ANY"` (OPT-917) is for text that omits "from the top" (rule 3-10-2): the chooser picks Life cards by position through a `SELECT_TARGET` built from the target count, and `amount` is unused. Face-down cards appear in the prompt with a hidden identity; face-up cards are shown.
+
 | Field | Value |
 |-------|-------|
-| **Target** | None (operates on a player's Life area) |
+| **Target** | None for `TOP`/`BOTTOM`; `OPPONENT_LIFE` with a `count` for `ANY` |
 | **Failure mode** | If the Life area has fewer cards than `amount`, trash as many as possible. |
 | **Fired events** | `CARD_REMOVED_FROM_LIFE`, `CARD_TRASHED` |
 | **Example cards** | ST04-001, ST07-010, OP03-114, OP03-120, EB03-057, OP15-116 |
@@ -2292,6 +2294,16 @@ interface TrashFromLifeParams {
 {
   "type": "TRASH_FROM_LIFE",
   "params": { "amount": 1, "position": "TOP" }
+}
+```
+
+ST04-001 Kaido, "Trash up to 1 of your opponent's Life cards":
+
+```json
+{
+  "type": "TRASH_FROM_LIFE",
+  "target": { "type": "OPPONENT_LIFE", "controller": "OPPONENT", "count": { "up_to": 1 } },
+  "params": { "position": "ANY" }
 }
 ```
 

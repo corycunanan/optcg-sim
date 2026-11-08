@@ -2,6 +2,7 @@
  * Target resolution — compute valid targets and build selection prompts.
  */
 
+import { HIDDEN_IDENTITY } from "../visibility.js";
 import type {
   Action,
   AggregateConstraint,
@@ -959,10 +960,18 @@ export function buildSelectTargetPrompt(
       : allValidIds.length;
   }
 
+  // OPT-917: a face-down Life card is secret to both players (rule 3-10-2),
+  // so the prompt names only its position. Redacting here also covers every
+  // re-prompt built from the same paused action.
+  const faceDownLifeIds = new Set(
+    state.players.flatMap((player) =>
+      player.life.filter((lifeCard) => lifeCard.face === "DOWN").map((lifeCard) => lifeCard.instanceId)),
+  );
   const cards: CardInstance[] = [];
   for (const id of allValidIds) {
     const c = findCardInstance(state, id);
-    if (c) cards.push(c);
+    if (!c) continue;
+    cards.push(faceDownLifeIds.has(id) ? { ...c, cardId: HIDDEN_IDENTITY } : c);
   }
 
   const effectDescription = promptEffectDescription(

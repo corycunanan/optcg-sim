@@ -1,4 +1,4 @@
-import type { ActionType } from "../effect-types.js";
+import type { Action, ActionType } from "../effect-types.js";
 
 /**
  * How an action's handler lets the player choose its targets (OPT-893).
@@ -89,7 +89,9 @@ export const ACTION_TARGET_PROMPT_KIND = {
   ADD_TO_LIFE_FROM_FIELD: "TARGET_COUNT",
   PLAY_FROM_LIFE: "OTHER",
   LIFE_TO_HAND: "OTHER",
-  TRASH_FROM_LIFE: "OTHER",
+  // Only position ANY (OPT-917) prompts from the target's count; see
+  // promptsFromTargetCount for the per-action refinement.
+  TRASH_FROM_LIFE: "TARGET_COUNT",
   DRAIN_LIFE_TO_THRESHOLD: "OTHER",
   LIFE_CARD_TO_DECK: "OTHER",
   TRASH_FACE_UP_LIFE: "OTHER",
@@ -113,6 +115,9 @@ export const ACTION_TARGET_PROMPT_KIND = {
 } as const satisfies Record<ActionType, TargetPromptKind>;
 
 /** Whether this action's handler prompts SELECT_TARGET with the target's count. */
-export function promptsFromTargetCount(type: ActionType): boolean {
-  return ACTION_TARGET_PROMPT_KIND[type] === "TARGET_COUNT";
+export function promptsFromTargetCount(action: Action): boolean {
+  // TRASH_FROM_LIFE builds a target prompt only for an any-position pick;
+  // TOP and BOTTOM trash a fixed amount from that end (OPT-917).
+  if (action.type === "TRASH_FROM_LIFE") return action.params?.position === "ANY";
+  return ACTION_TARGET_PROMPT_KIND[action.type] === "TARGET_COUNT";
 }

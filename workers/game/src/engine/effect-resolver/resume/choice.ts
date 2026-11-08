@@ -62,7 +62,7 @@ import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { postCostConditionsMet } from "../post-cost.js";
-import { executeAddToLifeFromField } from "../actions/life.js";
+import { executeAddToLifeFromField, executeLifeToHand, lifeToHandChoiceId } from "../actions/life.js";
 import { findCardInstance } from "../../state.js";
 import { executePlayCard } from "../actions/play.js";
 import {
@@ -336,6 +336,48 @@ export function handleFieldToLifePosition(
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
   return { ...result, kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed", resolved: true };
+}
+
+/**
+ * OPT-1014: resume a TOP_OR_BOTTOM LIFE_TO_HAND with the chosen end. Life has
+ * not moved while the prompt was pending, so the action re-runs with a fixed
+ * position; anything but one of the offered ends is rejected with the prompt
+ * left intact.
+ */
+export function handleLifeToHandPosition(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+): (HandlerResult & { succeeded?: boolean }) | null {
+  const { pausedAction, validTargets, controller, effectSourceInstanceId } = resumeCtx;
+  if (
+    pausedAction?.type !== "LIFE_TO_HAND" ||
+    pausedAction.params?.position !== "TOP_OR_BOTTOM" ||
+    !validTargets.includes(lifeToHandChoiceId("TOP"))
+  )
+    return null;
+  const position =
+    action.type !== "PLAYER_CHOICE" || !validTargets.includes(action.choiceId)
+      ? null
+      : action.choiceId === lifeToHandChoiceId("TOP")
+        ? "TOP"
+        : action.choiceId === lifeToHandChoiceId("BOTTOM")
+          ? "BOTTOM"
+          : null;
+  if (!position) return { kind: "waiting", state, events: [], resolved: false, rejected: true };
+  const result = executeLifeToHand(
+    state,
+    { ...pausedAction, params: { ...pausedAction.params, position } },
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+  );
+  if (pausedAction.result_ref && result.result)
+    resultRefs.set(pausedAction.result_ref, result.result);
+  return { ...result, kind: isGameTerminated(result.state) ? "terminal" : "completed", resolved: true };
 }
 
 /**
