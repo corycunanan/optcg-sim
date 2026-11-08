@@ -565,7 +565,7 @@ export const OP03_017_CROSS_FIRE: EffectSchema = {
   effects: [
     {
       id: "main_counter_debuff",
-      category: "activate",
+      category: "auto",
       trigger: {
         any_of: [
           { keyword: "MAIN_EVENT" },

@@ -1333,7 +1333,7 @@ export const OP13_039_GUM_GUM_SNAKE_SHOT: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       actions: [
-        { type: "REUSE_EFFECT", params: { target_effect: "COUNTER" } },
+        { type: "REUSE_EFFECT", params: { target_effect: "COUNTER_EVENT" } },
       ],
     },
   ],

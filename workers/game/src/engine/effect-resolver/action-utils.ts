@@ -21,6 +21,7 @@ import { resolveDynamicValue } from "../dynamic-values.js";
 import { findCardInstance } from "../state.js";
 
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../effect-types.js";
+import { triggerHasKeyword } from "../trigger-keywords.js";
 
 export { getActionParams } from "../effect-types.js";
 
@@ -288,6 +289,11 @@ export function extractEffectDescription(
         // Include DON!! prefix if present (e.g., "[DON!! x1] [On Play]")
         let actual = idx;
         const before = seg.substring(0, idx).trimEnd();
+        // "[Main]/[Counter]" is one combined header (OPT-911), not two sections.
+        if (before.endsWith("/")) {
+          idx = seg.indexOf(b, idx + b.length);
+          continue;
+        }
         const donMatch = before.match(/\[DON!!(?:\s*[x×]\s*\d+)?\]\s*$/);
         if (donMatch) {
           actual = before.length - donMatch[0].length;
@@ -358,12 +364,7 @@ export function sourceTextForBlock(
   block: EffectBlock,
 ): string {
   const trigger = block.trigger;
-  const isTriggerBlock = !!trigger && (
-    ("keyword" in trigger && trigger.keyword === "TRIGGER") ||
-    ("any_of" in trigger && trigger.any_of.some(
-      (candidate) => "keyword" in candidate && candidate.keyword === "TRIGGER",
-    ))
-  );
+  const isTriggerBlock = triggerHasKeyword(trigger, "TRIGGER");
 
   return isTriggerBlock
     ? cardData?.triggerText ?? cardData?.effectText ?? ""

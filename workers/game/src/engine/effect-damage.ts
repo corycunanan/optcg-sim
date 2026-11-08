@@ -21,6 +21,7 @@ import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isGameTerminated } from "./terminal.js";
 import { publishCommittedEvents, retainEventsOnFrame, retainPropagationBeforePrompt } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
+import { findBlockByKeyword } from "./trigger-keywords.js";
 
 export function popLifeForDamage(
   state: GameState,
@@ -133,12 +134,7 @@ export function canOfferTrigger(
 ): boolean {
   const cardData = cardDb.get(cardId);
   if (!cardData || !hasTrigger(cardData)) return false;
-  const block = cardData.effectSchema?.effects?.find(
-    (effect) =>
-      effect.trigger &&
-      "keyword" in effect.trigger &&
-      effect.trigger.keyword === "TRIGGER"
-  );
+  const block = findBlockByKeyword(cardData.effectSchema?.effects, "TRIGGER");
   // Fail closed when canonical Trigger text has no authored block. Offering
   // such a card would let the player accept, trash it from Life, and resolve
   // nothing. Until its schema is authored, use the normal add-to-hand outcome.
@@ -167,9 +163,7 @@ function triggerBlockOf(cardDb: Map<string, CardData>, cardId: string) {
   const cardData = cardDb.get(cardId);
   return {
     cardData,
-    block: cardData?.effectSchema?.effects?.find(
-      (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
-    ),
+    block: findBlockByKeyword(cardData?.effectSchema?.effects, "TRIGGER"),
   };
 }
 

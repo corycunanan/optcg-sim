@@ -33,13 +33,12 @@ import { isProhibitedForCard, isCardPlayProhibitedByEffect } from "../../prohibi
 import { replacePendingEventReferences } from "../../events.js";
 import { transitionCard } from "../../zone-transition.js";
 import type { EffectResolverServices } from "../services.js";
+import { findBlockByKeyword } from "../../trigger-keywords.js";
 
 function findMainEventBlock(cardData: CardData): EffectBlock | undefined {
   const schema = cardData.effectSchema;
   if (!schema) return undefined;
-  return schema.effects.find(
-    (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
-  );
+  return findBlockByKeyword(schema.effects, "MAIN_EVENT");
 }
 
 // ─── Single-target play frames (OPT-114 macro expansion) ────────────────────
