@@ -10,11 +10,11 @@ import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
  *
  * Rule processing (rule 9-2-1, both players evaluated at one checkpoint) lives
  * in `defeat.ts` `runRuleProcessing`, which calls this writer with the joint
- * result. Only the persisted fields that the PR 1 reader already accepts are
- * written: the outcome kind is an input, not a stored field.
+ * result. The outcome kind is an input; its structured reason code is stored
+ * as `endReasonCode` (OPT-978) for the result callback.
  */
 
-import type { EngineLimitDiagnostic, GameState, PendingEvent } from "../types.js";
+import type { EngineLimitDiagnostic, GameEndReasonCode, GameState, PendingEvent } from "../types.js";
 import { emitEvent, emitPendingEvent } from "./events.js";
 
 type EngineLimitKind = Extract<
@@ -24,8 +24,11 @@ type EngineLimitKind = Extract<
 type EngineContractKind = Extract<EngineLimitDiagnostic, { kind: "ENGINE_CONTRACT" }>;
 
 export type TerminalOutcome =
-  /** Rule processing found defeat conditions (rule 9-2-1); `winner` null is a joint draw. */
-  | { kind: "RULES"; winner: 0 | 1 | null; reason: string }
+  /**
+   * Rule processing found defeat conditions (rule 9-2-1); `winner` null is a
+   * joint draw. `cause` names how the loser lost (null for a joint draw).
+   */
+  | { kind: "RULES"; winner: 0 | 1 | null; reason: string; cause: RulesDefeatCause | null }
   /** WIN_GAME card effect: the effect's controller wins (card text over rules, rule 1-3-1). */
   | { kind: "WIN_GAME"; winner: 0 | 1 }
   | { kind: "CONCESSION"; concedingPlayer: 0 | 1 }
@@ -35,6 +38,7 @@ export type TerminalOutcome =
       status: "FINISHED" | "ABANDONED";
       winner: 0 | 1 | null;
       reason: string;
+      cause: "REJOIN_TIMEOUT" | "PREGAME_LEAVE";
       clearPregame?: boolean;
     }
   /** A result already decided outside the worker (Next.js notify-end). */
@@ -42,6 +46,34 @@ export type TerminalOutcome =
   /** A bounded engine guard stopped resolution; not a rules draw (Decision 5). */
   | { kind: "ENGINE_LIMIT"; diagnostic: EngineLimitKind }
   | { kind: "ENGINE_CONTRACT"; diagnostic: EngineContractKind };
+
+/** How the losing player lost at a single-winner rules checkpoint. */
+export type RulesDefeatCause = "DECK_OUT" | "LIFE_LOSS" | "DECK_OUT_WIN_INSTEAD";
+
+/**
+ * The structured end reason for an outcome (OPT-978). The result callback
+ * reads this from the state, so no layer parses `winReason` text.
+ */
+export function terminalReasonCode(outcome: TerminalOutcome): GameEndReasonCode {
+  switch (outcome.kind) {
+    case "RULES":
+      return outcome.winner === null || outcome.cause === null ? "JOINT_DRAW" : outcome.cause;
+    case "WIN_GAME":
+      return "CARD_EFFECT_WIN";
+    case "CONCESSION":
+      return "CONCEDE";
+    case "ABANDONMENT":
+      return outcome.cause === "PREGAME_LEAVE" ? "PREGAME_LEAVE" : "DISCONNECT_TIMEOUT";
+    case "EXTERNAL_RESULT":
+      // notify-end's only producer is the Next.js fallback concede, which has
+      // already finalized the row with this code.
+      return "FALLBACK_CONCEDE";
+    case "ENGINE_LIMIT":
+      return "ENGINE_LIMIT";
+    case "ENGINE_CONTRACT":
+      return "ENGINE_CONTRACT";
+  }
+}
 
 export const ENGINE_LIMIT_REASON =
   "Engine resolution limit reached — the game ended with no winner";
@@ -131,6 +163,7 @@ export function terminateGame(
     status,
     winner,
     winReason: reason,
+    endReasonCode: terminalReasonCode(outcome),
     ...(engineOutcome ? { engineOutcome } : {}),
     ...(outcome.kind === "ABANDONMENT" && outcome.clearPregame
       ? { pregame: null }

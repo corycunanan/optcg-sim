@@ -6,6 +6,7 @@ Cloudflare game worker, and (for card parsing) the data pipeline.
 | File                           | Contract                                                                                  |
 | ------------------------------ | ----------------------------------------------------------------------------------------- |
 | `card-parsing.ts`              | Card ID and effect-text parsing shared by the app/pipeline.                               |
+| `game-end-reason.ts`           | Legacy text inference for game end reason codes, for results written before OPT-978.      |
 | `game-init.ts`                 | Serialized Next.js-to-worker initialization payloads and pregame mode normalization.      |
 | `game-types.ts`                | Public game state, action, event, prompt, and transport types consumed by app and worker. |
 | `target-filter.ts`             | Runtime-neutral target-filter shape, key list, and predicate core with adapter callbacks. |

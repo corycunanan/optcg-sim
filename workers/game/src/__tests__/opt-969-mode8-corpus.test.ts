@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { runtime, memory, save, command } from "./native7-producer-support.js";
 import { getEffectiveCost, getEffectivePower } from "../engine/modifiers.js";
 import type { GameAction } from "../types.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const directory = fileURLToPath(new URL("./fixtures/opt-969-mode8/", import.meta.url));
 const files = readdirSync(directory).filter(f => f.endsWith(".json") && f !== "manifest.json");
 interface Corpus { id: string; producer: string; origin: Record<string, unknown>; activation: GameAction; initial: Record<string, unknown>; steps: { action: GameAction; stored: Record<string, unknown> }[] }
@@ -36,7 +37,7 @@ for (const file of files) describe(`mode8 reader ${file}`, () => {
         expect(loaded.state.pendingPrompt, `${file} start${start} step${index}`).not.toBeNull();
         loaded.state = command(rt, loaded.state, loaded.cardDb, step.action);
         const stored = await save(rt, loaded.state, loaded.cardDb);
-        expect(stored, `${file} ${context} start${start} step${index}`).toEqual(step.stored);
+        expect(withoutAssertedEndReasonCode(stored), `${file} ${context} start${start} step${index}`).toEqual(step.stored);
         loaded = (await memory(rt, stored).repo.load())!;
       }
       expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.effectStack).toHaveLength(0);

@@ -11,6 +11,7 @@ import { toPersistedGameState } from "../session/game-state-schema.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import manifest from "./fixtures/opt-966-final-writer-corpus.manifest.json";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 
 type Corpus = { writerBase: string; cases: { index: number; stored: Record<string, unknown>; replies: GameAction[];
   }[]; expected: GameState;
@@ -71,7 +72,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
         expect(result.responseRejected).toBeFalsy();
         actual = result.state;
       }
-      expect(actual).toEqual(
+      expect(withoutAssertedEndReasonCode(actual)).toEqual(
           root
             ? entry.expected
             : historicalBattle ? candidateExpected(`final/${name}/${item.index}/final`)
