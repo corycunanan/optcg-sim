@@ -317,7 +317,7 @@ interface CannotActivateBlocker extends Prohibition {
 - An empty binding ("up to 1" with none selected, or a declined/unpaid cost) creates no prohibition.
 - The prohibition expires with its `duration` like any other.
 
-Schema lint rejects the binding on any other prohibition type, with both `ref` and a `target`/`target_ref`, with neither, with keys other than `type`/`ref`, or without `scope.controller: "OPPONENT"`. **Leader binding (OPT-899).** `when_attacking: { type: "YOUR_LEADER" }` resolves the applying player's Leader instance at `APPLY_PROHIBITION` time into the same frozen `attackerInstanceIds`, so a Character attacking in the same turn can still be blocked. Its lint requires `CANNOT_ACTIVATE_BLOCKER`, only the `type` key, no `target`/`target_ref`, and `scope.controller: "OPPONENT"`. Any other `when_attacking` shape on a Blocker prohibition is not enforced by the Blocker check.
+Schema lint rejects the binding on any other prohibition type, with both `ref` and a `target`/`target_ref`, with neither, with keys other than `type`/`ref`, or without `scope.controller: "OPPONENT"`. **Leader binding (OPT-899).** `when_attacking: { type: "YOUR_LEADER" }` resolves the applying player's Leader instance at `APPLY_PROHIBITION` time into the same frozen `attackerInstanceIds`, so a Character attacking in the same turn can still be blocked. Only `CANNOT_ACTIVATE_BLOCKER` freezes that binding. Schema lint rejects it on the other Blocker-family types, `CANNOT_BLOCK` and `CANNOT_USE_BLOCKER` (OPT-934), which would otherwise ignore it and lock Blocker for every attack that turn; on `CANNOT_ATTACK` it keeps that type's attack-target meaning and is accepted. On `CANNOT_ACTIVATE_BLOCKER` the lint requires only the `type` key, no `target`/`target_ref`, and `scope.controller: "OPPONENT"`. Any other `when_attacking` shape on a Blocker prohibition is not enforced by the Blocker check.
 
 ---
 
@@ -378,6 +378,10 @@ Drawback prohibitions are typically granted by `auto` category effects as part o
 ### Prohibition Scope Qualifiers
 
 Prohibitions are scoped through multiple independent axes. Each axis narrows when the prohibition applies.
+
+#### target and target_ref
+
+An `APPLY_PROHIBITION` action binds its cards when it executes, and stores their instance ids in `RuntimeProhibition.appliesTo`. The cards come from the action's own `target`, or, with no `target`, from the cards in the result ref named by `target_ref` ("that Character will not become active", ST24-004 and EB02-021). An empty `appliesTo` means the prohibition is unrestricted, so a `target_ref` whose ref holds no card (an "up to 1" that chose nothing) registers no prohibition at all (OPT-935). An action with neither `target` nor `target_ref` is player-level and binds through `scope.controller`.
 
 #### cause
 

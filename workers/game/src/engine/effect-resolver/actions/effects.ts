@@ -58,6 +58,15 @@ export function executeApplyProhibition(
       return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
     }
     targetIds = autoSelectTargets(action.target, allValidIds);
+  } else if (action.target_ref) {
+    // OPT-935: "that Character will not become active" (ST24-004, EB02-021)
+    // names the cards an earlier action chose through its result ref. The
+    // chain passes them in as preselected targets on the direct path; read
+    // the ref itself when it arrives empty (an "up to 1" that chose nothing)
+    // so the binding is exactly the ref's instances.
+    targetIds = [
+      ...(preselectedTargets ?? resultRefs.get(action.target_ref)?.targetInstanceIds ?? []),
+    ];
   }
 
   // OPT-826: "if the selected card attacks, your opponent cannot activate
@@ -90,6 +99,13 @@ export function executeApplyProhibition(
     if (attackerInstanceIds.length === 0) {
       return { state, events, succeeded: false };
     }
+  }
+
+  // OPT-935: an empty `appliesTo` means "unrestricted" to the matchers, so a
+  // ref-bound prohibition whose ref holds no card must bind nothing rather
+  // than fall back to every card in scope.
+  if (!action.target && action.target_ref && !attackerInstanceIds && targetIds.length === 0) {
+    return { state, events, succeeded: false };
   }
 
   const allocated = allocateEngineId(state, "prohibition");
