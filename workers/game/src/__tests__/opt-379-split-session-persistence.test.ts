@@ -21,6 +21,7 @@ import {
 import { startPregame } from "../engine/pregame.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { setupGame } from "./factories.js";
+import { v1RngState } from "./helpers.js";
 
 class MemoryStorage implements SessionStorage {
   readonly data = new Map<string, unknown>();
@@ -179,8 +180,8 @@ describe("OPT-379 split session persistence", () => {
     expect(restored?.state.turn.activePlayerIndex).toBe(
       saved.state.turn.activePlayerIndex
     );
-    expect(restored?.state.executionContext.rngState).toBe(
-      saved.state.executionContext.rngState
+    expect(v1RngState(restored?.state.executionContext)).toBe(
+      v1RngState(saved.state.executionContext)
     );
     expect(
       restored?.state.eventLog.some(

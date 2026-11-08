@@ -41,6 +41,7 @@ import {
   createBattleReadyState,
   createTestCardDb,
 } from "./factories.js";
+import { v1RngState } from "./helpers.js";
 
 function fieldPowerState() {
   const cardDb = createTestCardDb();
@@ -215,7 +216,7 @@ describe("filterStateForPlayer", () => {
         trace: { gameId: state.id, traceId: "redacted" },
       });
       expect(filtered.executionContext.seed).not.toBe(original.seed);
-      expect(filtered.executionContext.rngState).not.toBe(original.rngState);
+      expect(v1RngState(filtered.executionContext)).not.toBe(v1RngState(original));
     }
   });
 

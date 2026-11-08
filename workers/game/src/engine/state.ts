@@ -551,6 +551,31 @@ export const PLAYER_VIEW_REWRITTEN_FIELDS = [
   "effectStack",
 ] as const satisfies readonly (keyof GameState)[];
 
+/**
+ * The seed and every RNG position stay server-side (OPT-888): the projection
+ * keeps only the context version and zeroes the rest, whichever generator the
+ * game runs on.
+ */
+function redactExecutionContext(state: GameState): GameState["executionContext"] {
+  const redacted = {
+    idCounter: 0,
+    clockEpochMs: 0,
+    clockCounter: 0,
+    actionBudget: { limit: 0, consumed: 0 },
+    trace: { gameId: state.id, traceId: "redacted" },
+  };
+  if (state.executionContext.version === 2) {
+    return {
+      version: 2,
+      seed: "redacted",
+      rngCounters: { pregame: 0, deck0: 0, deck1: 0, blindHand: 0 },
+      ...redacted,
+    };
+  }
+  // Same key order as before OPT-888, so version 1 views are byte-identical.
+  return { version: 1, seed: "redacted", rngState: 0, ...redacted };
+}
+
 type PlayerViewRewrittenField =
   (typeof PLAYER_VIEW_REWRITTEN_FIELDS)[number];
 
@@ -600,16 +625,7 @@ export function filterStateForPlayer(
   const filteredTurn = state.turn;
 
   const playerViewOverrides = {
-    executionContext: {
-      version: state.executionContext.version,
-      seed: "redacted",
-      rngState: 0,
-      idCounter: 0,
-      clockEpochMs: 0,
-      clockCounter: 0,
-      actionBudget: { limit: 0, consumed: 0 },
-      trace: { gameId: state.id, traceId: "redacted" },
-    },
+    executionContext: redactExecutionContext(state),
     players: newPlayers,
     eventLog: filteredEventLog,
     pendingPrompt: filteredPrompt,

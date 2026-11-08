@@ -7,6 +7,7 @@ import { convertPersistedGameState } from "../session/persistence.js";
 import { setupGame } from "./factories.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
+import { v1RngState } from "./helpers.js";
 
 const SECRET = "export-test-secret";
 const NOW = 1_800_000_000;
@@ -392,8 +393,8 @@ it("exports actual current writer state without changing its schema/capabilities
     );
     expect(body.state.players[0].leader).toEqual(persisted.players[0].leader);
     expect(body.state.turn).toEqual(persisted.turn);
-    expect(body.state.executionContext.rngState).toBe(
-      persisted.executionContext.rngState
+    expect(v1RngState(body.state.executionContext)).toBe(
+      v1RngState(persisted.executionContext)
     );
     expect(convertPersistedGameState(body.state, "state")).toBeDefined();
     expect(
