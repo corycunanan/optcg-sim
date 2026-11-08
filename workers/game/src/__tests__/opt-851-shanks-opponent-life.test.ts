@@ -131,7 +131,9 @@ describe("OPT-851 ST13-009 Shanks trashes the opponent's Life", () => {
     f.act({ type: "PLAYER_CHOICE", choiceId: accept ? "accept" : "skip" });
 
     const condition = accept && hand >= 7;
-    if (condition) {
+    // OPT-918: with an empty opponent Life the only answer is 0, so no
+    // CHOOSE_VALUE prompt is shown and the effect finishes in place.
+    if (condition && oppLifeBefore.length > 0) {
       const prompt = f.state.pendingPrompt;
       expect(prompt?.options.promptType).toBe("PLAYER_CHOICE");
       expect(prompt?.respondingPlayer).toBe(0);

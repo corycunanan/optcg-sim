@@ -64,6 +64,11 @@ export function executeModifyPower(
   const p = getActionParams(action, "MODIFY_POWER");
   const amount = resolveAmount(p.amount, resultRefs, state, controller, cardDb);
   const duration = action.duration ?? { type: "THIS_TURN" as const };
+  // OPT-930: a counted bonus that came to 0 ("+1000 for every card trashed",
+  // 0 trashed) changes no power. Skip it rather than ask for a target.
+  if (amount === 0 && typeof p.amount !== "number") {
+    return { state, events, succeeded: false };
+  }
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
@@ -438,7 +443,8 @@ export function executeCopyPower(
     const sourceTarget = resolvedSource.target;
     const sourceValidIds = preselectedTargets ?? computeAllValidTargets(state, sourceTarget, controller, cardDb, sourceCardInstanceId, resultRefs);
     if (!preselectedTargets && needsPlayerTargetSelection(sourceTarget, sourceValidIds)) {
-      return buildSelectTargetPrompt(state, action, sourceValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      // OPT-928: bounds come from the source's count ({exact:1} must pick 1).
+      return buildSelectTargetPrompt(state, action, sourceValidIds, sourceCardInstanceId, controller, cardDb, resultRefs, sourceTarget);
     }
     sourceIds = autoSelectTargets(sourceTarget, sourceValidIds);
   } else {

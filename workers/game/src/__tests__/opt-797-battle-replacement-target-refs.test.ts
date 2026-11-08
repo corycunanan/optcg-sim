@@ -288,7 +288,8 @@ describe("ST08-013 — K.O. exactly the opponent's Character it battled", () => 
 
     f.attack(me, battled); // 6000 vs 2000: the battled Character is K.O.'d
     expect(f.onField(battled)).toBe(false);
-    if (f.prompt() === "OPTIONAL_EFFECT") f.accept();
+    // OPT-904: accepting could K.O. nothing, so the optional is not offered.
+    expect(f.promptTypes).not.toContain("OPTIONAL_EFFECT");
 
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.onField(bystander)).toBe(true);
