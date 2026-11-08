@@ -1670,6 +1670,8 @@ export const OP05_043_ULTI: EffectSchema = {
             look_at: 3,
             pick: { up_to: 1 },
             rest_destination: "TOP_OR_BOTTOM",
+            // Unfiltered hand search: the pick is not revealed (OPT-879, OP12-079 FAQ).
+            reveal: false,
           },
         },
       ],

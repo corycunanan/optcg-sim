@@ -341,6 +341,9 @@ export function returnToDeck(
   position: "TOP" | "BOTTOM" = "BOTTOM",
   causingController?: 0 | 1,
 ): CardMutationResult | null {
+  const lifeFace = state.players
+    .flatMap((player) => player.life)
+    .find((card) => card.instanceId === instanceId)?.face;
   const moved = transitionCard(state, instanceId, "DECK", {
     position,
     preserveSourceTriggers: true,
@@ -351,7 +354,7 @@ export function returnToDeck(
   const events: PendingEvent[] = [{
     type: "CARD_RETURNED_TO_DECK",
     playerIndex: moved.fact.owner,
-    payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: "EFFECT" },
+    payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: "EFFECT", ...(lifeFace ? { sourceFace: lifeFace } : {}) },
   }];
   if (moved.fact.source === "LIFE") {
     events.push({

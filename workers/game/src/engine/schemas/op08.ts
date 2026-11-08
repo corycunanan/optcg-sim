@@ -1827,6 +1827,7 @@ export const OP08_052_PORTGAS_D_ACE: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: {
               traits_contains: ["Whitebeard Pirates"],
               card_type: "CHARACTER",
@@ -1922,6 +1923,7 @@ export const OP08_054_YOU_CANT_TAKE_OUR_KING: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: {
               traits_contains: ["Whitebeard Pirates"],
               card_type: "CHARACTER",
