@@ -28,6 +28,7 @@ import {
 import type { ActionOf } from "../engine/effect-types.js";
 import { filterStateForPlayer, removeTopLifeCard } from "../engine/state.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
+import { returnToDeck } from "../engine/effect-resolver/card-mutations.js";
 import { filterPromptForPlayer } from "../engine/visibility.js";
 import type { SessionFilteredState } from "../session/filtered-state.js";
 import type { SessionTransport } from "../session/transport.js";
@@ -639,6 +640,127 @@ describe("OPT-901 connect snapshots", () => {
         expect(view.players[owner].life).toEqual(expectedProjectedLife(owner));
       }
       expectNoFaceDownSecrets(snapshot);
+    }
+  });
+});
+
+// ─── OPT-933: an opponent's Life reorder stays private to its chooser ────────
+
+const VIOLA_ID = "EB01-052";
+const VIOLA_INSTANCE = "opt933-viola";
+
+function createViolaSession() {
+  const created = createSession();
+  const { session } = created;
+  const schema = getEffectSchema(VIOLA_ID);
+  if (!schema) throw new Error("EB01-052 schema must be registered");
+  session.cardDb.set(VIOLA_ID, {
+    ...CARDS.VANILLA,
+    id: VIOLA_ID,
+    name: schema.card_name ?? VIOLA_ID,
+    cost: 1,
+    effectSchema: schema,
+  });
+  const players = [...session.gameState.players] as [PlayerState, PlayerState];
+  players[0] = {
+    ...players[0],
+    hand: [
+      ...players[0].hand,
+      {
+        instanceId: VIOLA_INSTANCE,
+        cardId: VIOLA_ID,
+        zone: "HAND",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: null,
+        controller: 0,
+        owner: 0,
+      },
+    ],
+  };
+  session.gameState = { ...session.gameState, players };
+  return created;
+}
+
+describe("OPT-933 opponent reorders your Life (EB01-052 Viola)", () => {
+  // EB01-052 [On Play] option 1: "Look at all of your opponent's Life cards
+  // and place them back in their Life area in any order." The chooser looks
+  // (§11-3-1); the Life owner may not check face-down Life (§3-10-2), so the
+  // owner's frames must not disclose the new order.
+  it("tells the Life owner only how many cards were reordered", async () => {
+    const { session, sockets } = createViolaSession();
+
+    await act(session, sockets["player-0"], {
+      type: "PLAY_CARD",
+      cardInstanceId: VIOLA_INSTANCE,
+    });
+    const choice = session.gameState.pendingPrompt;
+    if (choice?.options.promptType !== "PLAYER_CHOICE") throw new Error("expected Viola's mode choice");
+    await act(session, sockets["player-0"], {
+      type: "PLAYER_CHOICE",
+      choiceId: choice.options.choices[0]!.id,
+      promptId: choice.promptId,
+    });
+    const arrange = session.gameState.pendingPrompt;
+    if (arrange?.options.promptType !== "ARRANGE_TOP_CARDS") throw new Error("expected the reorder prompt");
+    expect(arrange.respondingPlayer).toBe(0);
+    const newOrder = [secretInstanceId(1, 2), faceUpInstanceId(1), secretInstanceId(1, 0)];
+    await act(session, sockets["player-0"], {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: "",
+      orderedInstanceIds: newOrder,
+      destination: "top",
+      promptId: arrange.promptId,
+    });
+
+    expect(session.gameState.pendingPrompt).toBeNull();
+    expect(session.gameState.players[1].life.map((card) => card.instanceId)).toEqual(newOrder);
+    for (const socket of Object.values(sockets)) {
+      expect(frames(socket).some((frame) => frame.type === "action:rejected")).toBe(false);
+    }
+
+    // The chooser keeps the private record of the order they chose.
+    const chooserEvents = stateFrames(sockets["player-0"]).at(-1)!.eventLog;
+    expect(chooserEvents.filter((event) => event.type === "LIFE_REORDERED")).toEqual([
+      expect.objectContaining({ playerIndex: 0, payload: { orderedInstanceIds: newOrder } }),
+    ]);
+
+    // The Life owner sees a count of hidden ids and nothing else.
+    const ownerEvents = stateFrames(sockets["player-1"]).at(-1)!.eventLog;
+    expect(ownerEvents.filter((event) => event.type === "LIFE_REORDERED")).toEqual([
+      expect.objectContaining({ payload: { orderedInstanceIds: ["hidden", "hidden", "hidden"] } }),
+    ]);
+    expectNoFaceDownSecrets(sockets["player-1"].sent);
+    expectNoFaceDownSecrets(sockets.spectator.sent);
+    expect(stateFrames(sockets["player-1"]).at(-1)!.players[1].life).toEqual([
+      { instanceId: "hidden-1-life-0", cardId: "hidden", face: "DOWN" },
+      { instanceId: faceUpInstanceId(1), cardId: faceUpCardId(1), face: "UP" },
+      { instanceId: "hidden-1-life-2", cardId: "hidden", face: "DOWN" },
+    ]);
+  });
+});
+
+describe("OPT-933 face-down Life returned to the deck", () => {
+  // Latent path with no authored consumer: returnToDeck on a face-down Life
+  // card. Its identity is secret to its owner too (§3-10-2), so the
+  // CARD_RETURNED_TO_DECK event is redacted for every recipient, while a
+  // face-up Life card (an open-area card) keeps its owner-only identity.
+  it.each([
+    ["face-down", secretInstanceId(1, 0), "hidden"],
+    ["face-up", faceUpInstanceId(1), faceUpCardId(1)],
+  ] as const)("redacts a %s Life card's deck-return event as required", (_label, instanceId, ownerSees) => {
+    const { state, cardDb } = fixture();
+    const result = returnToDeck(state, instanceId, "BOTTOM", 0);
+    if (!result) throw new Error("returnToDeck failed");
+    const event = result.events.find((e) => e.type === "CARD_RETURNED_TO_DECK")!;
+    const withEvent: GameState = {
+      ...result.state,
+      eventLog: [{ ...event, timestamp: 1 } as GameState["eventLog"][number]],
+    };
+    const ownerView = visibleStateForPlayer(withEvent, cardDb, 1);
+    expect(ownerView.eventLog[0]!.payload).toMatchObject({ cardId: ownerSees, sourceZone: "LIFE" });
+    for (const view of [visibleStateForPlayer(withEvent, cardDb, 0), visibleStateForSpectator(withEvent, cardDb)]) {
+      expect(view.eventLog[0]!.payload).toMatchObject({ cardId: "hidden" });
     }
   });
 });

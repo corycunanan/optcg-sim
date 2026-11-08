@@ -864,6 +864,13 @@ export interface ActionParamsMap {
     rest_destination?: string;
     search_full_deck?: boolean;
     shuffle_after?: boolean;
+    /**
+     * Printed "reveal N card(s) from the top of your deck" (OPT-916): the
+     * looked-at group is revealed to both players before the play choice.
+     * Defaults to false, the "look at" wording, which stays controller-only.
+     * The schema lint requires it exactly when the canonical text says reveal.
+     */
+    reveal?: boolean;
     entry_state?: CardState;
     pick?: CountMode;
     cost_override?: string;
@@ -1977,7 +1984,8 @@ export interface EffectResolutionContext {
 
 /**
  * Last-known identity of a card an action exposed. REVEAL snapshots the card
- * in place; MILL snapshots the card it actually moved, using its new trash
+ * in place (a deck/Life top card, or the chosen hand cards for a CARD_IN_HAND
+ * target, OPT-999); MILL snapshots the card it actually moved, using its new trash
  * instance id (ZONE-TRANSITION-CONTRACT), so a later REVEALED_CARD_PROPERTY condition reads
  * the milled card's printed properties even if it has since changed zone and
  * never matches an unrelated trash or field card.
@@ -1985,7 +1993,7 @@ export interface EffectResolutionContext {
 export interface RevealedCardSnapshot {
   instanceId: string;
   cardId: string;
-  source: "DECK" | "DECK_TOP" | "LIFE_TOP" | "MILL";
+  source: "DECK" | "DECK_TOP" | "LIFE_TOP" | "MILL" | "HAND";
   controller: 0 | 1;
 }
 

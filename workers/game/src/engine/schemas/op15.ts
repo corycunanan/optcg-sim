@@ -4818,6 +4818,8 @@ export const OP15_118_ENEL: EffectSchema = {
             look_at: 5,
             pick: { up_to: 1 },
             rest_destination: "BOTTOM",
+            // Unfiltered hand search: the pick is not revealed (OPT-879, OP12-079 FAQ).
+            reveal: false,
           },
         },
         {

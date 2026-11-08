@@ -791,7 +791,14 @@ export function computeAllValidTargets(
       // Reference to previously selected targets — resolved via result_refs
       const ref = target.ref;
       if (ref && _resultRefs.has(ref)) {
-        return _resultRefs.get(ref)!.targetInstanceIds ?? [];
+        const ids = _resultRefs.get(ref)!.targetInstanceIds ?? [];
+        if (!target.filter) return ids;
+        // OPT-999: a filtered reference ("play the other card rested if it
+        // has a cost of 4 or less") narrows the referenced cards as they are now.
+        return ids.filter((id) => {
+          const card = findCardInstance(state, id);
+          return !!card && matchesFilterForTarget(card, target.filter!, cardDb, state, _resultRefs, controller);
+        });
       }
       return [];
     }
