@@ -373,7 +373,7 @@ Generic filter example (not Crocodile):
 
 ### CHARACTER_PLAYED
 
-Fires when a Character card is played (enters the field from hand or by effect). The `controller` filter determines whose play triggers it. Additional filters constrain the played card's properties.
+Fires when a Character card is played: it enters the Character area from hand, by effect, from Life or from the deck. Event and Stage plays also emit `CARD_PLAYED`, but the engine matches this trigger only when the payload `zone` is `CHARACTER` (OPT-1030), so they never fire it. The `controller` filter determines whose play triggers it. Additional filters constrain the played card's properties.
 
 ```typescript
 {
