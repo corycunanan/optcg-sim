@@ -624,7 +624,7 @@ interface RevealParams {
 
 | Field | Value |
 |-------|-------|
-| **Target** | Implicit (top of deck, or card in hand matching filter) |
+| **Target** | Implicit top of deck / Life (`params.source`), or a `CARD_IN_HAND` target: the controller chooses the eligible hand cards from the target's `count` and `filter` (OP10-058, OPT-999). The chosen identities are revealed publicly and become the result for later `SELECTED_CARDS` references. |
 | **Failure mode** | If no card matches or the source is empty, the action is ignored. |
 | **Fired events** | `CARD_REVEALED` |
 | **Example cards** | OP05-076 When You're at Sea, OP11-066 Charlotte Oven |
@@ -748,8 +748,11 @@ interface SearchAndPlayParams {
   play_state?: "ACTIVE" | "RESTED";
   cost_override: "FREE" | "REDUCED" | "NORMAL";
   rest_destination: "TOP" | "BOTTOM" | "TRASH" | "SHUFFLE";
+  reveal?: boolean; // default false; true for printed "reveal N card(s) from the top of your deck" (OPT-916)
 }
 ```
+
+`reveal: true` announces the looked-at group with a public `CARDS_REVEALED` (`source: "DECK_TOP"`, `visibility: "BOTH"`), whether or not a card is played. "Look at" searches omit it and stay private to the controller (rule 11-3-1). The schema lint (`schema-search-reveal-lint.ts`) requires the param exactly when the canonical text says "reveal … from the top of your deck".
 
 | Field | Value |
 |-------|-------|

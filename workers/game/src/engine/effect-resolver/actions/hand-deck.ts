@@ -19,6 +19,13 @@ import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 import { createBlindHandSlots } from "../blind-hand-slots.js";
+import {
+  autoSelectTargets,
+  buildSelectTargetPrompt,
+  computeAllValidTargets,
+  needsPlayerTargetSelection,
+  validateTargetConstraints,
+} from "../target-resolver.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
@@ -221,13 +228,70 @@ export function executeShuffleDeck(
 export function executeReveal(
   state: GameState,
   action: ActionOf<"REVEAL">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
+
+  // OPT-999: "reveal up to N <filter> cards from your hand" (OP10-058). The
+  // controller chooses which eligible hand cards to reveal; the deck is never
+  // read. The chosen identities are revealed publicly and carried forward as
+  // the result so later actions act on exactly those cards.
+  // Own hand only: the chooser sees these cards. validateEffectSchema rejects
+  // an opponent-hand target, whose blind pick belongs to REVEAL_HAND.
+  if (action.target?.type === "CARD_IN_HAND" && (action.target.controller ?? "SELF") === "SELF") {
+    const eligibleIds = computeAllValidTargets(
+      state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs,
+    );
+    const invalidSelection = preselectedTargets !== undefined && (
+      preselectedTargets.some((id) => !eligibleIds.includes(id)) ||
+      !validateTargetConstraints(preselectedTargets, action.target, state, cardDb, resultRefs, {
+        controller,
+        sourceCardInstanceId,
+      })
+    );
+    if (
+      invalidSelection ||
+      (preselectedTargets === undefined && needsPlayerTargetSelection(action.target, eligibleIds))
+    ) {
+      return buildSelectTargetPrompt(state, action, eligibleIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    const selectedIds = preselectedTargets ?? autoSelectTargets(action.target, eligibleIds);
+    if (selectedIds.length === 0) return { state, events, succeeded: false };
+
+    const revealedController = controller;
+    const hand = state.players[revealedController].hand;
+    const revealed = selectedIds.map((id) => hand.find((card) => card.instanceId === id)!);
+    events.push({
+      type: "CARDS_REVEALED",
+      playerIndex: revealedController,
+      payload: {
+        cards: revealed.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
+        source: "HAND",
+        visibility: "BOTH",
+      },
+    });
+    return {
+      state,
+      events,
+      succeeded: true,
+      result: {
+        targetInstanceIds: selectedIds,
+        count: selectedIds.length,
+        revealedCards: revealed.map((card) => ({
+          instanceId: card.instanceId,
+          cardId: card.cardId,
+          source: "HAND",
+          controller: revealedController,
+        })),
+      },
+    };
+  }
+
   const amount = params.amount ?? 1;
   const source = params.source ?? "DECK";
   // "BOTH" = reveal (both players see), "CONTROLLER_ONLY" = look at (private peek)
@@ -418,6 +482,21 @@ export function executeSearchAndPlay(
   const searchPool = searchFullDeck ? p.deck : p.deck.slice(0, Math.min(lookAt, p.deck.length));
 
   if (searchPool.length === 0) return { state, events, succeeded: false };
+
+  // OPT-916: "reveal N card(s) from the top of your deck, play up to 1 …"
+  // shows the whole revealed group to both players before the play choice,
+  // whether or not a card is played. Plain "look at" searches stay private.
+  if (sap.reveal === true && !searchFullDeck) {
+    events.push({
+      type: "CARDS_REVEALED",
+      playerIndex: controller,
+      payload: {
+        cards: searchPool.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
+        source: "DECK_TOP",
+        visibility: "BOTH",
+      },
+    });
+  }
 
   // Find matching cards
   const matching = searchPool.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));

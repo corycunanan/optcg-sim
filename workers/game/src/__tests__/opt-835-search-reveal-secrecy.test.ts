@@ -294,6 +294,33 @@ describe("OPT-835: OP12-079 searched hand pick stays secret", () => {
   });
 });
 
+describe("OPT-879: OP16-021 unfiltered hand pick stays secret", () => {
+  // Card (docs/cards/OP-16.md): "[On Play] If your Leader has the
+  // {Whitebeard Pirates} type, look at 3 cards from the top of your deck and
+  // add up to 1 card to your hand. ..." Unfiltered, so unrevealed (OPT-879).
+  it("never exposes the pick to the opponent or in spectator/persisted history", () => {
+    const PICK = "OPT879-SECRET-HAND-PICK";
+    const LEADER_ID = "OPT879-WB-LEADER";
+    const { db, state, searcher } = setup("OP16-021", [PICK, REST_A, REST_B]);
+    db.set(LEADER_ID, { ...CARDS.LEADER, id: LEADER_ID, name: "Edward.Newgate", types: ["Whitebeard Pirates"] });
+    state.players[0].leader = { ...state.players[0].leader, cardId: LEADER_ID };
+    const resolved = pickFirst(play(state, db, searcher), db);
+    expect(resolved.players[0].hand.map((c) => c.cardId)).toEqual([PICK]);
+    for (const [label, view] of Object.entries(nonOwnerProjections(resolved, db))) {
+      const serialized = JSON.stringify(label.startsWith("spectator") ? view.eventLog : view);
+      expect(serialized, label).not.toContain(PICK);
+      for (const event of revealEvents(view)) {
+        expect(event.payload.visibility, label).not.toBe("BOTH");
+      }
+    }
+    expect(revealEvents(visibleStateForPlayer(resolved, db, 0))[0]?.payload).toMatchObject({
+      visibility: "CONTROLLER_ONLY",
+      visibleTo: 0,
+      cards: [{ cardId: PICK }],
+    });
+  });
+});
+
 describe("OPT-835: ordinary reveal-to-hand searches stay public", () => {
   it("OP01-016 Nami reveals the {Straw Hat Crew} pick to the opponent and spectators", () => {
     const PICK = "OPT835-STRAW-HAT";
@@ -446,6 +473,31 @@ describe("OPT-835: authored search reveal inventory", () => {
     collectSearchUses(schema.effects, cardId, uses);
   }
 
+  it("keeps every unfiltered hand search unrevealed (OPT-879)", () => {
+    const unfiltered: string[] = [];
+    const visit = (node: unknown, cardId: string): void => {
+      if (Array.isArray(node)) return node.forEach((child) => visit(child, cardId));
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const params = record.params as Record<string, unknown> | undefined;
+      if ((record.type === "SEARCH_DECK" || record.type === "SEARCH_TRASH_THE_REST") && params) {
+        const filter = params.filter as Record<string, unknown> | undefined;
+        const toHand = String(params.pick_destination ?? "HAND").toUpperCase() === "HAND";
+        if (toHand && (!filter || Object.keys(filter).length === 0)) {
+          unfiltered.push(`${cardId}:${String(params.reveal)}`);
+        }
+      }
+      Object.values(record).forEach((child) => visit(child, cardId));
+    };
+    for (const [cardId, schema] of Object.entries(getAllAuthoredSchemas())) visit(schema.effects, cardId);
+    expect(unfiltered.sort()).toEqual([
+      "OP05-043:false",
+      "OP12-079:false",
+      "OP15-118:false",
+      "OP16-021:false",
+    ]);
+  });
+
   it("only uses a boolean reveal param", () => {
     expect(uses.length).toBeGreaterThan(0);
     for (const use of uses) {
@@ -456,9 +508,19 @@ describe("OPT-835: authored search reveal inventory", () => {
   it("marks only FAQ-backed secret searches as unrevealed, and their text never says reveal", () => {
     const secret = uses.filter((use) => use.reveal === false);
     // FAQ-derived: `grep -rniE "do not reveal|not revealed|without revealing"
-    // docs/FAQs/*.md` finds exactly these search rulings. Adding a card here
-    // requires a card/FAQ citation overriding rule 11-2-1.
+    // docs/FAQs/*.md` finds the OP12-079 and OP16-119 search rulings. Adding a
+    // card here requires a card/FAQ citation overriding rule 11-2-1.
+    //
+    // OPT-879 (decided by Cory, 2026-11-08): rule 11-2-1 forces a reveal only
+    // when the moved card must meet a stated requirement ("Add Monkey D. Luffy
+    // from your deck to your hand"). An unfiltered "look at N … add up to 1
+    // card to your hand" has nothing to verify, and the OP12-079 FAQ rules that
+    // exact shape unrevealed, so every unfiltered hand search keeps its pick
+    // secret. The "unfiltered hand searches" test below re-inventories them.
     const FAQ_UNREVEALED_SEARCHES: Record<string, string> = {
+      "OP05-043": "OPT-879, extends qa_op12 OP12-079",
+      "OP15-118": "OPT-879, extends qa_op12 OP12-079",
+      "OP16-021": "OPT-879, extends qa_op12 OP12-079",
       // docs/FAQs/qa_op12.md: "Do I reveal the card I add to my hand using
       // this [Main] effect to my opponent? — No, you do not reveal it."
       "OP12-079": "qa_op12",

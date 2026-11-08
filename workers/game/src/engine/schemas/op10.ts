@@ -2025,25 +2025,28 @@ export const OP10_058_REBECCA: EffectSchema = {
           result_ref: "revealed_cards",
           chain: "THEN",
         },
+        // "Play 1 of the revealed cards": active, even when it costs 4 or
+        // less (qa_op10 OP10-058). The second play takes the other revealed
+        // card, still in hand, rested if it costs 4 or less.
         {
           type: "PLAY_CARD",
           target: {
             type: "SELECTED_CARDS",
+            ref: "revealed_cards",
             count: { exact: 1 },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
-          target_ref: "revealed_cards",
           chain: "THEN",
         },
         {
           type: "PLAY_CARD",
           target: {
             type: "SELECTED_CARDS",
-            count: { up_to: 1 },
+            ref: "revealed_cards",
+            count: { exact: 1 },
             filter: { cost_max: 4 },
           },
           params: { source_zone: "HAND", cost_override: "FREE", entry_state: "RESTED" },
-          target_ref: "revealed_cards",
           chain: "THEN",
         },
       ],

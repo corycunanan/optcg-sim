@@ -512,7 +512,7 @@ export const OP16_021_MOBY_DICK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Whitebeard Pirates" } },
-      actions: [{ type: "SEARCH_DECK", params: { look_at: 3, pick: { up_to: 1 }, rest_destination: "BOTTOM" } }],
+      actions: [{ type: "SEARCH_DECK", params: { look_at: 3, pick: { up_to: 1 }, rest_destination: "BOTTOM", reveal: false } }], // OPT-879: unfiltered, unrevealed
     },
     {
       id: "activate_trash_give_don",

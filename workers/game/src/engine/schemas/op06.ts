@@ -2007,6 +2007,7 @@ export const OP06_057_BUT_I_WILL_NEVER_DOUBT: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: {
               card_type: "CHARACTER",
               cost_exact: 2,
@@ -4463,6 +4464,7 @@ export const OP06_119_SANJI: EffectSchema = {
           type: "SEARCH_AND_PLAY",
           params: {
             look_at: 1,
+            reveal: true,
             filter: {
               card_type: "CHARACTER",
               cost_max: 9,
