@@ -891,8 +891,17 @@ function matchesBattleParticipantFilter(
   const opposingIsLeader = state.players.some((p) => p.leader.instanceId === opposingId);
   if ((opposingIsLeader ? "LEADER" : "CHARACTER") !== filter.battle_target_type) return false;
   if (filter.target_filter) {
-    const opposing = findCardInstance(state, opposingId);
-    if (!opposing || (opposing.zone !== "CHARACTER" && opposing.zone !== "LEADER")) return false;
+    // "K.O.'s your opponent's Character [with …]" describes the card as it
+    // battled. A K.O.'d loser is gone by scan time, so use its last known
+    // card as a base-stat snapshot on its former field seat.
+    const onField = findCardInstance(state, opposingId);
+    let opposing = onField && (onField.zone === "CHARACTER" || onField.zone === "LEADER") ? onField : undefined;
+    if (!opposing) {
+      const cardId = lastKnownCardId(state, opposingId);
+      if (!cardId) return false;
+      const seat: 0 | 1 = sourceCard.controller === 0 ? 1 : 0;
+      opposing = { instanceId: opposingId, cardId, zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: seat, owner: seat };
+    }
     if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
   }
   return true;
@@ -914,7 +923,8 @@ function matchesBattleParticipantFilter(
  *   ST05-010: Zephyr gains power each time it is attacked).
  * - `battle_target_type`, `attribute` and `target_filter` describe the
  *   opposing combatant ("battles your opponent's Character", "battles Strike
- *   attribute Characters"), never the attacker named in the payload.
+ *   attribute Characters"), never the attacker named in the payload. A
+ *   combatant K.O.'d in the battle is read from its last known card.
  */
 function matchesHostBattle(
   trigger: CustomTrigger,
@@ -939,8 +949,17 @@ function matchesHostBattle(
     if (!cardId || !cardDb.get(cardId)?.attribute?.some((a) => a.toUpperCase() === want)) return false;
   }
   if (filter.target_filter) {
-    const opposing = findCardInstance(state, opposingId);
-    if (!opposing || (opposing.zone !== "CHARACTER" && opposing.zone !== "LEADER")) return false;
+    // "K.O.'s your opponent's Character [with …]" describes the card as it
+    // battled. A K.O.'d loser is gone by scan time, so use its last known
+    // card as a base-stat snapshot on its former field seat.
+    const onField = findCardInstance(state, opposingId);
+    let opposing = onField && (onField.zone === "CHARACTER" || onField.zone === "LEADER") ? onField : undefined;
+    if (!opposing) {
+      const cardId = lastKnownCardId(state, opposingId);
+      if (!cardId) return false;
+      const seat: 0 | 1 = sourceCard.controller === 0 ? 1 : 0;
+      opposing = { instanceId: opposingId, cardId, zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: seat, owner: seat };
+    }
     if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
   }
   return true;

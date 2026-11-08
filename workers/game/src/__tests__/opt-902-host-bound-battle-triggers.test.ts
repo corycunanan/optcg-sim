@@ -293,3 +293,30 @@ describe("OPT-902 ST05-010 Zephyr (CHARACTER_BATTLES)", () => {
     expect(power(f, zephyr)).toBe(8000);
   });
 });
+
+describe("OPT-902 target_filter on the defeated combatant (last known card)", () => {
+  function victoryWatcher(f: Fixture, maxCost: number) {
+    f.def("OPT902-VICTOR", { cost: 4, power: 5000 }, {
+      card_id: "OPT902-VICTOR",
+      card_name: "Victor",
+      card_type: "Character",
+      effects: [{
+        id: "victory_draw",
+        category: "auto",
+        trigger: { event: "COMBAT_VICTORY", filter: { target_filter: { cost_max: maxCost } } },
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      }],
+    } as EffectSchema);
+    return f.put("OPT902-VICTOR", 0);
+  }
+
+  it.each([[2, 1], [1, 0]] as const)("K.O. of a cost-2 Character with cost_max %i draws %i", (maxCost, drawn) => {
+    const f = setup();
+    const victor = victoryWatcher(f, maxCost);
+    const weak = f.put("OPP-WEAK", 1);
+    const hand = f.state.players[0].hand.length;
+    f.attack(victor, weak);
+    expect(f.onField(weak)).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(hand + drawn);
+  });
+});
