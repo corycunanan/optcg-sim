@@ -56,6 +56,7 @@ export const THIS_WAY_COST_FILLERS: Record<ThisWaySource, readonly string[]> = {
     "PLACE_SELF_TO_DECK",
     "PLACE_SELF_AND_TRASH_TO_DECK",
     "PLACE_SELF_AND_HAND_TO_DECK",
+    "PLACE_STAGE_TO_DECK",
   ],
 };
 

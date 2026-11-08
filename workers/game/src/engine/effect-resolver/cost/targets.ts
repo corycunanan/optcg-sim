@@ -24,6 +24,15 @@ export function isEitherPlayerDeckPlacement(cost: Cost): boolean {
 }
 
 /**
+ * OPT-866: true for "place 1 Stage ... at the bottom of the owner's deck"
+ * costs that may select either player's Stage (OP06-102/111/114). Unlike the
+ * fixed own-Stage cost, this is a player selection.
+ */
+export function isEitherPlayerStagePlacement(cost: Cost): boolean {
+  return cost.type === "PLACE_STAGE_TO_DECK" && cost.controller === "EITHER";
+}
+
+/**
  * OPT-828: true for "place 1 of your opponent's Characters ... at the top or
  * bottom of your opponent's Life cards" costs (OP09-101). Only the opponent's
  * Characters are offered, and each moves to its owner's (the opponent's) Life.
@@ -214,6 +223,11 @@ export function isFixedCostMovementProhibited(
       fixedId = sourceCardInstanceId;
       break;
     case "PLACE_STAGE_TO_DECK":
+      // OPT-866: the EITHER form is a selection; computeCostTargets drops
+      // protected candidates instead.
+      if (isEitherPlayerStagePlacement(cost)) return false;
+      fixedId = state.players[controller].stage?.instanceId;
+      break;
     case "TRASH_OWN_STAGE":
       fixedId = state.players[controller].stage?.instanceId;
       break;
@@ -366,6 +380,25 @@ export function computeCostTargets(
       return dropProtected(state, cost, dropSelf(candidates.map((c) => c.instanceId)), controller, cardDb, sourceCardInstanceId);
     }
 
+    case "PLACE_STAGE_TO_DECK": {
+      // Only the EITHER form is a selection (OPT-866); the own-Stage form is
+      // fixed and auto-pays in payCosts.
+      if (!isEitherPlayerStagePlacement(cost)) return [];
+      const opponent = state.players[controller === 0 ? 1 : 0];
+      const stages = [player.stage, opponent.stage]
+        .filter((stage): stage is CardInstance => stage !== null && stage !== undefined)
+        .filter((stage) => !cost.filter || matchesFilter(stage, cost.filter, cardDb, state, undefined, undefined, controller))
+        // Moving the opponent's Stage is an effect-caused return to deck —
+        // honor its removal protections, as the Character EITHER cost does.
+        .filter((stage) => stage.controller === controller || !isRemovalProhibited(
+          state,
+          stage.instanceId,
+          { action: "RETURN_TO_DECK", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
+          cardDb,
+        ));
+      return dropProtected(state, cost, dropSelf(stages.map((stage) => stage.instanceId)), controller, cardDb, sourceCardInstanceId);
+    }
+
     case "PLACE_FROM_TRASH_TO_DECK":
     // OPT-431: the selectable half of the compound cost is the trash side
     // only — the self half is fixed to the source card and never offered.
@@ -459,6 +492,11 @@ export function getCostCards(
 
     case "PLACE_FROM_TRASH_TO_DECK":
       return player.trash.filter((c) => targetSet.has(c.instanceId));
+
+    case "PLACE_STAGE_TO_DECK":
+      // OPT-866: either player's Stage, own first.
+      return [player.stage, state.players[controller === 0 ? 1 : 0].stage]
+        .filter((stage): stage is CardInstance => !!stage && targetSet.has(stage.instanceId));
 
     case "GIVE_OPPONENT_DON_TO_OPPONENT":
       // OPT-868: the recipients are the opponent's Characters.

@@ -3751,7 +3751,8 @@ export const OP12_102_SHIRAHOSHI: EffectSchema = {
         not: {
           type: "CARD_ON_FIELD",
           controller: "SELF",
-          filter: { name: "Shirahoshi", base_cost_exact: 2, exclude_self: true },
+          filter: { name: "Shirahoshi", base_cost_exact: 2 },
+          exclude_self: true,
           count: { operator: ">=", value: 1 },
         },
       },

@@ -405,7 +405,7 @@ interface CardOnFieldCondition {
 
 - `filter` — a [TargetFilter](./05-TARGETING.md) matching card properties (name, trait, cost, power, color, attribute, etc.).
 - `count` — when provided, checks the count of matching cards against a threshold. When omitted, defaults to existence (at least 1).
-- `exclude_self` — when true, the source card is excluded from the check. Used for uniqueness/duplicate patterns.
+- `exclude_self` — when true, the source card is excluded from the check. Used for uniqueness/duplicate patterns. It belongs on the condition, never inside `filter`: conditions do not read `filter.exclude_self`, and only `CARD_ON_FIELD` reads the condition-level key. The schema lint (`schema-exclude-self-lint.ts`, OPT-882) rejects both ignored forms. Targets, costs and permanent modifier targets are the opposite: they read `filter.exclude_self`.
 
 | Text Pattern | Example Cards |
 |-------------|---------------|

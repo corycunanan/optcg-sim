@@ -431,7 +431,8 @@ export const EB01_012_CAVENDISH: EffectSchema = {
             not: {
               type: "CARD_ON_FIELD",
               controller: "SELF",
-              filter: { name: "Cavendish", exclude_self: true },
+              filter: { name: "Cavendish", card_type: "CHARACTER" },
+              exclude_self: true,
             },
           },
         ],
