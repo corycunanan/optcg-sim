@@ -1494,6 +1494,17 @@ function handleAwaitingCostSelectionCore(
         targetInstanceIds: [...existing.targetInstanceIds, ...selected],
         count: existing.count + selected.length,
       });
+    } else if (cost.type === "PLACE_STAGE_TO_DECK") {
+      // OPT-866 review: the EITHER Stage selection fills
+      // CARDS_PLACED_TO_DECK_THIS_WAY, as the fixed own-Stage payment does.
+      const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
+        targetInstanceIds: [],
+        count: 0,
+      };
+      accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
+        targetInstanceIds: existing.targetInstanceIds,
+        count: existing.count + selected.length,
+      });
     } else if (cost.type === "KO_OWN_CHARACTER") {
       const existing = accumulatedCostRefs.get("__cost_characters_ko") ?? {
         targetInstanceIds: [],

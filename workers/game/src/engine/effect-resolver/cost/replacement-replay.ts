@@ -2,7 +2,7 @@
 import { GameActionSchema } from "../../../../../../shared/validators/client-message.js";
 import type { Cost, SimpleCost } from "../../effect-types.js";
 import type { EffectStackFrame, GameState, GameAction } from "../../../types.js";
-import { costSelectionCount, isOpponentLifePlacement } from "./targets.js";
+import { costSelectionCount, isEitherPlayerStagePlacement, isOpponentLifePlacement } from "./targets.js";
 import { blockShufflesDeck } from "./prompts.js";
 const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
 /** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
@@ -33,11 +33,19 @@ export function parseLifeDestinationChoiceId(
 export const FIELD_EXIT_COSTS: ReadonlySet<Cost["type"]> = new Set([
   "KO_OWN_CHARACTER", "TRASH_OWN_CHARACTER", "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
   "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
+  // OPT-866: only the EITHER form selects; isFixedReplayCost keeps the
+  // own-Stage form on the fixed-exit path.
+  "PLACE_STAGE_TO_DECK",
 ]);
 const FIXED_SOURCE_EXIT_COSTS = ["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"];
 const FIXED_STAGE_EXIT_COSTS = ["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"];
 const FIXED_REPLAY_COSTS: ReadonlySet<string> = new Set(["TRASH_SELF", "PLACE_SELF_TO_DECK", ...FIXED_STAGE_EXIT_COSTS]);
+/** OPT-866: the EITHER Stage cost is a field selection, not a fixed exit. */
+function isFixedReplayCost(cost: Cost): boolean {
+  return FIXED_REPLAY_COSTS.has(cost.type) && !isEitherPlayerStagePlacement(cost);
+}
 export function fixedCostExitTarget(state: GameState, cost: Cost, controller: 0 | 1, source: string): string | undefined {
+  if (isEitherPlayerStagePlacement(cost)) return undefined;
   if (FIXED_SOURCE_EXIT_COSTS.includes(cost.type)) return source;
   if (FIXED_STAGE_EXIT_COSTS.includes(cost.type)) return state.players[controller].stage?.instanceId;
   return undefined;
@@ -59,7 +67,7 @@ function classifyCostReplayStage(frame: ReplayContext): ReplayStage | null {
     return shuffles && frame.validTargets.length > amount && !frame.validTargets.includes(frame.sourceCardInstanceId) ? "COMPOUND_SELECTION" : null;
   }
   if (frame.costArrangeStage) return null;
-  if (FIXED_REPLAY_COSTS.has(cost.type)) return frame.validTargets.length === 0 ? "FIXED_EXIT" : null;
+  if (isFixedReplayCost(cost)) return frame.validTargets.length === 0 ? "FIXED_EXIT" : null;
   if (!FIELD_EXIT_COSTS.has(cost.type) || amount < 1) return null;
   if (cost.type === "ADD_OWN_CHARACTER_TO_LIFE" && isOpponentLifePlacement(cost) && cost.position === "TOP_OR_BOTTOM") {
     if (frame.validTargets.length !== 2) return null;

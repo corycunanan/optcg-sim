@@ -398,7 +398,8 @@ export const OP13_009_CURLY_DADAN: EffectSchema = {
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
-        filter: { traits: ["Mountain Bandits"], exclude_self: true },
+        filter: { card_type: "CHARACTER", traits: ["Mountain Bandits"] },
+        exclude_self: true,
       },
       modifiers: [
         {

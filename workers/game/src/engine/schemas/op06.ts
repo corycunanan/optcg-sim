@@ -3804,6 +3804,9 @@ export const OP06_102_KAMAKIRI: EffectSchema = {
           amount: 1,
           filter: { cost_exact: 1 },
           position: "BOTTOM",
+          // "the owner's deck" (no "your"): either player's Stage
+          // (qa_op06.md OP06-102/111/114).
+          controller: "EITHER",
         },
       ],
       actions: [
@@ -4105,6 +4108,9 @@ export const OP06_111_BRAHAM: EffectSchema = {
           amount: 1,
           filter: { cost_exact: 1 },
           position: "BOTTOM",
+          // "the owner's deck" (no "your"): either player's Stage
+          // (qa_op06.md OP06-102/111/114).
+          controller: "EITHER",
         },
       ],
       actions: [
@@ -4229,6 +4235,9 @@ export const OP06_114_WYPER: EffectSchema = {
           amount: 1,
           filter: { cost_exact: 1 },
           position: "BOTTOM",
+          // "the owner's deck" (no "your"): either player's Stage
+          // (qa_op06.md OP06-102/111/114).
+          controller: "EITHER",
         },
       ],
       flags: { optional: true },
