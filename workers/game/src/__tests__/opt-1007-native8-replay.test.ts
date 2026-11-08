@@ -8,6 +8,7 @@ import { computeExpiry } from "../engine/effect-resolver/action-utils.js";
 import { executePass } from "../engine/battle.js";
 import { continuePipelineFromExecution } from "../engine/pipeline.js";
 import type { GameAction, GameState, CardData } from "../types.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 
 const directory = fileURLToPath(
   new URL("./fixtures/opt-1007-native8/", import.meta.url)
@@ -282,7 +283,7 @@ describe.each(files)("native8 isolated writer %s", (file) => {
           // Only replays that actually execute this captured Character-trash
           // selection promote. Starting after historical movement remains8.
           if (branch === "writer" && trashStep !== undefined && start <= trashStep && start + suffixIndex >= trashStep) version = 9;
-          assertStoredEnvelope(stored, step.stored, version);
+          assertStoredEnvelope(withoutAssertedEndReasonCode(stored), step.stored, version);
           if (version === 9) {
             if (rollback) {
               const floorNext = command(floor, rollback.state, rollback.cardDb, step.action, step.actor);

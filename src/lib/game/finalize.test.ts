@@ -34,7 +34,8 @@ vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
 
-const { finalizeGameResult, notifyRestoredLobby } = await import("./finalize");
+const { finalizeGameResult, inferGameEndReasonCode, notifyRestoredLobby } =
+  await import("./finalize");
 
 beforeEach(() => {
   transactionMock.mockReset();
@@ -212,5 +213,50 @@ describe("notifyRestoredLobby", () => {
     await notifyRestoredLobby("lobby-1");
 
     expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
+});
+
+// OPT-978: legacy text inference is only a fallback for callers that send no
+// structured code; it no longer mislabels the endings the text parser missed.
+describe("inferGameEndReasonCode", () => {
+  it.each([
+    ["Player 1 won by a card effect", "FINISHED", "CARD_EFFECT_WIN"],
+    [
+      "Player 1's deck reached 0 — Player 1 wins instead of losing",
+      "FINISHED",
+      "DECK_OUT_WIN_INSTEAD",
+    ],
+    ["Player 1 decked out; Player 2 decked out — draw", "FINISHED", "JOINT_DRAW"],
+    [
+      "Engine resolution limit reached — the game ended with no winner",
+      "FINISHED",
+      "ENGINE_LIMIT",
+    ],
+    ["Engine contract failure — game ends in a draw", "FINISHED", "ENGINE_CONTRACT"],
+    ["Player 2 left during pre-game", "FINISHED", "PREGAME_LEAVE"],
+    ["Player 2 failed to rejoin in time", "FINISHED", "DISCONNECT_TIMEOUT"],
+    ["Player 2 decked out", "FINISHED", "DECK_OUT"],
+    ["Player 2's life reached 0", "FINISHED", "LIFE_LOSS"],
+    ["Player 1 conceded", "FINISHED", "CONCEDE"],
+    ["anything", "ABANDONED", "DISCONNECT_TIMEOUT"],
+    [null, "FINISHED", "UNKNOWN"],
+  ] as const)("maps %s (%s) to %s", (winReason, status, code) => {
+    expect(inferGameEndReasonCode(winReason, status)).toBe(code);
+  });
+
+  it("prefers a supplied structured code over the text", async () => {
+    gameSessionUpdateManyMock.mockResolvedValue({ count: 0 });
+
+    await finalizeGameResult({
+      gameId: "game-1",
+      status: "FINISHED",
+      winnerId: "user-1",
+      winReason: "Player 1 decked out",
+      reasonCode: "DECK_OUT_WIN_INSTEAD",
+    });
+
+    expect(gameSessionUpdateManyMock.mock.calls[0][0].data.reasonCode).toBe(
+      "DECK_OUT_WIN_INSTEAD"
+    );
   });
 });

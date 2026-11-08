@@ -1,21 +1,21 @@
-import type { GameState } from "../types.js";
+import { inferLegacyGameEndReasonCode } from "../../../../shared/game-end-reason.js";
+import type { GameEndReasonCode, GameState } from "../types.js";
 
 export type GameResultCallbackPayload = {
   gameId: string;
   status: GameState["status"];
   winnerId: string | null;
   winReason: string | null;
-  reasonCode: "LEADER_KO" | "DECK_OUT" | "LIFE_LOSS" | "CONCEDE" | "DISCONNECT_TIMEOUT" | "FALLBACK_CONCEDE" | "UNKNOWN";
+  reasonCode: GameEndReasonCode;
 };
 
-function inferReasonCode(state: GameState): GameResultCallbackPayload["reasonCode"] {
-  if (state.status === "ABANDONED") return "DISCONNECT_TIMEOUT";
-
-  const reason = (state.winReason ?? "").toLowerCase();
-  if (reason.includes("conceded")) return "CONCEDE";
-  if (reason.includes("deck")) return "DECK_OUT";
-  if (reason.includes("life") || reason.includes("ko")) return "LIFE_LOSS";
-  return "UNKNOWN";
+/**
+ * OPT-978: the terminal writer stores the structured code; the text reader
+ * covers only saves that ended before it did.
+ */
+export function resolveGameEndReasonCode(state: GameState): GameEndReasonCode {
+  return state.endReasonCode ??
+    inferLegacyGameEndReasonCode(state.winReason, state.status, state.engineOutcome?.type);
 }
 
 export function buildGameResultCallbackPayload(state: GameState): GameResultCallbackPayload {
@@ -26,6 +26,6 @@ export function buildGameResultCallbackPayload(state: GameState): GameResultCall
       ? state.players[state.winner].playerId
       : null,
     winReason: state.winReason,
-    reasonCode: inferReasonCode(state),
+    reasonCode: resolveGameEndReasonCode(state),
   };
 }

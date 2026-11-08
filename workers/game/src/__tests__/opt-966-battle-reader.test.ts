@@ -12,6 +12,7 @@ import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import battleJson from "./fixtures/opt-966-battle-debt-writer.json";
 
 import terminalJson from "./fixtures/opt-966-battle-terminal-writer.json";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 
 type Corpus = {
   producerCommit: string;
@@ -67,7 +68,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
     expect(actual.players).toEqual(currentExpected.players);
     expect(actual.turn).toEqual(currentExpected.turn);
     expect(actual.executionContext).toEqual(currentExpected.executionContext);
-    expect(actual).toEqual(currentExpected);
+    expect(withoutAssertedEndReasonCode(actual)).toEqual(currentExpected);
     const types = actual.eventLog.map((event) => event.type);
     if (name.includes("immediate")) {
       expect(types.filter((type) => type === "CARD_DRAWN")).toHaveLength(2);

@@ -14,6 +14,7 @@ import {
   save,
   type ProducerScenario,
 } from "./native7-producer-support.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const directory = fileURLToPath(
   new URL("./fixtures/opt-969-native7-producers/", import.meta.url)
 );
@@ -70,7 +71,7 @@ describe.each(files)("native7 future producers %s", (file) => {
           const next = command(rt, loaded.state, loaded.cardDb, step.action);
           const stored = await save(rt, next, loaded.cardDb);
           expect(
-            withoutAssertedCostEvidence(stored),
+            withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored)),
             `${file} ${context} start${start} after ${step.action.type}`
           ).toEqual(writerSessionEnvelope(step.stored));
           loaded = (await memory(rt, stored).repo.load())!;

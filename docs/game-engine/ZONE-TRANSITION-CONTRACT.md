@@ -84,8 +84,11 @@ Enforcement:
   in any card zone of either player (Leader, Character, Stage, Hand, Deck,
   Trash, Life, removed from game) or equals the moving card's old id, and the
   zone removal throws if more than one card in the source zone shares the moving
-  card's id. The throw aborts the whole action before the session persists it;
-  a rejected action is recoverable, silent inventory loss is not.
+  card's id. The throw aborts the whole action before the session persists it.
+  `GameSession` catches it (OPT-929): the sender receives one `action:rejected`
+  ("Internal engine error; game state unchanged"), in-memory state and undo
+  history stay as they were, nothing is persisted, and the next valid action
+  runs normally. A rejected action is recoverable; silent inventory loss is not.
 - **Tests.** A fixture that needs a specific RNG seed uses
   `reseedExecutionContext(state, seed)` from `workers/game/src/__tests__/helpers.ts`,
   which keeps the counter, rather than assigning a bare
