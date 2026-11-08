@@ -241,6 +241,29 @@ const REST_MIXED: Action = {
 } as Action;
 
 describe("OPT-880 SELECT_TARGET resume re-checks candidate eligibility", () => {
+  it("an exact count re-asked over fewer candidates asks only for what is offered", () => {
+    const { state, cardDb } = fixture(["COST-3", "COST-2", "COST-2"]);
+    const action = {
+      type: "SET_REST",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 2 }, filter: { cost_max: 3 } },
+    } as Action;
+    const prompt = resolveEffect(state, block(action), state.players[0].leader.instanceId, 0, cardDb);
+    expect(selectOptions(prompt).countMin).toBe(2);
+
+    let stale = raiseCost(prompt.state, "opp-0");
+    stale = raiseCost(stale, "opp-1");
+    const rejected = select(stale, ["opp-0", "opp-2"], cardDb);
+    expect(rejected.rejected).toBe(true);
+    expect(rejected.reprompted).toBe(true);
+    const reasked = selectOptions(rejected);
+    expect(reasked.validTargets).toEqual(["opp-2"]);
+    expect([reasked.countMin, reasked.countMax]).toEqual([1, 1]);
+
+    const resolved = select({ ...rejected.state, pendingPrompt: rejected.pendingPrompt ?? null }, ["opp-2"], cardDb);
+    expect(resolved.rejected).toBeFalsy();
+    expect(charState(resolved.state, "opp-2")).toBe("RESTED");
+  });
+
   for (const [label, action] of [["single-type", REST_SINGLE], ["mixed-pool", REST_MIXED]] as const) {
     it(`${label}: a candidate that became ineligible is rejected and the choice re-asked`, () => {
       const { state, cardDb } = fixture(["COST-3", "COST-2"]);

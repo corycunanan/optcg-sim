@@ -942,9 +942,12 @@ export function buildSelectTargetPrompt(
     countMax = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMax, 0);
   } else {
     const count = effectiveTargetCount(target);
-    countMin = targetPromptCountMin(target);
+    // OPT-880: an exact count never asks for more cards than are offered (a
+    // stale re-prompt can offer fewer candidates than the count).
+    const offered = new Set(allValidIds).size;
+    countMin = Math.min(targetPromptCountMin(target), offered);
     countMax = !count ? 1
-      : "exact" in count ? count.exact
+      : "exact" in count ? Math.min(count.exact, offered)
       : "up_to" in count ? count.up_to
       : allValidIds.length;
   }
