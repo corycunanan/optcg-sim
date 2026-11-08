@@ -37,7 +37,7 @@ Order of operations, fixed by this contract:
 5. **Apply load-time legacy migrations** that are content rewrites rather than shape changes (today: `migrateLegacyTriggerRegistry`, OPT-796).
 6. **Classify legacy shapes** that are loadable but owned by a later ticket (§4), and log the classification. Classification never mutates state.
 
-After the hook, `SessionRepository.load()` retains two pure, write-free helpers that predate it: `ensureExecutionContext` and `restoreIdCounterInvariant` (OPT-891, raises a low id counter and logs). **The current strict converter requires `executionContext`, so a raw context-less save rejects before the repository can reach its context-hydration helper.** Calling that helper on a scratch copy is not evidence that the raw repository ingress accepts it. The captured cases in §4.2 expose this historical admission gap; no bypass or new defaults are introduced here. "One entry point" means one path from stored bytes to a validated runtime shape, not that nothing runs after it.
+After the hook, `SessionRepository.load()` retains two pure, write-free helpers that predate it: `ensureExecutionContext` and `restoreIdCounterInvariant` (OPT-891, raises a low id counter and logs). **The strict converter requires `executionContext`, so a raw context-less save never reaches the repository's context-hydration helper.** Since OPT-1013 the converter itself admits one such shape before step 2: an unversioned, context-less save that is terminal and holds no paused work (§4.2). Every other context-less save still rejects. "One entry point" means one path from stored bytes to a validated runtime shape, not that nothing runs after it.
 
 A failure at any step throws `SessionLoadError` carrying `location` and `reason`. Storage is never written during a load, and the repository's in-memory bookkeeping is only updated after every snapshot converts, so a failed load leaves the three storage values byte-identical and the repository unchanged.
 
@@ -220,9 +220,30 @@ Two actual sanitized persisted terminal sessions were exported on 2026-10-28 Pac
 | `capture-01.json` | ABANDONED, REFRESH; schema/cost mode absent; no execution context; pregame object lacks `startOfGameEffectsResolved`; no prompt, stack, or undo | Assigned v1, then rejects missing `executionContext` | Still rejects missing `pregame.startOfGameEffectsResolved` |
 | `capture-06.json` | FINISHED, MAIN; schema/cost mode absent; no execution context or pregame field; no prompt, stack, or undo | Assigned v1, then rejects missing `executionContext` | Still rejects missing `pregame` |
 
-No `classifyLegacyShapes` runtime classification is emitted because strict core validation fails first. `opt-971-captured-rejections.test.ts` pins the exact errors, immutable fixture hashes, absence of captured undo, scratch-only diagnostic, and a valid synthetic v1 positive control. The diagnostic does not assert that filling further fields would be sufficient or semantically justified. The raw captures are never adapted, reserialized, relabelled as accepted, or used to infer historical RNG outcomes.
+Before OPT-1013, strict core validation failed first, so no `classifyLegacyShapes` classification was emitted. The required core fields already existed at the PR1 baseline `03071b69`; strict core admission was introduced earlier by `d244a3b3` (OPT-102). The observed shapes are structurally older than that baseline, but their original writer revisions were not captured. This was an inherited historical admission gap, not an OPT-971 regression.
 
-The required core fields already existed at the PR1 baseline `03071b69`; strict core admission was introduced earlier by `d244a3b3` (OPT-102). The observed shapes are structurally older than that baseline, but their original writer revisions were not captured. This is an inherited historical admission/documentation gap, not a new OPT-971 rejection. **Absent version still permanently means v1; no policy explicitly retires or excludes these older shapes.** Recording their current rejection is not approval to invent defaults or declare them out of support. [OPT-1013](https://linear.app/optcg-sim/issue/OPT-1013/resolve-captured-unversionedv1-admission-gaps-before-legacy-support) owns an explicit support disposition or justified reader adapter. No reader, writer, gameplay, or production-session behavior changes in this fixture delivery.
+**Disposition (OPT-1013): read-only admission of terminal pre-context saves.** Absent version still permanently means v1 (§1.1); no version is retired and no reader is removed. The rule, implemented in `session/pre-context-terminal-admission.ts` and called by `convertPersistedGameState` before conversion:
+
+| Condition | Treatment |
+|---|---|
+| `schemaVersion` key present, or `executionContext` key present | Not a pre-context save. Unchanged path; an explicit `schemaVersion: 1` without a context still rejects at `executionContext`, because every writer that stored the key also stored a context. |
+| Pre-context, `status` `FINISHED` or `ABANDONED`, `pendingPrompt: null`, empty `effectStack` | **Admitted read-only** with the fills below, then the ordinary conversion and strict validation. |
+| Pre-context, any other status, a prompt, or stack work | **Rejected** with `SessionLoadError` naming the condition and this section. The runbook (§5.2) applies; no capture shows such a session exists, and there is no evidence for how it would resume. |
+
+Fills, each the historical meaning rather than a guess about lost work:
+
+* `executionContext` → `createDeterministicExecutionContext("legacy:<gameId>", { gameId })`, the context `ensureExecutionContext` already defines for pre-OPT-477 snapshots. After strict validation its `idCounter` is raised to the highest engine id in the state (OPT-891). A terminal game never draws RNG or allocates a gameplay id from it.
+* Absent `pregame` → `null`, which the current engine stores when pregame reaches `DONE` and when a game is abandoned during pregame (`terminateGame` with `clearPregame`).
+* Absent `pregame.startOfGameEffectsResolved` → `[false, false]` **only** when `pregame.phase` is `PRIORITY_ROLLING` or `PRIORITY_CHOICE`. Start-of-game effects run in `START_OF_GAME_FX`, which follows, so none can have resolved; it is also the value `advanceStartOfGameEffects` reads for an absent ledger. In any later phase the ledger is unknowable and the save rejects. Nothing is granted or replayed: the admitted game is terminal, so no pregame step runs.
+
+Nothing else is filled; strict validation still rejects every other omission or unknown key, and the stored bytes are never rewritten. Live state and each undo snapshot pass through the same rule by location, so a non-terminal pre-context undo snapshot is an undo-only failure (§5.2 item 3).
+
+| Captured file | Disposition from OPT-1013 |
+|---|---|
+| `capture-01.json` | Admitted: legacy context; pregame kept as recorded (`PRIORITY_CHOICE`) with `startOfGameEffectsResolved: [false, false]`. |
+| `capture-06.json` | Admitted: legacy context; `pregame: null`. |
+
+`opt-1013-pre-context-terminal-admission.test.ts` pins both admissions, determinism, repository load without storage writes, and every rejection boundary. `opt-971-captured-rejections.test.ts` keeps the immutable hashes and the capture-time rejection recorded in the manifest, which remains provenance for the reader deployed at capture. Two terminal captures with empty undo remain insufficient for the §7 capture gate.
 
 ## 5. Rollback, repair, rejection runbook
 
@@ -305,7 +326,7 @@ This is a degraded but loadable resume, limited to games paused inside an End Ph
 
 OPT-940 requires sanitized real Durable Object sessions as fixtures. The [signed export route](./SESSION-CAPTURE-EXPORT.md) was deployed and 25 existing-session read-only exports were attempted: **23 returned HTTP 404; two yielded sanitized terminal records; neither raw record is accepted by the deployed reader** (§4.2). Both have empty undo, no prompt and no effect stack. These exact known-rejected captures now exist alongside the earlier synthetic goldens, which retain their original provenance.
 
-The capture gate remains **open**: no actual live-plus-undo pair, paused cost transaction, single/batch replacement, battle/effect damage pause, or mid-End-Phase frame below a prompt was captured. In particular, none of the three named historical damage continuation fields was observed. No gameplay actions, test workers, synthetic production sessions, repairs or storage writes were used to manufacture coverage. The [safe fixture manifest](../../workers/game/src/__tests__/fixtures/opt-971-captured/manifest.json) retains all missing classes; OPT-1013 separately owns the captured v1 admission gap. Two rejected terminal captures do not satisfy the requested acceptance inventory or permit reader retirement.
+The capture gate remains **open**: no actual live-plus-undo pair, paused cost transaction, single/batch replacement, battle/effect damage pause, or mid-End-Phase frame below a prompt was captured. In particular, none of the three named historical damage continuation fields was observed. No gameplay actions, test workers, synthetic production sessions, repairs or storage writes were used to manufacture coverage. The [safe fixture manifest](../../workers/game/src/__tests__/fixtures/opt-971-captured/manifest.json) retains all missing classes; OPT-1013 resolved the captured v1 admission gap by read-only terminal admission (§4.2). Two terminal captures with empty undo do not satisfy the requested acceptance inventory or permit reader retirement.
 
 ## 8. Typed replacement and damage continuations (OPT-963: PR 5a reader, PR 5b writer)
 
