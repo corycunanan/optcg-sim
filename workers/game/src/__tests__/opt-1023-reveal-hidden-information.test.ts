@@ -19,7 +19,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActionOf } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameAction, GameEvent, GameState } from "../types.js";
-import { getAllAuthoredSchemas, getEffectSchema } from "../engine/schema-registry.js";
+import { getAllAuthoredSchemas, getEffectSchema, validateEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { executeSearchAndPlay } from "../engine/effect-resolver/actions/hand-deck.js";
@@ -359,5 +359,23 @@ describe("OPT-916: SEARCH_AND_PLAY reveal is public", () => {
     expect(findSearchAndPlayRevealIntentViolations(revealText, { X: sap(true) })).toEqual([]);
     expect(findSearchAndPlayRevealIntentViolations(lookText, { X: sap(true) })).toHaveLength(1);
     expect(findSearchAndPlayRevealIntentViolations(lookText, { X: sap() })).toEqual([]);
+  });
+});
+
+describe("OPT-999: REVEAL hand target is own-hand only", () => {
+  it("rejects an opponent-hand REVEAL target in schema validation", () => {
+    const schema = {
+      card_id: "X",
+      effects: [{
+        id: "e",
+        category: "auto" as const,
+        trigger: { keyword: "ON_PLAY" as const },
+        actions: [{
+          type: "REVEAL" as const,
+          target: { type: "CARD_IN_HAND" as const, controller: "OPPONENT" as const, count: { up_to: 1 } },
+        }],
+      }],
+    };
+    expect(validateEffectSchema(schema, "X").join("\n")).toMatch(/use REVEAL_HAND/);
   });
 });

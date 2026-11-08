@@ -241,7 +241,9 @@ export function executeReveal(
   // controller chooses which eligible hand cards to reveal; the deck is never
   // read. The chosen identities are revealed publicly and carried forward as
   // the result so later actions act on exactly those cards.
-  if (action.target?.type === "CARD_IN_HAND") {
+  // Own hand only: the chooser sees these cards. validateEffectSchema rejects
+  // an opponent-hand target, whose blind pick belongs to REVEAL_HAND.
+  if (action.target?.type === "CARD_IN_HAND" && (action.target.controller ?? "SELF") === "SELF") {
     const eligibleIds = computeAllValidTargets(
       state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs,
     );
@@ -261,9 +263,7 @@ export function executeReveal(
     const selectedIds = preselectedTargets ?? autoSelectTargets(action.target, eligibleIds);
     if (selectedIds.length === 0) return { state, events, succeeded: false };
 
-    const revealedController = action.target.controller === "OPPONENT"
-      ? (controller === 0 ? 1 : 0)
-      : controller;
+    const revealedController = controller;
     const hand = state.players[revealedController].hand;
     const revealed = selectedIds.map((id) => hand.find((card) => card.instanceId === id)!);
     events.push({

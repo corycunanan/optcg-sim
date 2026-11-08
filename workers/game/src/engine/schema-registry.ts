@@ -951,6 +951,19 @@ function validateAction(
       `${prefix}: First action has chain '${action.chain}' (only subsequent actions may declare a connector)`,
     );
   }
+  // OPT-999: REVEAL's hand branch shows the chooser the real cards, which is
+  // only legal for the chooser's own hand. A blind pick from the opponent's
+  // hand is REVEAL_HAND (opaque slots, OPT-838).
+  if (
+    action.type === "REVEAL" &&
+    action.target?.type === "CARD_IN_HAND" &&
+    action.target.controller !== undefined &&
+    action.target.controller !== "SELF"
+  ) {
+    errors.push(
+      `${prefix}: REVEAL with a CARD_IN_HAND target reveals from your own hand only; use REVEAL_HAND for the opponent's hand`,
+    );
+  }
   if (action.chain && !["THEN", "IF_DO", "AND"].includes(action.chain)) {
     errors.push(`${prefix}: Unknown chain connector '${action.chain}'`);
   }
