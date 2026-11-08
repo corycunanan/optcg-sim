@@ -362,7 +362,7 @@ export interface GameEventPayloadMap {
   EVENT_TRIGGER_RESOLVED: { cardId?: string; cardInstanceId: string };
   LIFE_CARD_TURNED_FACE_UP: { count: number };
   LIFE_CARD_TURNED_FACE_DOWN: { count: number };
-  COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string };
+  COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string; grantedAttributes?: Record<string, string[]> };
   CHARACTER_BATTLES: { cardInstanceId: string; targetInstanceId: string; grantedAttributes?: Record<string, string[]> };
   END_OF_BATTLE: { attackerInstanceId: string; targetInstanceId: string; aborted: boolean };
   BATTLE_ABORTED: { attackerInstanceId: string; targetInstanceId: string; reason: "ATTACKER_LEFT_FIELD" | "TARGET_LEFT_FIELD" };

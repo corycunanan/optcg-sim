@@ -356,4 +356,37 @@ describe("OPT-902 target_filter on the defeated combatant (last known card)", ()
     expect(f.onField(weak)).toBe(false);
     expect(f.state.players[0].hand).toHaveLength(hand + drawn);
   });
+
+  it.each([[true, 1], [false, 0]] as const)("COMBAT_VICTORY attribute filter on a K.O.'d Character granted Strike %s draws %i", (grant, drawn) => {
+    const f = setup();
+    f.def("OPT902-STRIKE-VICTOR", { cost: 4, power: 5000 }, {
+      card_id: "OPT902-STRIKE-VICTOR",
+      card_name: "Strike victor",
+      card_type: "Character",
+      effects: [{
+        id: "victory_draw",
+        category: "auto",
+        trigger: { event: "COMBAT_VICTORY", filter: { attribute: "STRIKE" } },
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      }],
+    } as EffectSchema);
+    const victor = f.put("OPT902-STRIKE-VICTOR", 0);
+    const weak = f.put("OPP-WEAK", 1);
+    if (grant) {
+      const granted = executeGrantAttribute(
+        f.state,
+        { type: "GRANT_ATTRIBUTE", target: { type: "CHARACTER", controller: "SELF" }, params: { attribute: "STRIKE" }, duration: { type: "THIS_TURN" } },
+        weak.instanceId,
+        1,
+        f.db,
+        new Map(),
+        [weak.instanceId],
+      );
+      f.state = granted.state;
+    }
+    const hand = f.state.players[0].hand.length;
+    f.attack(victor, weak);
+    expect(f.onField(weak)).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(hand + drawn);
+  });
 });

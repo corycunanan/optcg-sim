@@ -945,13 +945,13 @@ function matchesHostBattle(
     // The attribute it battled with: printed, or granted by an effect
     // (GRANT_ATTRIBUTE). The K.O.'d loser has left the field by the time the
     // event is scanned, so read its last known card, and the grants that
-    // CHARACTER_BATTLES recorded as it battled (a grant ends when the card
-    // leaves the field).
+    // CHARACTER_BATTLES / COMBAT_VICTORY recorded as it battled (a grant
+    // ends when the card leaves the field).
     const cardId = lastKnownCardId(state, opposingId);
     const want = filter.attribute.toUpperCase();
     if (!cardId) return false;
     const printed = cardDb.get(cardId)?.attribute?.some((a) => a.toUpperCase() === want) ?? false;
-    const recorded = event.type === "CHARACTER_BATTLES" && (event.payload.grantedAttributes?.[opposingId]?.includes(want) ?? false);
+    const recorded = event.payload.grantedAttributes?.[opposingId]?.includes(want) ?? false;
     const onField = findCardInstance(state, opposingId);
     const granted = recorded || (onField != null && hasGrantedAttribute(onField, want, state, cardDb));
     if (!printed && !granted) return false;
