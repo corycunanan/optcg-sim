@@ -1258,7 +1258,7 @@ function countAllowsZero(count: unknown): boolean {
  * action's handler builds its SELECT_TARGET from the target's count
  * (`promptsFromTargetCount`) and the target type can offer more than one
  * candidate (`targetCandidatePoolMax`). Otherwise no zero-choice prompt exists
- * (e.g. TRASH_FROM_LIFE never prompts; TRASH_FROM_HAND with an amount asks for
+ * (e.g. a TOP/BOTTOM TRASH_FROM_LIFE never prompts; TRASH_FROM_HAND with an amount asks for
  * exactly that many), and action-level `optional` is the only decline.
  */
 function zeroAllowingTargetCounts(action: Action): string[] {
@@ -1279,7 +1279,7 @@ function zeroAllowingTargetCounts(action: Action): string[] {
   return zeroAllowingCountsFor(
     action.target,
     "target",
-    promptsFromTargetCount(action.type),
+    promptsFromTargetCount(action),
   );
 }
 

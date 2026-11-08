@@ -60,6 +60,7 @@ import {
   handlePlayerChoiceDonReturn,
   handleChooseValue,
   handleFieldToLifePosition,
+  handleLifeToHandPosition,
   handlePlayerChoiceBranch,
   handleAwaitingOptionalResponse,
   handleAwaitingOptionalActionResponse,
@@ -249,6 +250,14 @@ function resumeEffectChainCore(
         pendingPrompt: fieldToLife.pendingPrompt,
       };
     }
+  }
+
+  const lifeToHand = handleLifeToHandPosition(nextState, action, resumeCtx, resultRefs, cardDb);
+  if (lifeToHand) {
+    if (lifeToHand.rejected) return lifeToHand;
+    nextState = lifeToHand.state;
+    events.push(...lifeToHand.events);
+    pausedActionSucceeded = lifeToHand.succeeded;
   }
 
   // ── PLAYER_CHOICE branches ────────────────────────────────────────────────

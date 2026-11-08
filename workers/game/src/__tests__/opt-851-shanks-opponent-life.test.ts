@@ -246,6 +246,11 @@ describe("OPT-851 TRASH_FROM_LIFE controller contract", () => {
     const db = createTestCardDb();
     const state = createBattleReadyState(db);
     const before = [state.players[0].life.length, state.players[1].life.length];
+    const lifeOwner = owner === "SELF" ? 0 : 1;
+    // An any-position pick (ST04-001, OPT-917) resumes with the chosen card.
+    const picked = (action.params as { position?: string } | undefined)?.position === "ANY"
+      ? [state.players[lifeOwner].life[0].instanceId]
+      : undefined;
     const result = executeTrashFromLife(
       state,
       { ...action, params: { ...action.params, up_to: false } } as never,
@@ -253,8 +258,8 @@ describe("OPT-851 TRASH_FROM_LIFE controller contract", () => {
       0,
       db,
       new Map(),
+      picked,
     );
-    const lifeOwner = owner === "SELF" ? 0 : 1;
     expect(result.succeeded).toBe(true);
     expect(result.state.players[lifeOwner].life).toHaveLength(before[lifeOwner] - 1);
     expect(result.state.players[1 - lifeOwner].life).toHaveLength(before[1 - lifeOwner]);

@@ -315,7 +315,8 @@ export interface GameEventPayloadMap {
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
   CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
   CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
-  CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string };
+  /** `face` is the Life face the card entered with; a face-down card from the deck is secret to its owner too (OPT-976). */
+  CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string; face?: "UP" | "DOWN" };
   CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };

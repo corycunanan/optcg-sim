@@ -867,7 +867,8 @@ describe("OPT-919 — OP08-116 Burn Bazooka: optional Life add gates the Life pl
   it("accept: a Life card goes to hand, then up to 1 {Shandian Warrior} goes to the top of Life face-up", () => {
     const { f, warrior, leaderBase, life } = setup();
     const lifeCardId = f.state.players[1].life[0].cardId;
-    f.counter("OP08-116", [ids(f.p1Leader()), "accept", ids(warrior)]);
+    // "top or bottom" asks the end (OPT-1014); top takes life[0].
+    f.counter("OP08-116", [ids(f.p1Leader()), "accept", { choice: "life-to-hand:TOP" }, ids(warrior)]);
     expect(f.power(f.p1Leader())).toBe(leaderBase + 4000);
     // Zone moves re-key instance ids (hidden information), so compare card ids.
     const after = f.state.players[1].life;
@@ -908,7 +909,8 @@ describe("OPT-919 — OP08-116 Burn Bazooka: optional Life add gates the Life pl
     f.state.turn.activePlayerIndex = 1;
     const ev = f.put("ST22-015", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: canonicalText("ST22-015") });
     f.act({ type: "PLAY_CARD", cardInstanceId: ev.instanceId }, 1);
-    f.drive([answer]);
+    // Accepting asks top or bottom (OPT-1014).
+    f.drive(answer === "accept" ? [answer, { choice: "life-to-hand:BOTTOM" }] : [answer]);
     expect(f.state.players[1].life).toHaveLength(lifeBefore - taken);
     expect(f.state.players[1].hand).toHaveLength(taken);
     expect(f.power(f.p1Leader())).toBe(leaderBase + bonus);

@@ -1006,7 +1006,12 @@ export interface ActionParamsMap {
   };
   TRASH_FROM_LIFE: {
     amount?: number | DynamicValue;
-    position?: "TOP" | "BOTTOM";
+    /**
+     * `ANY` (OPT-917): the chooser picks Life cards by position through the
+     * target's count (`OPPONENT_LIFE`, `count: { up_to: N }`); `amount` is
+     * unused. Face-down identities stay hidden in the prompt.
+     */
+    position?: "TOP" | "BOTTOM" | "ANY";
     controller?: Controller;
     up_to?: boolean;
   };

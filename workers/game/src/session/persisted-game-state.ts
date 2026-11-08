@@ -613,6 +613,7 @@ const EventPayloadSchemas = {
     cardInstanceId: z.string(),
     newCardInstanceId: z.string(),
     cardId: z.string(),
+    face: z.enum(["UP", "DOWN"]).optional(),
   }),
   CARD_ADDED_TO_HAND_FROM_LIFE: z.strictObject({
     cardId: z.string().optional(),

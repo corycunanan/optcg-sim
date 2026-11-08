@@ -149,7 +149,10 @@ describe("OPT-731 choose-fewer resource action contract", () => {
       expect(result.state.players[0].deck).toHaveLength(
         state.players[0].deck.length - amount
       );
-      expect(result.events).toEqual([]);
+      // OPT-976: one CARD_ADDED_TO_LIFE per card that entered Life.
+      expect(result.events.map((event) => event.type)).toEqual(
+        Array.from({ length: amount }, () => "CARD_ADDED_TO_LIFE")
+      );
     });
   }
 
