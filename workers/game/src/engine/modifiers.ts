@@ -966,6 +966,28 @@ export function hasGrantedAttribute(
 }
 
 /**
+ * Every attribute (uppercase) that active GRANT_ATTRIBUTE effects give the
+ * card now, in first-granted order. OPT-1016: recorded on CHARACTER_BATTLES so
+ * "battles Strike attribute Characters" sees a grant on a combatant that is
+ * K.O.'d in the battle (its grant ends when it leaves the field).
+ */
+export function getGrantedAttributes(
+  card: CardInstance,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>
+): string[] {
+  const granted: string[] = [];
+  for (const e of state.activeEffects) {
+    for (const m of e.modifiers ?? []) {
+      if (m.type !== "GRANT_ATTRIBUTE" || typeof m.params?.attribute !== "string") continue;
+      const attribute = m.params.attribute.toUpperCase();
+      if (!granted.includes(attribute) && hasGrantedAttribute(card, attribute, state, cardDb)) granted.push(attribute);
+    }
+  }
+  return granted;
+}
+
+/**
  * Check if a card has a specific removed keyword from active effects.
  */
 export function hasRemovedKeyword(

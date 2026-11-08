@@ -24,6 +24,7 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { getEffectivePower } from "../engine/modifiers.js";
+import { executeGrantAttribute } from "../engine/effect-resolver/actions/modifiers.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
@@ -290,6 +291,42 @@ describe("OPT-902 ST05-010 Zephyr (CHARACTER_BATTLES)", () => {
     slotOf(f, zephyr)!.state = "ACTIVE";
     const strike = f.put("OPP-STRIKE", 1);
     f.attack(zephyr, strike);
+    expect(power(f, zephyr)).toBe(8000);
+  });
+  function grantStrike(f: Fixture, card: CardInstance) {
+    const granted = executeGrantAttribute(
+      f.state,
+      { type: "GRANT_ATTRIBUTE", target: { type: "CHARACTER", controller: "SELF" }, params: { attribute: "STRIKE" }, duration: { type: "THIS_TURN" } },
+      card.instanceId,
+      card.controller,
+      f.db,
+      new Map(),
+      [card.instanceId],
+    );
+    expect(granted.succeeded).toBe(true);
+    f.state = granted.state;
+  }
+
+  it("gains +3000 when a Character granted Strike by an effect attacks it", () => {
+    const f = setup();
+    const zephyr = f.put("ST05-010", 1);
+    f.def("GRANTED-ATK", { cost: 3, power: 4000 });
+    const granted = f.put("GRANTED-ATK", 0);
+    grantStrike(f, granted);
+    f.attack(granted, zephyr);
+    expect(f.onField(zephyr)).toBe(true);
+    expect(power(f, zephyr)).toBe(8000);
+  });
+
+  it("gains +3000 when it K.O.s a Character granted Strike by an effect", () => {
+    const f = setup();
+    const zephyr = f.put("ST05-010", 0);
+    const plain = f.put("OPP-WEAK", 1);
+    grantStrike(f, plain);
+    f.attack(zephyr, plain);
+    expect(f.onField(plain)).toBe(false);
+    const battles = f.state.eventLog.filter((e) => e.type === "CHARACTER_BATTLES");
+    expect(battles.at(-1)?.payload).toMatchObject({ grantedAttributes: { [plain.instanceId]: ["STRIKE"] } });
     expect(power(f, zephyr)).toBe(8000);
   });
 });

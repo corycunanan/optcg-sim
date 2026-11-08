@@ -700,6 +700,7 @@ const EventPayloadSchemas = {
   CHARACTER_BATTLES: z.strictObject({
     cardInstanceId: z.string(),
     targetInstanceId: z.string(),
+    grantedAttributes: z.record(z.string(), StringArray).optional(),
   }),
   END_OF_BATTLE: z.strictObject({
     attackerInstanceId: z.string(),
