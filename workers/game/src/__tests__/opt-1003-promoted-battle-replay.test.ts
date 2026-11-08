@@ -8,6 +8,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import type { GameAction, GameState } from "../types.js";
 import manifest from "./fixtures/opt-1003-promoted-battles.manifest.json";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const bytes = readFileSync(
   new URL(
     "./fixtures/opt-1003-promoted-battles.synthetic.json.gz",
@@ -139,14 +140,14 @@ for (const trace of corpus.traces)
             undoHistory: [resumed.state],
           });
           loaded = await repo.save({ ...loaded, undoHistory: [loaded.state] });
-          expect(Object.fromEntries(storage.data)).toEqual(step.stored);
+          expect(withoutAssertedEndReasonCode(Object.fromEntries(storage.data))).toEqual(step.stored);
           expect(loaded.state.pendingPrompt).toEqual(
             stateOf(step.stored).pendingPrompt
           );
           ownerContract(loaded.state);
         }
         loaded = (await repo.load())!;
-        expect(loaded.state).toEqual(trace.final);
+        expect(withoutAssertedEndReasonCode(loaded.state)).toEqual(trace.final);
         expect(loaded.state.effectStack).toHaveLength(0);
         expect(loaded.state.pendingPrompt).toBeNull();
         expect(loaded.state.status).toBe(old.expected.status);

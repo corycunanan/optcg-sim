@@ -9,6 +9,7 @@ import { memoryRepository, command, type CostCorpus } from "./opt-997-corpus-sup
 import { parseStoredSession, convertPersistedGameState } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import type { GameState } from "../types.js";
+import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const dir = fileURLToPath(new URL("./fixtures/opt-997-v7-canonical/", import.meta.url));
 const files = readdirSync(dir).filter(f => f.endsWith(".json") && f !== "manifest.json" && !f.includes("-diagnostic"));
 for (const file of files) {
@@ -30,7 +31,7 @@ for (const file of files) {
         state = command(state, step.action, loaded.cardDb);
         const saved = await repo.save({ ...loaded, state, undoHistory: [state] });
         state = toPersistedGameState(saved.state);
-        expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(step.expected));
+        expect(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(state))).toEqual(writerEnvelope(step.expected));
         expect((await repo.load())!.state).toEqual(state);
       }
       if (f.knownDebt) {

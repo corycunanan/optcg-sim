@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { END_PHASE_STAGES, END_PHASE_STEPS, type GameEventType } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS } from "../engine/frame-kinds.js";
+import { GAME_END_REASON_CODES } from "../../../../shared/game-types.js";
 
 const EffectSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) });
 
@@ -543,6 +544,7 @@ export const PersistedGameStateV3 = z.strictObject({
   winner: PlayerIndex.nullable(),
   winReason: NullableString,
   engineOutcome: z.unknown().nullable().optional(),
+  endReasonCode: z.enum(GAME_END_REASON_CODES).nullable().optional(),
   engineActionCount: NonNegativeInteger.optional(),
 });
 
