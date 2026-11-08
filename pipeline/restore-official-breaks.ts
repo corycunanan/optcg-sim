@@ -12,12 +12,16 @@ import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { pathToFileURL } from "url";
 
+import { decodeHtmlEntities } from "../shared/card-parsing.js";
 import type { RawVegapullCard } from "./load";
 
 const BASE_URL = "https://en.onepiece-cardgame.com/cardlist/";
 const DEFAULT_DATA_DIR = "data/vegapull-full/json";
 const USER_AGENT = "OPTCG-Simulator/1.0 (card-data-pipeline)";
 const BREAK_PATTERN = /<br\s*\/?>/gi;
+// Card attributes are printed as bare angle-bracket tokens such as <Slash>.
+// The official page emits them either raw or entity-encoded; neither is markup.
+const ATTRIBUTE_TOKEN_PATTERN = /<(Slash|Strike|Special|Ranged|Wisdom)>/g;
 
 export interface OfficialCardText {
   effect: string;
@@ -62,7 +66,9 @@ function extractField(
       /^\s*<h3\b[^>]*>[\s\S]*?<\/h3\s*>\s*/i,
       ""
     );
-    const withBreakMarkers = withoutHeading.replace(BREAK_PATTERN, "\u0000");
+    const withBreakMarkers = withoutHeading
+      .replace(BREAK_PATTERN, "\u0000")
+      .replace(ATTRIBUTE_TOKEN_PATTERN, "\u0001$1\u0002");
     const unexpectedTag = withBreakMarkers.match(/<[^>]+>/);
     if (unexpectedTag) {
       throw new Error(
@@ -72,7 +78,11 @@ function extractField(
 
     return withBreakMarkers
       .split("\u0000")
-      .map((line) => line.replace(/\s+/g, " ").trim())
+      .map((line) =>
+        decodeHtmlEntities(
+          line.replace(/\u0001(\w+)\u0002/g, "<$1>").replace(/\s+/g, " ")
+        ).trim()
+      )
       .filter(Boolean)
       .join("<br>");
   }
@@ -116,7 +126,10 @@ export function parseOfficialCardlist(
 }
 
 function normalizedText(value: string | null): string {
-  return (value ?? "").replace(BREAK_PATTERN, " ").replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(value ?? "")
+    .replace(BREAK_PATTERN, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function assertSameWording(
