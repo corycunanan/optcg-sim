@@ -236,6 +236,16 @@ export function modifierAppliesToCard(
       return false;
   }
 
+  // OPT-882: "other than this Character" auras (OP04-012, OP04-118) put
+  // exclude_self on the target filter. matchesFilter never sees the source,
+  // so the dynamic aura enforces it here, as action targets and costs do.
+  if (
+    modifier.target.filter?.exclude_self &&
+    card.instanceId === effect.sourceCardInstanceId
+  ) {
+    return false;
+  }
+
   return (
     !modifier.target.filter ||
     matchesFilter(

@@ -12,7 +12,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets, isFixedCostMovementProhibited, isOpponentLifePlacement } from "./targets.js";
+import { computeCostTargets, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, isOpponentLifePlacement } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 import { lifeFaceCostIndices } from "./payability.js";
@@ -454,6 +454,10 @@ function payCostsUnreleased(
       }
 
       case "PLACE_STAGE_TO_DECK": {
+        // OPT-866: the EITHER form is the paying player's choice, paid through
+        // payCostsWithSelection's prompt; no synchronous caller may pick the
+        // Stage, so fail closed.
+        if (isEitherPlayerStagePlacement(cost)) return null;
         const p = nextState.players[controller];
         if (!p.stage) return null;
         // Printed restrictions ("place 1 of your cost-1 Stages...") ride on

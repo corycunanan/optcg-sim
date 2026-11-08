@@ -3327,7 +3327,8 @@ export const OP15_080_OARS: EffectSchema = {
             not: {
               type: "CARD_ON_FIELD",
               controller: "SELF",
-              filter: { name: "Oars", exclude_self: true },
+              filter: { name: "Oars" },
+              exclude_self: true,
             },
           },
         ],

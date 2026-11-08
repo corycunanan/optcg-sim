@@ -172,7 +172,8 @@ export const OP04_005_KUNG_FU_JUGON: EffectSchema = {
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
-        filter: { name: "Kung Fu Jugon", exclude_self: true },
+        filter: { name: "Kung Fu Jugon" },
+        exclude_self: true,
       },
       modifiers: [
         {

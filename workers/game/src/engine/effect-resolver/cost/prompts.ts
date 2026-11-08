@@ -67,6 +67,7 @@ export function getCostLabel(cost: Cost): string {
     case "PLACE_OWN_CHARACTER_TO_DECK": return cost.controller === "EITHER"
       ? `Choose ${amount} Character(s) to place at the bottom of the owner's deck as cost`
       : `Choose ${amount} character(s) to place on deck as cost`;
+    case "PLACE_STAGE_TO_DECK": return "Choose 1 Stage to place at the bottom of the owner's deck as cost";
     case "MILL": return `Trash ${amount} card(s) from the top of your deck as cost`;
     case "ADD_OWN_CHARACTER_TO_LIFE": return cost.controller === "OPPONENT"
       ? `Choose ${amount} of your opponent's Character(s) to place in their Life cards face-up as cost`
@@ -101,6 +102,7 @@ export function getCostCtaLabel(cost: Cost): string {
     case "KO_OWN_CHARACTER": return "KO";
     case "RETURN_OWN_CHARACTER_TO_HAND": return "Return";
     case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "PLACE_STAGE_TO_DECK":
     case "PLACE_HAND_TO_DECK":
     case "PLACE_FROM_TRASH_TO_DECK":
     case "PLACE_SELF_AND_TRASH_TO_DECK": return "Place on Deck";

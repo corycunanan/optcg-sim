@@ -566,11 +566,12 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
   }
 
   // OPT-798 / OPT-828: a cost-level `controller` widens a Character-selection
-  // cost beyond the payer's own field. It is meaningful on exactly two types.
+  // or Stage cost beyond the payer's own field (OPT-866 adds the Stage cost).
   const costController = (cost as { controller?: unknown }).controller;
   if (costController !== undefined) {
     const allowed: Partial<Record<Cost["type"], readonly unknown[]>> = {
       PLACE_OWN_CHARACTER_TO_DECK: ["SELF", "EITHER"],
+      PLACE_STAGE_TO_DECK: ["SELF", "EITHER"],
       ADD_OWN_CHARACTER_TO_LIFE: ["SELF", "OPPONENT"],
     };
     const accepted = allowed[cost.type];
