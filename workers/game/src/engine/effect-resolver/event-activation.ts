@@ -13,6 +13,7 @@ import {
 } from "../effect-stack.js";
 import { isGameTerminated } from "../terminal.js";
 import type { ActionResult, EffectResolverServices } from "./types.js";
+import { triggerHasKeyword } from "../trigger-keywords.js";
 
 /** A notification is future work, not a committed accumulator: nested costs and
  * prompts may publish their prefixes without publishing this activation early. */
@@ -108,9 +109,7 @@ export function withdrawUnactivatedTrashMain(
     top?.eventActivation?.events[0]?.type !==
       "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
     top.sourceCardInstanceId !== abandoned.sourceCardInstanceId ||
-    !trigger ||
-    !("keyword" in trigger) ||
-    trigger.keyword !== "MAIN_EVENT"
+    !triggerHasKeyword(trigger, "MAIN_EVENT")
   )
     return state;
   const boundary: EffectStackFrame = { ...top };
