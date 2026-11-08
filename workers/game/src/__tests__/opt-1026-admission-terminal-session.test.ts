@@ -44,6 +44,12 @@ function mainPhaseDecision(): { r: Rig; source: string; state: GameState } {
   return { r, source: source.instanceId, state: opened.state };
 }
 
+function firstValidTarget(state: GameState): string {
+  const options = state.pendingPrompt!.options;
+  if (!("validTargets" in options) || !options.validTargets?.length) throw new Error("Expected a target prompt");
+  return options.validTargets[0];
+}
+
 function directCommands(r: Rig, source: string): GameAction[] {
   const hand = r.state.players[0].hand[0].instanceId;
   const leader = r.state.players[0].leader.instanceId;
@@ -105,7 +111,7 @@ describe("OPT-1011: direct pipeline admission while a decision waits", () => {
 
   it("still admits the legitimate prompt reply through the session coordinator", () => {
     const { r, state } = mainPhaseDecision();
-    const target = state.pendingPrompt!.options.validTargets![0];
+    const target = firstValidTarget(state);
     const coordinator = new SessionCoordinator();
     const reply: GameAction = { type: "SELECT_TARGET", selectedInstanceIds: [target], promptId: state.pendingPrompt!.promptId };
     expect(coordinator.executeAction(state, [], 0, reply, r.db).kind).toBe("resume");
@@ -267,7 +273,7 @@ describe("OPT-929: engine exceptions at the GameSession boundary", () => {
     const spy = vi.spyOn(session.coordinator, "surfaceRevealTrigger").mockImplementationOnce(() => {
       throw new Error("engine invariant");
     });
-    const target = state.pendingPrompt!.options.validTargets![0];
+    const target = firstValidTarget(state);
     const reply: GameAction = { type: "SELECT_TARGET", selectedInstanceIds: [target], promptId: state.pendingPrompt!.promptId };
 
     await session.handleAction(ws, 0, reply);
