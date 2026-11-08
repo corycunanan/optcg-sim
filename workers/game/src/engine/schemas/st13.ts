@@ -243,7 +243,7 @@ export const ST13_006_CURLY_DADAN: EffectSchema = {
               names: ["Sabo", "Portgas.D.Ace", "Monkey.D.Luffy"],
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -275,7 +275,7 @@ export const ST13_007_SABO_COST2: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
-          params: { source_zone: "LIFE", cost_override: "FREE" },
+          params: { source_zone: "LIFE" },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",
@@ -320,7 +320,7 @@ export const ST13_010_PORTGAS_D_ACE_COST2: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
-          params: { source_zone: "LIFE", cost_override: "FREE" },
+          params: { source_zone: "LIFE" },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",
@@ -365,7 +365,7 @@ export const ST13_014_MONKEY_D_LUFFY_COST2: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
-          params: { source_zone: "LIFE", cost_override: "FREE" },
+          params: { source_zone: "LIFE" },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",

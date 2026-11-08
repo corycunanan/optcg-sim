@@ -154,7 +154,7 @@ export const ST18_005_LUFFY_TAROU: EffectSchema = {
               cost_max: 5,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },

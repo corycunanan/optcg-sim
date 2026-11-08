@@ -127,7 +127,6 @@ export const ST27_003_KUZAN: EffectSchema = {
           },
           params: {
             source_zone: "TRASH",
-            cost_override: "FREE",
             entry_state: "RESTED",
           },
         },

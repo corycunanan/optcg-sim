@@ -1137,7 +1137,6 @@ export const P_048_ARLONG: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "PLACE_HAND_TO_DECK",
               params: { amount: 1, position: "BOTTOM" },
@@ -1364,7 +1363,6 @@ export const P_055_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "RETURN_TO_DECK",
               target: {
@@ -2046,7 +2044,7 @@ export const P_081_DRACULE_MIHAWK: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Cross Guild"], cost_exact: 5 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },
@@ -2189,7 +2187,7 @@ export const P_084_BUGGY: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Cross Guild"], cost_max: 6 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2270,7 +2268,7 @@ export const P_090_CHARLOTTE_SMOOTHIE: EffectSchema = {
               },
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2302,7 +2300,7 @@ export const P_091_SHIRAHOSHI: EffectSchema = {
               cost_max: 5,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2859,7 +2857,7 @@ export const P_112_NAMI: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 2 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -2958,7 +2956,7 @@ export const P_115_BOA_HANCOCK: EffectSchema = {
             count: { up_to: 1 },
             filter: { color: "YELLOW", power_max: 5000, has_trigger: true },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },

@@ -49,7 +49,7 @@ export const ST10_001_TRAFALGAR_LAW: EffectSchema = {
             count: { up_to: 1 },
             filter: { card_type: "CHARACTER", cost_max: 4 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -352,7 +352,6 @@ export const ST10_010_TRAFALGAR_LAW: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_FROM_HAND",
               target: {

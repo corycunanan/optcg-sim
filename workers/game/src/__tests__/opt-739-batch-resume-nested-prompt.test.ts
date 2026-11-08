@@ -420,7 +420,6 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
       },
       params: {
         source_zone: "TRASH" as const,
-        cost_override: "FREE" as const,
         entry_state: "PLAYER_CHOICE" as const,
         state_distribution: { ACTIVE: 1, RESTED: 1 },
       },
@@ -667,7 +666,7 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
         source_zone: "TRASH" as const,
         count: { exact: 1 },
       },
-      params: { source_zone: "TRASH" as const, cost_override: "FREE" as const },
+      params: { source_zone: "TRASH" as const },
     };
     const stateWithBatch = pushBatchResumeFrame(
       withPlayers(base, { characters: padChars([]), trash: [target] }),

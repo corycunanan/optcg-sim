@@ -210,7 +210,7 @@ export const ST30_008_MARCO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELF" },
-          params: { source_zone: "TRASH", entry_state: "RESTED", cost_override: "FREE" },
+          params: { source_zone: "TRASH", entry_state: "RESTED" },
         },
       ],
       flags: { optional: true },

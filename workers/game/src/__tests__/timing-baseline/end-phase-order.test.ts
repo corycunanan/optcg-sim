@@ -158,7 +158,7 @@ describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 607, 6-6-1-1-
 describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 text; rules 1-3-1 line 57, 6-6-1-4 line 624; FAQ faq_op15-eb04.md Brook)", () => {
   const BROOK_SCHEMA: EffectSchema = schema("OP15-022", "Leader", [], {
     rule_modifications: [
-      { rule_type: "LOSS_CONDITION_MOD", trigger_event: "DECK_OUT", modification: "DELAYED_LOSS", delay: { timing: "END_OF_TURN" } },
+      { rule_type: "LOSS_CONDITION_MOD", trigger_event: "DECK_OUT", modification: "DELAYED_LOSS" },
     ],
   });
   const MILLER = "SYN-MILLER"; // [Activate: Main] trash 2 from the top of your deck, then +1000 power

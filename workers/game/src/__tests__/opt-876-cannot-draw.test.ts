@@ -21,7 +21,6 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { executeDraw } from "../engine/effect-resolver/actions/draw-search.js";
-import { executeHandWheel } from "../engine/effect-resolver/actions/hand-deck.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { parseStoredSession } from "../session/persistence.js";
@@ -194,35 +193,6 @@ describe("OPT-876 — CANNOT_DRAW frame (drawer vs effect controller)", () => {
     expect(r.state.players[1].hand).toHaveLength(f.state.players[1].hand.length + 1);
   });
 
-  it("HAND_WHEEL: the trash half still happens, the draw half is blocked with no draw events", () => {
-    const f = withProhibition();
-    const hand: CardInstance = {
-      instanceId: "wheel-hand", cardId: CARDS.VANILLA.id, controller: 0, owner: 0,
-      zone: "HAND", state: "ACTIVE", attachedDon: [], turnPlayed: 0,
-    };
-    f.state.players[0].hand = [hand];
-    const deckBefore = f.state.players[0].deck.length;
-    const action = { type: "HAND_WHEEL", params: { trash_count: 1, draw_count: 1 } } as Action;
-    const r = executeHandWheel(f.state, action as never, "src", 0, f.db, new Map());
-    expect(r.state.players[0].hand).toHaveLength(0);
-    expect(r.state.players[0].deck).toHaveLength(deckBefore);
-    expect(r.state.players[0].trash.length).toBeGreaterThan(f.state.players[0].trash.length);
-    expect(r.events.some((e) => e.type === "CARD_DRAWN" || e.type === "DRAW_OUTSIDE_DRAW_PHASE")).toBe(false);
-  });
-
-  it("HAND_WHEEL without the prohibition still draws (control)", () => {
-    const f = fixture(0);
-    const hand: CardInstance = {
-      instanceId: "wheel-hand", cardId: CARDS.VANILLA.id, controller: 0, owner: 0,
-      zone: "HAND", state: "ACTIVE", attachedDon: [], turnPlayed: 0,
-    };
-    f.state.players[0].hand = [hand];
-    const action = { type: "HAND_WHEEL", params: { trash_count: 1, draw_count: 1 } } as Action;
-    const r = executeHandWheel(f.state, action as never, "src", 0, f.db, new Map());
-    expect(r.state.players[0].hand).toHaveLength(1);
-    expect(r.events.some((e) => e.type === "CARD_DRAWN")).toBe(true);
-  });
-
   it("the Draw Phase draw is unaffected by an active CANNOT_DRAW", () => {
     const f = fixture(0);
     // Inject a live CANNOT_DRAW on player 1 that outlives the turn boundary.
@@ -328,34 +298,6 @@ describe("OPT-876 — OPPONENT_ACTION-wrapped draws are caused by the effect sou
     expect(r.state.players[0].hand).toHaveLength(f.state.players[0].hand.length);
   });
 
-  it("HAND_WHEEL inside OPPONENT_ACTION: the trash half precedes and is isolated from the draw half", () => {
-    // Player 1's effect makes player 0 trash 1 and draw 1. The trashed card is
-    // the pre-wheel hand card, never the drawn one; the draw half follows the
-    // wrapper source's cause (opponent-caused) independently of the trash half.
-    for (const [cause, drawn] of [["BY_YOUR_EFFECT", 1], ["BY_OPPONENT_EFFECT", 0]] as const) {
-      const f = withInjectedProhibition(0, cause);
-      f.state.players[0].hand = [{
-        instanceId: "wheel-hand", cardId: CARDS.VANILLA.id, controller: 0, owner: 0,
-        zone: "HAND", state: "ACTIVE", attachedDon: [], turnPlayed: 0,
-      }];
-      f.state.players[0].trash = [];
-      const topOfDeck = f.state.players[0].deck[0].instanceId;
-      const wheel = {
-        type: "OPPONENT_ACTION",
-        params: { action: { type: "HAND_WHEEL", params: { trash_count: 1, draw_count: 1 } } },
-      } as Action;
-      const r = executeActionChain(f.state, [wheel], leaderOf(f, 1), 1, f.db);
-      // Zone moves mint new instance ids; the wheel card is the only trash
-      // entry and the drawn card is the former top of deck.
-      expect(r.state.players[0].trash, cause).toHaveLength(1);
-      expect(r.state.players[0].deck[0]?.instanceId === topOfDeck, cause).toBe(!drawn);
-      expect(r.state.players[0].hand, cause).toHaveLength(drawn);
-      expect(r.events.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 0), cause).toHaveLength(drawn);
-      const trashIdx = r.events.findIndex((e) => e.type === "CARD_TRASHED");
-      expect(trashIdx, cause).toBeGreaterThanOrEqual(0);
-      if (drawn) expect(r.events.findIndex((e) => e.type === "CARD_DRAWN")).toBeGreaterThan(trashIdx);
-    }
-  });
 });
 
 describe("OPT-876 — a paused OPPONENT_ACTION draw keeps its cause across a serialized resume", () => {

@@ -65,8 +65,6 @@ function renderMenu(
         <CardActionMenuContent
           card={card}
           cardDb={overrides.cardDb ?? cardDb}
-          activation={null}
-          canActivateNow={false}
           onAction={overrides.onAction ?? vi.fn()}
           onClose={vi.fn()}
         />
@@ -105,8 +103,6 @@ describe("CardActionMenuContent", () => {
             <CardActionMenuContent
               card={source}
               cardDb={Object.fromEntries(db)}
-              activation={null}
-              canActivateNow={true}
               onAction={onAction}
               onClose={vi.fn()}
             />
