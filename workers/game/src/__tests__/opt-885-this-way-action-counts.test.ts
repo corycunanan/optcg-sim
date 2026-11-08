@@ -444,30 +444,15 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
   const P_059_TEXT =
     "[Counter] If your Leader is [Uta], you may return any number of Characters on your field to the owner's hand. Up to 1 of your Leader or Character cards gains +2000 power during this battle for every returned Character.";
 
-  /**
-   * The authored P-059 block is `category: "activate"`, which
-   * USE_COUNTER_EVENT never runs (OPT-894 owns that). The `auto` variant
-   * exercises the authored RETURN_TO_HAND → PER_COUNT actions unchanged.
-   */
-  function counterP059(f: Fixture, n: number, wrapped: boolean) {
+  /** Authored P-059 (`auto` since OPT-912), resolved from USE_COUNTER_EVENT. */
+  function counterP059(f: Fixture, n: number) {
     f.put("uta", 1, "LEADER", { type: "Leader", name: "Uta", power: 5000 });
     const leader = f.state.players[1].leader;
     const chars = [0, 1].map(() => f.put("c", 1, "CHARACTER"));
-    const authored = getEffectSchema("P-059")!;
-    const id = wrapped ? "P-059-auto" : "P-059";
-    const counter = f.put(id, 1, "HAND", {
+    const counter = f.put("P-059", 1, "HAND", {
       type: "Event",
       cost: 1,
       effectText: P_059_TEXT,
-      ...(wrapped
-        ? {
-            effectSchema: {
-              ...authored,
-              card_id: id,
-              effects: [{ ...authored.effects[0], category: "auto" as const }],
-            },
-          }
-        : {}),
     });
     f.act({
       type: "DECLARE_ATTACK",
@@ -497,12 +482,8 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
     expect(f.power(leader)).toBe(5000);
   }
 
-  it.each([0, 1, 2])("P-059 authored actions: return %i → +2000×N during this battle", (n) => {
-    counterP059(fixture(), n, true);
-  });
-
-  it.fails("P-059 as authored resolves from USE_COUNTER_EVENT (OPT-894)", () => {
-    counterP059(fixture(), 1, false);
+  it.each([0, 1, 2])("P-059 as authored: return %i → +2000×N during this battle", (n) => {
+    counterP059(fixture(), n);
   });
 });
 
