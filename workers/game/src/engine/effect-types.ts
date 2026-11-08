@@ -734,6 +734,8 @@ export type ActionType =
   | "GRANT_COUNTER"
   // One-time modifier
   | "APPLY_ONE_TIME_MODIFIER"
+  // Effect-granted replacement
+  | "APPLY_REPLACEMENT"
   // Self-play
   | "PLAY_SELF";
 
@@ -776,6 +778,8 @@ export const ALL_ACTION_TYPES = [
   "RETURN_HAND_TO_DECK", "GRANT_COUNTER",
   // One-time modifier
   "APPLY_ONE_TIME_MODIFIER",
+  // Effect-granted replacement
+  "APPLY_REPLACEMENT",
   // Self-play
   "PLAY_SELF",
 ] as const satisfies readonly ActionType[];
@@ -1043,6 +1047,20 @@ export interface ActionParamsMap {
     modification: Modifier;
     applies_to: RuntimeOneTimeModifier["appliesTo"];
   };
+  /**
+   * A resolving effect grants a replacement for the action's duration
+   * ("if any of your Characters would be K.O.'d in battle during this turn,
+   * you may ... instead", EB02-030). `replaces` and `replacement_actions` read
+   * like a `category: "replacement"` block. The protected cards are the
+   * on-field cards matching `replaces.target_filter` when the action resolves;
+   * cards that arrive later are not covered (qa_eb02 EB02-030).
+   */
+  APPLY_REPLACEMENT: {
+    replaces: ReplacementTrigger;
+    replacement_actions: Action[];
+    optional?: boolean;
+    once_per_turn?: boolean;
+  };
   PLAY_SELF: Record<string, never>;
 }
 
@@ -1069,6 +1087,8 @@ export function getNestedActions(action: Action): Action[] {
     case "OPPONENT_ACTION":
     case "SCHEDULE_ACTION":
       return action.params?.action ? [action.params.action] : [];
+    case "APPLY_REPLACEMENT":
+      return action.params?.replacement_actions ?? [];
     case "APPLY_PROHIBITION": {
       const override = action.params?.conditional_override;
       return override && "action" in override && typeof override.action === "object"

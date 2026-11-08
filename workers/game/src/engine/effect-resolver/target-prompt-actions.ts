@@ -109,6 +109,7 @@ export const ACTION_TARGET_PROMPT_KIND = {
   RETURN_HAND_TO_DECK: "OTHER",
   GRANT_COUNTER: "OTHER",
   APPLY_ONE_TIME_MODIFIER: "OTHER",
+  APPLY_REPLACEMENT: "OTHER",
   PLAY_SELF: "OTHER",
 } as const satisfies Record<ActionType, TargetPromptKind>;
 

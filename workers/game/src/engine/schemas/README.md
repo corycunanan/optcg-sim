@@ -521,6 +521,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `GRANT_ATTRIBUTE` | "Gains [Attribute]" | `{ attribute: "SLASH"\|"STRIKE"\|etc. }` |
 | `GRANT_COUNTER` | "Gains Counter" | — |
 | `APPLY_ONE_TIME_MODIFIER` | Apply a one-shot modifier | `{ modification: Modifier, applies_to: {...} }` |
+| `APPLY_REPLACEMENT` | "If any of your Characters would be K.O.'d ... during this turn, you may ... instead" | `{ replaces: ReplacementTrigger, replacement_actions: Action[], optional?, once_per_turn? }`; protects the field cards matching `replaces.target_filter` when it resolves, for the action's `duration` (default THIS_TURN) |
 | `PLAY_SELF` | "Play this card" (from Trigger) | — |
 
 ### Additional Power & Stats
