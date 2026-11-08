@@ -14,6 +14,7 @@ import {
 } from "../session/visibility.js";
 import { CARDS, createTestPayload } from "./factories.js";
 import { battleTriggerLifeCard } from "./trigger-window-helpers.js";
+import { v1RngState } from "./helpers.js";
 
 type PeekExpectation =
   | { kind: "visible"; cardIds: readonly string[]; instanceIds: readonly string[] }
@@ -287,9 +288,9 @@ function buildPeekScenarios(): [Scenario, Scenario] {
     "post-shuffle scenario must change authoritative deck order",
   ).not.toEqual(postPeek.players[0].deck.map((card) => card.instanceId));
   expect(
-    postShuffle.executionContext.rngState,
+    v1RngState(postShuffle.executionContext),
     "post-shuffle scenario must consume deterministic RNG state",
-  ).not.toBe(postPeek.executionContext.rngState);
+  ).not.toBe(v1RngState(postPeek.executionContext));
 
   return [
     {

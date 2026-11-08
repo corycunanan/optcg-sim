@@ -250,10 +250,8 @@ const PendingPrompt = z.strictObject({
     .optional(),
 });
 
-const ExecutionContext = z.strictObject({
-  version: z.literal(1),
+const executionContextBase = {
   seed: z.string(),
-  rngState: FiniteNumber,
   idCounter: NonNegativeInteger,
   clockEpochMs: FiniteNumber,
   clockCounter: NonNegativeInteger,
@@ -262,7 +260,38 @@ const ExecutionContext = z.strictObject({
     consumed: NonNegativeInteger,
   }),
   trace: z.strictObject({ gameId: z.string(), traceId: z.string() }),
-});
+};
+
+/**
+ * Version 2 stream counters (OPT-888): words consumed, always even (a draw
+ * takes two words) and below ChaCha20's 2^32-block counter space.
+ */
+const RngStreamCounter = NonNegativeInteger.refine(
+  (value) => value % 2 === 0 && value < 2 ** 36,
+  { message: "RNG stream counter must be an even word count below 2^36" },
+);
+
+// The execution-context version is independent of the game-state schema
+// version (SAVED-STATE-COMPATIBILITY.md §1): version 1 is Mulberry32, version
+// 2 the per-stream ChaCha20 generator. Both are readable at every schema
+// version.
+const ExecutionContext = z.discriminatedUnion("version", [
+  z.strictObject({
+    version: z.literal(1),
+    ...executionContextBase,
+    rngState: FiniteNumber,
+  }),
+  z.strictObject({
+    version: z.literal(2),
+    ...executionContextBase,
+    rngCounters: z.strictObject({
+      pregame: RngStreamCounter,
+      deck0: RngStreamCounter,
+      deck1: RngStreamCounter,
+      blindHand: RngStreamCounter,
+    }),
+  }),
+]);
 
 const PregameState = z.strictObject({
   phase: z.enum([

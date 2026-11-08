@@ -12,7 +12,7 @@ import { advancePregame, resumePregameFromPrompt, startPregame } from "../engine
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { filterStateForPlayer } from "../engine/state.js";
-import { CARDS, createTestPayload } from "./helpers.js";
+import { CARDS, createTestPayload, v1RngState } from "./helpers.js";
 
 const IMU: CardData = {
   ...CARDS.LEADER,
@@ -206,12 +206,12 @@ describe("OPT-476 start-of-game effects", () => {
     const { state, cardDb } = buildState([true, false], [true, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
     const prompted = advancePregame(chosen, cardDb, []).state;
-    const rngStateBeforeShuffle = prompted.executionContext.rngState;
+    const rngStateBeforeShuffle = v1RngState(prompted.executionContext);
 
     const declined = answerSearch(prompted, cardDb, false);
     expect(declined.players[0].stage).toBeNull();
     expect(declined.players[0].deck.filter((card) => card.cardId === MARY_GEOISE.id)).toHaveLength(2);
-    expect(declined.executionContext.rngState).not.toBe(rngStateBeforeShuffle);
+    expect(v1RngState(declined.executionContext)).not.toBe(rngStateBeforeShuffle);
   });
 
   it("resolves both Leaders in priority-decider order", () => {
@@ -283,10 +283,10 @@ describe("OPT-476 start-of-game effects", () => {
   it("handles a zero-match search, shuffles, and advances without prompting", () => {
     const { state, cardDb } = buildState([true, false], [false, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const rngStateBeforeShuffle = chosen.executionContext.rngState;
+    const rngStateBeforeShuffle = v1RngState(chosen.executionContext);
     const result = advancePregame(chosen, cardDb, []).state;
 
-    expect(result.executionContext.rngState).not.toBe(rngStateBeforeShuffle);
+    expect(v1RngState(result.executionContext)).not.toBe(rngStateBeforeShuffle);
     expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     expect(result.pregame?.phase).toBe("MULLIGAN_DECISIONS");
     expect(result.pregame?.startOfGameEffectsResolved).toEqual([true, true]);

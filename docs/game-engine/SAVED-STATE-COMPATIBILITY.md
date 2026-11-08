@@ -13,7 +13,7 @@
 | Version | Where | Meaning | Who bumps it |
 |---|---|---|---|
 | `SESSION_STORAGE_FORMAT_VERSION` (`persistence.ts`, currently `2`) | `session.formatVersion` | How the Durable Object splits one session across storage keys (`session`, `session:card-db`, `session:undo-history`) and which envelope fields exist. Says nothing about the shape of a game state. | Storage layout changes only. |
-| `executionContext.version` (`execution-context.ts`, currently `1`) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
+| `executionContext.version` (`execution-context.ts`; writer `1`, reader `1` and `2` from OPT-888, see [Engine RNG version 2](#engine-rng-version-2-reader-opt-888)) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
 | **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1, **`2`** from PR 4b; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's; PR 5a raises it to `3` and adds `RUNTIME_GAME_STATE_SCHEMA_VERSION = 2`, the shape the engine executes) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
 
 The three are independent. A game-state bump never implies a session-format bump and vice versa.
@@ -1192,3 +1192,22 @@ clean deployed source; no remote saved-state import exists. See the
 archive/runtime hashes, deployment receipts, source equivalence and limitations.
 The reader-only section above records its historical stage; this section enables
 the producer after that stage's external floor gate was met.
+
+## Engine RNG version 2 reader (OPT-888)
+
+`executionContext.version` 1 is Mulberry32 over one 32-bit `rngState` shared by every draw. A player receives their own deck order after every shuffle, which reveals enough outputs to recover that state offline and predict the opponent's deck, face-down Life and blind hand slots. Version 2 replaces the generator. It is an execution-context bump only (§1): `GAME_STATE_SCHEMA_VERSION` and `SESSION_STORAGE_FORMAT_VERSION` do not change, and both context versions are valid at every readable schema version.
+
+### Version 2 contract
+
+* **Generator.** ChaCha20 (RFC 8439) keyed by `SHA-256("optcg-sim/engine-rng/v2\0" + seed)`. Production seeds stay 128 bits from `crypto.getRandomValues`. Both primitives are synchronous (`engine/secure-random.ts`) and pinned to their published test vectors.
+* **Streams.** Four independent streams, one ChaCha20 nonce each: `pregame` (first-player coin, priority dice), `deck0` and `deck1` (every shuffle of that player's deck: setup, mulligan, in-game), and `blindHand` (blind hand-slot permutations). Every call site names its stream. A version 1 context ignores the name and keeps its one shared stream.
+* **Persisted state.** `rngCounters: { pregame, deck0, deck1, blindHand }`, each the number of 32-bit keystream words consumed. A draw takes two words (a 53-bit value), so counters are even. There is no `rngState` and no key material on disk; the key is re-derived from `seed`. The reader rejects odd, negative or oversized counters, unknown streams, a stray `rngState`, and any version other than 1 or 2.
+* **Projection.** `filterStateForPlayer` sends `seed: "redacted"`, every counter `0`, and the other existing redactions, whichever version the game runs. Production trace ids are now drawn separately from the seed, so diagnostics never carry seed material.
+
+### Legacy games: continue on version 1
+
+A version 1 context keeps running Mulberry32, byte-for-byte as before, until the game ends. It is never re-seeded at load: a re-seed would change the outcome of every later shuffle in replays and undo snapshots, and writing the upgraded context is a writer change that §5.3 forbids before the reader is live. Version 1 games stay exposed to OPT-888 for the rest of their (short) lifetime; no new game is affected once the writer below ships.
+
+### Writer gate
+
+This change ships the reader and the generator only. `WRITTEN_EXECUTION_CONTEXT_VERSION` stays `1`, so production and deterministic contexts are still created at version 1 and the persisted bytes of every game are unchanged. The follow-up writer change raises it to `2` for new games, after this build is deployed and verified; from then on this build is the rollback floor, because an older build rejects a version 2 context as an invalid core shape.

@@ -7,7 +7,7 @@ import { runPipeline } from "../engine/pipeline.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
-import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { CARDS, createBattleReadyState, createTestCardDb, padChars, v1RngState } from "./helpers.js";
 
 // OP04-048 Sasaki (docs/cards/OP-04.md:341): "[On Play] Return all cards in
 // your hand to your deck and shuffle your deck. Then, draw cards equal to the
@@ -126,11 +126,12 @@ describe("OPT-853 OP04-048 Sasaki returns the hand to deck, shuffles and redraws
 
     // The deck was shuffled through the engine execution context: exactly one
     // Fisher-Yates pass over (prior deck + returned) cards consumed the RNG.
-    const expectedRng = shuffleWithContext(
+    const expectedRng = v1RngState(shuffleWithContext(
       contextBefore,
       Array.from({ length: deckBefore.length + handSize }),
-    ).context.rngState;
-    expect(state.executionContext!.rngState).toBe(expectedRng);
+      "deck0",
+    ).context);
+    expect(v1RngState(state.executionContext)).toBe(expectedRng);
 
     // Returning to deck is not trashing: trash, hand-trash events and the
     // OPT-795 watchers are untouched.

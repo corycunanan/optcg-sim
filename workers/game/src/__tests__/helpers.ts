@@ -5,7 +5,7 @@
  * so individual tests can focus on the scenario being tested.
  */
 
-import type { CardData, CardInstance, DonInstance, GameState, KeywordSet, GameInitPayload, PlayerState } from "../types.js";
+import type { CardData, CardInstance, DonInstance, EngineExecutionContext, GameState, KeywordSet, GameInitPayload, PlayerState } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { buildInitialState } from "../engine/setup.js";
 import { runPipeline } from "../engine/pipeline.js";
@@ -261,4 +261,16 @@ export function createBattleReadyState(cardDb: Map<string, CardData>): GameState
   };
 
   return { ...state, players: newPlayers };
+}
+
+/**
+ * Mulberry32 state of a version 1 execution context (OPT-888). Throws on any
+ * other version so a test written against the version 1 stream cannot pass
+ * vacuously against version 2.
+ */
+export function v1RngState(context: EngineExecutionContext | undefined): number {
+  if (context?.version !== 1) {
+    throw new Error(`expected a version 1 execution context, got ${context?.version}`);
+  }
+  return context.rngState;
 }

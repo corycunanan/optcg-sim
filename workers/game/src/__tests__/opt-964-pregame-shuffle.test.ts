@@ -11,7 +11,7 @@ import { advancePregame, startPregame } from "../engine/pregame.js";
 import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { parseStoredSession } from "../session/persistence.js";
-import { CARDS, createTestPayload } from "./helpers.js";
+import { CARDS, createTestPayload, v1RngState } from "./helpers.js";
 
 function pausedImu() {
   const payload = createTestPayload();
@@ -81,8 +81,8 @@ describe.each(["state", "undoHistory[0]"] as const)(
           params: { search_full_deck: true, shuffle_after: true },
         });
         expect(paused.pregame?.startOfGameEffectsResolved[0]).toBe(true);
-        expect(paused.executionContext.rngState).toBe(
-          beforeSearch.executionContext.rngState
+        expect(v1RngState(paused.executionContext)).toBe(
+          v1RngState(beforeSearch.executionContext)
         );
         expect(paused.players[0].deck).toEqual(beforeSearch.players[0].deck);
         expect(advancePregame(paused, cardDb, []).state).toEqual(paused);
@@ -110,12 +110,12 @@ describe.each(["state", "undoHistory[0]"] as const)(
             (id) => paused.players[0].deck.find((c) => c.instanceId === id)!
           ),
         ];
-        const expected = shuffleWithEngineContext(paused, deckBeforeShuffle);
+        const expected = shuffleWithEngineContext(paused, deckBeforeShuffle, "deck0");
         const expectedRng =
-          (paused.executionContext.rngState +
+          (v1RngState(paused.executionContext) +
             Math.imul(deckBeforeShuffle.length - 1, 0x6d2b79f5)) >>>
           0;
-        expect(expected.state.executionContext.rngState).toBe(expectedRng);
+        expect(v1RngState(expected.state.executionContext)).toBe(expectedRng);
         expect(expected.values).not.toEqual(deckBeforeShuffle);
 
         // JSON storage deliberately removes object identity and any hidden
@@ -150,7 +150,7 @@ describe.each(["state", "undoHistory[0]"] as const)(
           expect(beforeDeal!.effectStack).toHaveLength(0);
           expect(beforeDeal!.players[0].hand).toHaveLength(0);
           expect(beforeDeal!.players[0].deck).toEqual(expected.values);
-          expect(beforeDeal!.executionContext.rngState).toBe(expectedRng);
+          expect(v1RngState(beforeDeal!.executionContext)).toBe(expectedRng);
           expect(beforeDeal!.players[0].stage?.cardId ?? null).toBe(
             playStage ? mary.id : null
           );
@@ -166,7 +166,7 @@ describe.each(["state", "undoHistory[0]"] as const)(
         );
         expect(dealt.players[0].deck).toEqual(expected.values.slice(5));
         expect(dealt.players[1].hand).toHaveLength(5);
-        expect(dealt.executionContext.rngState).toBe(expectedRng);
+        expect(v1RngState(dealt.executionContext)).toBe(expectedRng);
         // Polling after the effect drains cannot shuffle or deal a second time.
         expect(advancePregame(dealt, restoredCardDb, []).state).toEqual(dealt);
       }
