@@ -22,7 +22,6 @@ const BROOK_SCHEMA: EffectSchema = {
       rule_type: "LOSS_CONDITION_MOD",
       trigger_event: "DECK_OUT",
       modification: "DELAYED_LOSS",
-      delay: { timing: "END_OF_TURN" },
     },
   ],
   effects: [],

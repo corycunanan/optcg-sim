@@ -58,7 +58,7 @@ export const ST04_002_ULTI: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Page One", cost_max: 4 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },

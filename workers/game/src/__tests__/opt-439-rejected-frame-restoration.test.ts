@@ -150,7 +150,7 @@ describe("OPT-439 rejected response frame restoration", () => {
     const pausedAction: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { exact: 1 } },
-      params: { source_zone: "HAND", cost_override: "FREE" },
+      params: { source_zone: "HAND" },
     };
     const outer = frame("outer", pausedAction, { phase: "INTERRUPTED_BY_TRIGGERS" });
     const pending = frame("play-target", pausedAction, {

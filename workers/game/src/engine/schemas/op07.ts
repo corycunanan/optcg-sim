@@ -672,7 +672,7 @@ export const OP07_020_ALADINE: EffectSchema = {
               cost_max: 3,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -831,7 +831,7 @@ export const OP07_025_CORIBOU: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Caribou", cost_max: 4 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE", entry_state: "RESTED" },
+          params: { source_zone: "HAND", entry_state: "RESTED" },
         },
       ],
     },
@@ -1521,7 +1521,7 @@ export const OP07_045_JINBE: EffectSchema = {
               exclude_name: "Jinbe",
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -1586,7 +1586,6 @@ export const OP07_047_TRAFALGAR_LAW: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "PLACE_HAND_TO_DECK",
               params: { amount: 1, position: "BOTTOM" },
@@ -1623,7 +1622,7 @@ export const OP07_048_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELECTED_CARDS", ref: "revealed", count: { up_to: 1 } },
-          params: { source_zone: "DECK", cost_override: "FREE", entry_state: "RESTED" },
+          params: { source_zone: "DECK", entry_state: "RESTED" },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",
@@ -1665,7 +1664,7 @@ export const OP07_049_BUCKIN: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Edward Weevil", cost_max: 4 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE", entry_state: "RESTED" },
+          params: { source_zone: "HAND", entry_state: "RESTED" },
         },
       ],
     },
@@ -2463,7 +2462,7 @@ export const OP07_070_BIG_BUN: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Foxy Pirates"], cost_max: 4 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2549,7 +2548,7 @@ export const OP07_072_PORCHE: EffectSchema = {
             count: { up_to: 1 },
             filter: { color: "PURPLE", card_type: "CHARACTER", power_max: 4000 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -3147,7 +3146,6 @@ export const OP07_090_MORGANS: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_FROM_HAND",
               params: { amount: 1 },
@@ -3296,7 +3294,6 @@ export const OP07_093_ROB_LUCCI: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_FROM_HAND",
               params: { amount: 1 },
@@ -3545,7 +3542,7 @@ export const OP07_097_VEGAPUNK: EffectSchema = {
                     count: { up_to: 1 },
                     filter: { traits: ["Egghead"], cost_max: 5 },
                   },
-                  params: { source_zone: "HAND", cost_override: "FREE" },
+                  params: { source_zone: "HAND" },
                 },
               ],
               [
@@ -3724,7 +3721,7 @@ export const OP07_105_PYTHAGORAS: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Egghead"], cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE", entry_state: "RESTED" },
+          params: { source_zone: "TRASH", entry_state: "RESTED" },
         },
       ],
     },
@@ -4070,7 +4067,7 @@ export const OP07_115_I_RE_QUASAR_HELLLP: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Egghead"], cost_max: 5 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },

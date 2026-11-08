@@ -187,7 +187,7 @@ export const ST09_008_SHIMOTSUKI_USHIMARU: EffectSchema = {
               cost_max: 4,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },

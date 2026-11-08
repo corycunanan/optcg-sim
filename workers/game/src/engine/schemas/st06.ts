@@ -371,7 +371,6 @@ export const ST06_015_GREAT_ERUPTION: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_CARD",
               target: {

@@ -802,7 +802,7 @@ export const OP11_022_SHIRAHOSHI: EffectSchema = {
               cost_max: { type: "GAME_STATE", source: "DON_FIELD_COUNT" },
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -904,7 +904,7 @@ export const OP11_024_ALADINE: EffectSchema = {
               cost_max: 6,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -1222,7 +1222,7 @@ export const OP11_035_FISHER_TIGER: EffectSchema = {
               cost_max: 4,
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2430,7 +2430,6 @@ export const OP11_072_CHARLOTTE_MONT_DOR: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "RETURN_TO_DECK",
               target: {
@@ -2533,7 +2532,7 @@ export const OP11_076_HANNYABAL: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Impel Down"], cost_max: 3 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2803,7 +2802,7 @@ export const OP11_086_CORIBOU: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Caribou", cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -2883,7 +2882,6 @@ export const OP11_091_BERRY_GOOD: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "RETURN_TO_DECK",
               target: {
@@ -2936,7 +2934,7 @@ export const OP11_092_HELMEPPO: EffectSchema = {
               exclude_name: "Helmeppo",
             },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           result_ref: "played_character",
           chain: "THEN",
         },

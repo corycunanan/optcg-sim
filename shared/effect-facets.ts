@@ -210,7 +210,6 @@ export const EFFECT_FACET_GROUPS = [
       ["reveal", "Reveal"],
       ["discard", "Discard"],
       ["to_deck", "Hand to Deck"],
-      ["wheel", "Wheel"],
       ["event_reuse", "Reuse Event"],
       ["grant_counter", "Grant Counter"],
       ["play_from_hand", "Play from Hand"],

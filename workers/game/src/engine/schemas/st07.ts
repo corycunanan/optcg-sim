@@ -238,7 +238,6 @@ export const ST07_010_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             options: [
               [
                 {
@@ -355,7 +354,6 @@ export const ST07_015_SOUL_POCUS: EffectSchema = {
         {
           type: "OPPONENT_CHOICE",
           params: {
-            mandatory: true,
             options: [
               [
                 {

@@ -69,7 +69,7 @@ function makePlayFromTrashTriggerCard(id: string): CardData {
               source_zone: "TRASH",
               count: { up_to: 1 },
             },
-            params: { source_zone: "TRASH", cost_override: "FREE", entry_state: "RESTED" },
+            params: { source_zone: "TRASH", entry_state: "RESTED" },
           },
         ],
       },

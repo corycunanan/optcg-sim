@@ -101,11 +101,10 @@ function playBlock(count: number, distributed = false): EffectBlock {
       params: distributed
         ? {
             source_zone: "TRASH",
-            cost_override: "FREE",
             entry_state: "PLAYER_CHOICE",
             state_distribution: { ACTIVE: 3, RESTED: 1 },
           }
-        : { source_zone: "TRASH", cost_override: "FREE" },
+        : { source_zone: "TRASH" },
     }],
   };
 }

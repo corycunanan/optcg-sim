@@ -240,7 +240,6 @@ Your Leader and all of your Characters that do not have a type including "Roger 
                 {
                   "type": "OPPONENT_ACTION",
                   "params": {
-                    "mandatory": true,
                     "action": {
                       "type": "TRASH_CARD",
                       "target": {
@@ -276,7 +275,7 @@ Your Leader and all of your Characters that do not have a type including "Roger 
 #### Annotations
 - **Block-level condition:** "If your opponent has 5 or more cards in their hand" gates the entire effect. If the opponent has fewer than 5 cards, the effect does not activate at all.
 - **PLAYER_CHOICE:** "choose one" with exactly two branches. The controller (Perona's player) selects which option to apply. Each branch is an array of actions (here, one action per branch).
-- **Option 1 — OPPONENT_ACTION:** "Your opponent trashes 1 card from their hand" is an opponent-performed action. The OPPONENT_ACTION wrapper delegates the card selection to the opponent (`mandatory: true` — the opponent must trash if this branch is chosen). The opponent chooses which card to discard.
+- **Option 1 — OPPONENT_ACTION:** "Your opponent trashes 1 card from their hand" is an opponent-performed action. The OPPONENT_ACTION wrapper delegates the card selection to the opponent (the wrapped trash is not optional, so the opponent must trash if this branch is chosen). The opponent chooses which card to discard.
 - **Option 2 — MODIFY_COST:** Reducing an opponent's character's cost by 3 is a debuff — it makes the character vulnerable to cost-based removal effects (e.g., "K.O. a character with cost 3 or less"). The `up_to: 1` allows the controller to choose 0 targets.
 - **No flags.optional:** The effect is mandatory once conditions are met. The controller must choose one of the two options.
 
@@ -304,7 +303,6 @@ Your Leader and all of your Characters that do not have a type including "Roger 
         {
           "type": "OPPONENT_CHOICE",
           "params": {
-            "mandatory": true,
             "options": [
               [
                 {
@@ -336,7 +334,7 @@ Your Leader and all of your Characters that do not have a type including "Roger 
 ```
 
 #### Annotations
-- **OPPONENT_CHOICE vs PLAYER_CHOICE:** "Your opponent chooses one" means the decision belongs to the opponent, not the controller. This uses `OPPONENT_CHOICE` with `mandatory: true` — the opponent must select one branch.
+- **OPPONENT_CHOICE vs PLAYER_CHOICE:** "Your opponent chooses one" means the decision belongs to the opponent, not the controller. This uses `OPPONENT_CHOICE`; the opponent must select one feasible branch (there is no decline).
 - **Option 1 — TRASH_FROM_LIFE:** "Trash 1 card from the top of your opponent's Life cards" removes a Life card without triggering damage or Trigger effects. The `controller: "OPPONENT"` on the params specifies whose Life is affected. This is bad for the opponent (they lose a Life card).
 - **Option 2 — ADD_TO_LIFE_FROM_DECK:** "Add 1 card from the top of your deck to the top of your Life cards" benefits the controller (Linlin's player). The `face: "DOWN"` is the standard Life card orientation.
 - **Lose-lose for opponent:** Both options benefit the Linlin player — either the opponent loses a Life card or the Linlin player gains one. This is the classic "punisher choice" pattern where the opponent picks the lesser evil.
@@ -577,8 +575,7 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
           },
           "params": {
             "source_zone": "TRASH",
-            "play_state": "RESTED",
-            "cost_override": "FREE"
+            "play_state": "RESTED"
           }
         }
       ],
@@ -598,7 +595,7 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
   - **Never** encode a post-colon "If" as action-level `conditions`: per-action placement re-evaluates mid-chain (wrong when the chain mutates its own predicate) and leaves `chain: "THEN"` siblings ungated in violation of Rule 4-10-1. Lint rule C6 rejects the block-level-`conditions`-with-costs form; the OPT-457 migration removed the last per-action encodings.
 - **Self-targeting from trash:** When Marco is K.O.'d, it moves to trash. The ON_KO trigger fires while the card is transitioning zones. The action `PLAY_CARD` with `target: { type: "SELF" }` and `source_zone: "TRASH"` plays Marco back onto the field from the trash.
 - **play_state: RESTED:** "play this Character card from your trash rested" means Marco enters the field in the rested (tapped) state. This prevents immediate Blocker activation on the same turn.
-- **cost_override: FREE:** Playing from trash via effect does not require paying Marco's normal play cost.
+- **No cost param:** A card played by an effect never pays its play cost, so nothing encodes "free".
 - **flags.optional:** The "you may" on the cost makes the entire activation optional. The player can decline to pay the cost and let Marco stay in the trash.
 
 ---

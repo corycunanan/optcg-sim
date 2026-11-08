@@ -111,7 +111,7 @@ export const ST12_003_DRACULE_MIHAWK: EffectSchema = {
               ],
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE", entry_state: "RESTED" },
+          params: { source_zone: "HAND", entry_state: "RESTED" },
         },
       ],
     },

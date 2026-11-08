@@ -114,7 +114,7 @@
 
 **Deck inspection.** `DECK_SCRY` produces `hand:scry`. `MILL` produces `hand:mill`. `REVEAL` or `REVEAL_HAND` produces `hand:reveal`.
 
-**Hand movement.** The `TRASH_FROM_HAND` action produces `hand:discard`. `PLACE_HAND_TO_DECK` or `RETURN_HAND_TO_DECK` produces `hand:to_deck`. `HAND_WHEEL` produces `hand:wheel`.
+**Hand movement.** The `TRASH_FROM_HAND` action produces `hand:discard`. `PLACE_HAND_TO_DECK` or `RETURN_HAND_TO_DECK` produces `hand:to_deck`.
 
 **Reuse and counter.** `ACTIVATE_EVENT_FROM_HAND`, `ACTIVATE_EVENT_FROM_TRASH`, or `REUSE_EFFECT` produces `hand:event_reuse`. `GRANT_COUNTER` produces `hand:grant_counter`.
 

@@ -54,7 +54,6 @@ it.each(["battle", "effect"] as const)(
               },
               params: {
                 source_zone: "TRASH",
-                cost_override: "FREE",
                 entry_state: "RESTED",
               },
             },

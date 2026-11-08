@@ -80,7 +80,6 @@ type ActionType =
   | "SEARCH_TRASH_THE_REST"
   | "SEARCH_AND_PLAY"
   | "PLACE_HAND_TO_DECK"
-  | "HAND_WHEEL"
   | "REVEAL_HAND"
   | "SHUFFLE_DECK"
 
@@ -469,8 +468,6 @@ Play a card onto the field from a source zone. The most complex action primitive
 interface PlayCardParams {
   source_zone: "HAND" | "TRASH" | "DECK" | "LIFE";
   play_state?: "ACTIVE" | "RESTED";
-  cost_override: "FREE" | "REDUCED" | "NORMAL";
-  cost_reduction?: number;
 }
 ```
 
@@ -483,10 +480,7 @@ interface PlayCardParams {
 
 `play_state` defaults to `"ACTIVE"` when omitted. Some effects explicitly play cards rested.
 
-`cost_override` determines how the play cost is handled:
-- `"FREE"` — No cost is paid. The card enters the field at zero cost. Most "play by effect" actions use this.
-- `"REDUCED"` — The card's play cost is reduced by `cost_reduction`. The player still pays the remainder.
-- `"NORMAL"` — The card is played at full cost. Rare for effect-based plays.
+A card played by an effect never pays its play cost; there is no cost override param (OPT-802 removed the unread `cost_override`).
 
 Play from hand (free):
 
@@ -499,7 +493,7 @@ Play from hand (free):
     "count": { "up_to": 1 },
     "filter": { "cost": { "operator": "<=", "value": 5 }, "traits": ["Straw Hat Crew"] }
   },
-  "params": { "source_zone": "HAND", "cost_override": "FREE" }
+  "params": { "source_zone": "HAND" }
 }
 ```
 
@@ -518,7 +512,7 @@ Play from trash rested — OP13-082 Five Elders:
       "unique_names": true
     }
   },
-  "params": { "source_zone": "TRASH", "cost_override": "FREE" }
+  "params": { "source_zone": "TRASH" }
 }
 ```
 
@@ -533,7 +527,7 @@ Play from deck (via search) — OP01-116:
     "count": { "up_to": 1 },
     "filter": { "cost": { "operator": "<=", "value": 4 } }
   },
-  "params": { "source_zone": "DECK", "cost_override": "FREE" }
+  "params": { "source_zone": "DECK" }
 }
 ```
 
@@ -747,7 +741,6 @@ interface SearchAndPlayParams {
   pick: { up_to: number };
   filter: TargetFilter;
   play_state?: "ACTIVE" | "RESTED";
-  cost_override: "FREE" | "REDUCED" | "NORMAL";
   rest_destination: "TOP" | "BOTTOM" | "TRASH" | "SHUFFLE";
   reveal?: boolean; // default false; true for printed "reveal N card(s) from the top of your deck" (OPT-916)
 }
@@ -769,7 +762,6 @@ interface SearchAndPlayParams {
     "look_at": 5,
     "pick": { "up_to": 1 },
     "filter": { "card_type": "CHARACTER", "cost": { "operator": "<=", "value": 4 } },
-    "cost_override": "FREE",
     "rest_destination": "BOTTOM"
   }
 }
@@ -800,35 +792,6 @@ interface PlaceHandToDeckParams {
 {
   "type": "PLACE_HAND_TO_DECK",
   "params": { "amount": 1, "position": "BOTTOM" }
-}
-```
-
----
-
-### HAND_WHEEL
-
-Return all cards from hand to deck (bottom or shuffle), then draw the same number. A complete hand replacement.
-
-```typescript
-interface HandWheelParams {
-  return_mode: "BOTTOM" | "SHUFFLE";
-}
-```
-
-| Field | Value |
-|-------|-------|
-| **Target** | None (operates on the controller's hand and deck) |
-| **Failure mode** | If the hand is empty, the action is ignored. If the deck has fewer cards than were returned, draw as many as possible. |
-| **Fired events** | `CARD_PLACED_TO_DECK` per returned card, `CARD_DRAWN` per drawn card |
-| **Example cards** | None authored (OP04-048 Sasaki and P-002 use `RETURN_HAND_TO_DECK` → `SHUFFLE_DECK` → `DRAW`) |
-
-The `result_ref` captures the count of cards returned, enabling dynamic draw amounts:
-
-```json
-{
-  "type": "HAND_WHEEL",
-  "params": { "return_mode": "BOTTOM" },
-  "result_ref": "returned_count"
 }
 ```
 
@@ -1776,19 +1739,20 @@ Keyword choice — OP09-084 Catarina Devon: "gains [Double Attack], [Banish] or 
 
 ### OPPONENT_CHOICE
 
-Present the opponent with a mandatory or optional choice. Used for "opponent decision with consequence" patterns where the opponent selects an outcome.
+Present the opponent with a choice between branches. Used for "opponent decision with consequence" patterns where the opponent selects an outcome.
 
 ```typescript
 interface OpponentChoiceParams {
   options: Action[][];
-  mandatory: boolean;
+  option_conditions?: Condition[];
+  labels?: string[];
 }
 ```
 
 | Field | Value |
 |-------|-------|
 | **Target** | None (meta-action — the opponent decides) |
-| **Failure mode** | If `mandatory` is true, the opponent must choose a feasible option. If no option is feasible, the entire action is ignored. If `mandatory` is false, the opponent may decline all options. |
+| **Failure mode** | The opponent must choose one feasible option; there is no decline. A single feasible option resolves without a prompt. If no option is feasible, the entire action is ignored. Encode "may decline" as its own branch. |
 | **Fired events** | Depends on the chosen branch |
 | **Example cards** | OP05-099 Amazon, OP15-059 Amazon |
 
@@ -1798,7 +1762,6 @@ OP05-099 Amazon: "Your opponent may trash 1 card from their Life. If they do not
 {
   "type": "OPPONENT_CHOICE",
   "params": {
-    "mandatory": false,
     "options": [
       [{ "type": "TRASH_FROM_LIFE", "target": { "controller": "OPPONENT", "count": { "exact": 1 } } }],
       [{ "type": "MODIFY_POWER", "target": { "controller": "OPPONENT", "card_type": "CHARACTER", "count": { "up_to": 1 } }, "params": { "amount": -2000 }, "duration": { "type": "THIS_TURN" } }]
@@ -1864,19 +1827,18 @@ interface WinGameParams {
 
 ### OPPONENT_ACTION
 
-Wrap an action that the opponent must execute. Distinguishes mandatory actions (the opponent must do it) from optional ones (the opponent may choose).
+Wrap an action that the opponent executes. The wrapped action's own optionality governs: it is mandatory unless the wrapped action is optional (action-level `optional: true`, or `up_to` targets/params).
 
 ```typescript
 interface OpponentActionParams {
   action: Action;
-  mandatory: boolean;
 }
 ```
 
 | Field | Value |
 |-------|-------|
 | **Target** | Defined within the wrapped `action` |
-| **Failure mode** | If `mandatory` is true and the action is impossible, the impossible action is ignored per comprehensive rules 1-3-2. If `mandatory` is false and the opponent declines, the action is skipped. |
+| **Failure mode** | If the wrapped action is impossible, it is ignored per comprehensive rules 1-3-2. If the wrapped action is optional and the opponent declines, it is skipped. |
 | **Fired events** | Depends on the wrapped action |
 | **Example cards** | EB01-028, EB03-026, P-009, P-055 |
 
@@ -1886,7 +1848,6 @@ EB01-028 (mandatory): "your opponent returns 1 of their active Characters to the
 {
   "type": "OPPONENT_ACTION",
   "params": {
-    "mandatory": true,
     "action": {
       "type": "RETURN_TO_HAND",
       "target": {
@@ -1906,7 +1867,6 @@ EB03-026 (mandatory): "your opponent places 1 card from their hand at the bottom
 {
   "type": "OPPONENT_ACTION",
   "params": {
-    "mandatory": true,
     "action": {
       "type": "PLACE_HAND_TO_DECK",
       "params": { "amount": 1, "position": "BOTTOM" }
@@ -2253,7 +2213,6 @@ Reveal a Life card and conditionally play it to the field. If the revealed card 
 interface PlayFromLifeParams {
   position: "TOP" | "BOTTOM";
   filter: TargetFilter;
-  cost_override: "FREE" | "REDUCED" | "NORMAL";
 }
 ```
 
@@ -2273,8 +2232,7 @@ interface PlayFromLifeParams {
       "card_type": "CHARACTER",
       "traits": ["Supernovas"],
       "cost": { "operator": "<=", "value": 5 }
-    },
-    "cost_override": "FREE"
+    }
   }
 }
 ```
@@ -2555,7 +2513,6 @@ Resolve an Event card's **[Main] effect** directly from the trash (e.g. EB03-031
 ```typescript
 interface ActivateEventFromTrashParams {
   filter: TargetFilter;
-  cost_override: "FREE" | "REDUCED" | "NORMAL";
 }
 ```
 
@@ -2729,7 +2686,6 @@ All action types at a glance with their primary zone interactions and event emis
 | `SEARCH_TRASH_THE_REST` | DECK | HAND/TRASH | `CARD_SEARCHED` |
 | `SEARCH_AND_PLAY` | DECK | FIELD | `CARD_PLAYED` |
 | `PLACE_HAND_TO_DECK` | HAND | DECK | `CARD_PLACED_TO_DECK` |
-| `HAND_WHEEL` | HAND | DECK/HAND | `CARD_DRAWN` |
 | `REVEAL_HAND` | HAND | -- (stays) | `CARDS_REVEALED` |
 | `SHUFFLE_DECK` | DECK | DECK | `DECK_SHUFFLED` |
 | `MODIFY_POWER` | -- | -- | `POWER_MODIFIED` |

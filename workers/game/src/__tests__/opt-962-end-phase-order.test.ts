@@ -108,7 +108,7 @@ describe("OPT-962 [End of Your Turn] effects resolve while the ending player is 
       actions: [{
         type: "PLAY_CARD",
         target: { type: "CHARACTER_CARD", source_zone: "HAND", count, filter: { name: LATE } },
-        params: { source_zone: "HAND", cost_override: "FREE" },
+        params: { source_zone: "HAND" },
       }],
     }]), 0, "CHARACTER");
     const late = r.putSyn(LATE, synSchema(LATE, "Character", [{

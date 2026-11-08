@@ -316,7 +316,7 @@ describe("OPT-861 valid replies that lead to another prompt stay accepted", () =
               source_zone: "TRASH",
               count: { up_to: 1 },
             },
-            params: { source_zone: "TRASH", cost_override: "FREE" },
+            params: { source_zone: "TRASH" },
           },
         ],
       },
