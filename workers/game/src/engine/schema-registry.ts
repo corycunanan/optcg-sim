@@ -43,6 +43,7 @@ import { validateReplacementAbilityGroups } from "./replacement-ability-identity
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
+import { findReuseTargetBlocks } from "./trigger-keywords.js";
 
 /**
  * Get the effect schema for a card by ID.
@@ -332,6 +333,8 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
     // Category-specific checks
     errors.push(...validateBlock(block, blockPrefix));
   }
+
+  errors.push(...validateReuseEffectTargets(candidate.effects as EffectBlock[], prefix));
 
   if (candidate.rule_modifications !== undefined) {
     errors.push(
@@ -1278,6 +1281,45 @@ function validateOptionalActionPlacement(block: EffectBlock, prefix: string): st
         `${prefix}[0].optional: block flags.optional already asks before this first action; remove one of the two`,
       );
     }
+  });
+  return errors;
+}
+
+/**
+ * OPT-913: every REUSE_EFFECT `target_effect` resolves to exactly one OTHER
+ * block of the same card, by block id or by trigger keyword (any_of included);
+ * see `findReuseTargetBlocks`. An unresolvable or ambiguous target is a silent
+ * no-op at runtime, so it fails schema validation instead.
+ */
+function validateReuseEffectTargets(effects: EffectBlock[], prefix: string): string[] {
+  const errors: string[] = [];
+  const visit = (node: unknown, path: string, owner: EffectBlock): void => {
+    if (Array.isArray(node)) {
+      node.forEach((child, index) => visit(child, `${path}[${index}]`, owner));
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    if (record.type === "REUSE_EFFECT") {
+      const params = record.params as Record<string, unknown> | undefined;
+      const target = params?.target_effect;
+      if (typeof target !== "string" || target.length === 0) {
+        errors.push(`${path}.params.target_effect: Must be a non-empty block id or trigger keyword (OPT-913)`);
+      } else {
+        const matches = findReuseTargetBlocks(effects, target);
+        if (matches.length !== 1) {
+          errors.push(
+            `${path}.params.target_effect '${target}': must name exactly one block of this card by id or trigger keyword, found ${matches.length} (OPT-913)`,
+          );
+        } else if (matches[0] === owner) {
+          errors.push(`${path}.params.target_effect '${target}': resolves to the block that contains it (OPT-913)`);
+        }
+      }
+    }
+    for (const [key, value] of Object.entries(record)) visit(value, `${path}.${key}`, owner);
+  };
+  effects.forEach((block, index) => {
+    if (block && typeof block === "object") visit(block, `${prefix} effects[${index}]`, block);
   });
   return errors;
 }

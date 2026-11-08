@@ -2528,25 +2528,25 @@ interface ActivateEventFromTrashParams {
 
 ### REUSE_EFFECT
 
-Activate another EffectBlock on the same card by referencing its trigger keyword. The engine locates the matching EffectBlock and resolves it, including condition checks and cost payment.
+Activate another EffectBlock on the same card by referencing its block `id` or a trigger keyword it carries (directly or inside `any_of`). The engine locates the matching EffectBlock and resolves it, including condition checks and cost payment.
 
 ```typescript
 interface ReuseEffectParams {
-  target_effect: KeywordTriggerType;
+  target_effect: string; // block id or KeywordTriggerType
 }
 ```
 
 | Field | Value |
 |-------|-------|
 | **Target** | None (operates on the source card's own effects) |
-| **Failure mode** | If no EffectBlock with the matching trigger exists on the card, the action is ignored. If the referenced effect's conditions are not met, it does not resolve. |
+| **Failure mode** | `target_effect` must resolve to exactly one other block (OPT-913); schema validation rejects anything else. If the referenced effect's conditions are not met, it does not resolve. |
 | **Fired events** | Depends on the referenced EffectBlock's actions |
 | **Example cards** | ST03-016 (Trigger activates Counter), ST21-017 (Trigger activates Main), OP13-113 (Trigger activates On Play) |
 
 ```json
 {
   "type": "REUSE_EFFECT",
-  "params": { "target_effect": "COUNTER" }
+  "params": { "target_effect": "COUNTER_EVENT" }
 }
 ```
 

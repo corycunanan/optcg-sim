@@ -268,9 +268,8 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
 
   /**
    * The authored OP06-095 block, optionally rewrapped with a plain MAIN_EVENT
-   * trigger. The authored `any_of: [MAIN_EVENT, COUNTER_EVENT]` block is never
-   * found by PLAY_CARD (execute.ts matches only a top-level `keyword`), so the
-   * wrapped variant exercises the authored KO → PER_COUNT actions unchanged.
+   * trigger. Since OPT-911 PLAY_CARD also selects the authored
+   * `any_of: [MAIN_EVENT, COUNTER_EVENT]` block, so both variants resolve.
    */
   function playOp06095(f: Fixture, n: number, wrapped: boolean) {
     const kos = [0, 1].map(() =>
@@ -305,10 +304,10 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
     playOp06095(fixture(), n, true);
   });
 
-  // Follow-up (reported on the OPT-885 PR): an Event whose block trigger is
-  // `any_of: [MAIN_EVENT, COUNTER_EVENT]` never resolves from PLAY_CARD.
-  it.fails("OP06-095 as authored resolves when played (any_of MAIN/COUNTER gap — follow-up)", () => {
-    playOp06095(fixture(), 1, false);
+  // OPT-911: the authored `any_of: [MAIN_EVENT, COUNTER_EVENT]` block now
+  // resolves from PLAY_CARD.
+  it.each([0, 1, 2])("OP06-095 as authored resolves when played: K.O. %i (OPT-911)", (n) => {
+    playOp06095(fixture(), n, false);
   });
 
   /**
