@@ -353,6 +353,22 @@ describe("OPT-931 DON!! Phase GIVEN_TO_LEADER honors CANNOT_ATTACH_DON (rule 1-3
     expect(result.state.players[P0].donCostArea).toHaveLength(3);
     expect(result.state.eventLog.some((e) => e.type === "DON_GIVEN_TO_CARD")).toBe(false);
   });
+
+  it("checks the prohibition after the new DON!! are placed, before they are given", () => {
+    const f = rogerAtDonPhase();
+    const leader = f.state.players[P0].leader;
+    // Active only once this phase's two DON!! join the one already there.
+    const gated = {
+      ...prohibition("no-don-at-3", P0, "CANNOT_ATTACH_DON", [leader.instanceId]),
+      conditions: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 3 },
+    } as Prohibition;
+    f.state = { ...f.state, prohibitions: [...f.state.prohibitions, gated] };
+    expect(isDonAttachProhibited(f.state, leader.instanceId, f.db, P0)).toBe(false);
+    const result = runPipeline(f.state, { type: "ADVANCE_PHASE" }, f.db, P0);
+    expect(result.valid, result.error).toBe(true);
+    expect(result.state.players[P0].leader.attachedDon).toEqual([]);
+    expect(result.state.players[P0].donCostArea).toHaveLength(3);
+  });
 });
 
 // ─── OPT-931: GIVE_DON identity resume ───────────────────────────────────────

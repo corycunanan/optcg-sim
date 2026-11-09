@@ -142,10 +142,11 @@ export function executeAdvancePhaseWork(state: GameState, cardDb: Map<string, Ca
         })) continue;
         givenCount = Math.min(placedCount, givenCount + rule.count);
       }
-      // Rule 1-3-3: a "cannot be given DON!!" effect beats the rule
-      // modification, so the DON!! stay in the cost area (OPT-1036).
-      if (givenCount > 0 && isDonAttachProhibited(state, player.leader.instanceId, cardDb, pi)) givenCount = 0;
       nextState = placeDonFromDeck(nextState, pi, donCount);
+      // Rule 1-3-3: a "cannot be given DON!!" effect beats the rule
+      // modification, so the DON!! stay in the cost area (OPT-1036). Checked
+      // once the DON!! are placed, so a condition they satisfy counts.
+      if (givenCount > 0 && isDonAttachProhibited(nextState, player.leader.instanceId, cardDb, pi)) givenCount = 0;
       if (givenCount > 0) {
         const placedPlayer = nextState.players[pi];
         const newDonStart = player.donCostArea.length;
