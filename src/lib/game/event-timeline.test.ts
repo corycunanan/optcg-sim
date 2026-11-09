@@ -129,7 +129,15 @@ describe("buildEventTimeline", () => {
     ]);
   });
 
-  it("starts a new beat when the player changes", () => {
+  it("dissolves a K.O. across both boards together", () => {
+    const events = [ko(0), ko(1), ko(1)];
+    const timeline = buildEventTimeline(events);
+    expect(events.map((event) => eventOffsetMs(timeline, event))).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
+  it("starts a new flight beat when the player changes", () => {
     const events = [drawn(0), drawn(1)];
     const timeline = buildEventTimeline(events);
     expect(eventOffsetMs(timeline, events[1])).toBe(FLIGHT_MS + BEAT_GAP_MS);

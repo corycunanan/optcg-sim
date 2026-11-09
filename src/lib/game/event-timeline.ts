@@ -143,7 +143,8 @@ export interface BuildEventTimelineOptions {
 
 /**
  * Assign every event in one update batch a start offset. Consecutive events
- * of the same type for the same player share a beat (draw 2, a multi-K.O.);
+ * of the same type share a beat (draw 2, a K.O. across both boards); flights
+ * and glows also need the same player;
  * events without their own visual inherit the current beat's offset.
  */
 export function buildEventTimeline(
@@ -179,12 +180,15 @@ export function buildEventTimeline(
     }
 
     const fanOut = countedFanOut(event);
+    // One effect's simultaneous K.O. or trash reaches both sides of the board
+    // at once, so dissolves join across players. Flights and glows split by
+    // player, so each side's draws read as their own step.
     const joinsCurrent =
       current !== undefined &&
       kind !== "spotlight" &&
       current.kind === kind &&
       current.type === event.type &&
-      current.playerIndex === event.playerIndex;
+      (kind === "transform" || current.playerIndex === event.playerIndex);
 
     if (joinsCurrent) {
       const innerOffsetMs = kind === "travel" ? current.nextTravelOffsetMs : 0;
