@@ -78,6 +78,7 @@ const ownerFields = {
   returnToDeckArrangement: "absent",
   fieldToLifeTargetIds: "absent",
   giveDonIdentity: "absent",
+  donDistribution: "absent",
   priorActionSucceeded: "absent",
   simultaneousGroup: "absent",
   phaseBoundaryContinuation: "absent",

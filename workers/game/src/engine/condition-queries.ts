@@ -31,6 +31,7 @@ import type {
   PlayerState,
 } from "../types.js";
 import { findCardInstance } from "./state.js";
+import { handTrashedByEffectThisTurn } from "./hand-trash.js";
 import { isPresent } from "./type-guards.js";
 import {
   matchesTargetFilter,
@@ -449,6 +450,24 @@ function evaluateSimple(
     case "ACTION_PERFORMED_THIS_TURN": {
       // Check actionsPerformedThisTurn for matching action references
       const _actionType = cond.action;
+      if (_actionType === "CARD_TRASHED_FROM_HAND_BY_EFFECT") {
+        // Read from the event log, not actionsPerformedThisTurn (OPT-1034).
+        // cond.controller scopes whose hand lost the card; who caused the
+        // trash does not matter (ST33-004 FAQ).
+        if (
+          !cond.controller ||
+          cond.controller === "EITHER" ||
+          cond.controller === "ANY"
+        )
+          return (
+            handTrashedByEffectThisTurn(state, 0) ||
+            handTrashedByEffectThisTurn(state, 1)
+          );
+        return handTrashedByEffectThisTurn(
+          state,
+          resolveController(cond.controller, ctx.controller)
+        );
+      }
       return state.turn.actionsPerformedThisTurn.some((a) => {
         if (_actionType === "ACTIVATED_EVENT") {
           if (

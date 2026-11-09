@@ -1251,3 +1251,13 @@ Unchanged in mode 9: initial infeasibility (8-3-1-3) still blocks activation bef
 Writer test changes: assertions that new setup is mode 8 now expect 9; tests that exercise mode 8 behavior on a fresh rig now set `costSemanticsVersion = 8` explicitly. The OPT-1006 final-writer corpus pins its generator by hash; that generator (`opt-1001-field-trash.test.ts`) changed only in its new-game mode assertions, so the recorded source is kept verbatim at `fixtures/opt-1006-final-writer-generator.test.ts.txt` and the pin checks that copy. The corpus is not re-captured.
 
 Tests: `opt-958-mode9-replaced-cost.test.ts` (authored Oden/Ganzui accept/decline with reload at every prompt, synthetic fixed exit, synthetic K.O. cost with authored OP08-045 Thatch, initial infeasibility), the mode 9 case in `opt-824-give-don-cost.test.ts` (OP13-007). The mode 8 deviation suites (`opt-864-decision-10-replaced-cost-rollback.test.ts`, `opt-969-mode8-policy.test.ts`, the Decision 10 cases in `opt-1001-field-trash.test.ts` and the frozen mode 8 corpora) stay unchanged.
+
+## DON!! split rounds (OPT-955)
+
+A `DISTRIBUTE_DON` with `max_per_target` asks its split in rounds of `SELECT_TARGET` prompts (BATCH-CONTRACT.md §5). Between rounds, the action-choice frame carries one new optional key:
+
+* `donDistribution: { round: positive integer, allocation: [instanceId, non-negative integer][] }` on the frame (and on the structural `ResumeContext` that `legacy-prompt-lift.ts` lifts). The strict reader (`persisted-game-state.ts`) validates it; the version 5 trigger-execution owner map lists it as `absent`.
+
+No version bump. The key is written only while a split is pending, and no authored card schema uses `max_per_target` yet (OP18-046 is the first, and OP18 card data is not in the repository). This PR is therefore its own reader-first release: every save written by it is byte-identical to the previous writer's.
+
+**Rollback floor:** none until a card that uses `max_per_target` ships. From then on, the floor is this PR's merge: an earlier build rejects a save paused mid-split by its unknown key (`SessionLoadError`, §5.2).

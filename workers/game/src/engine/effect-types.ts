@@ -471,7 +471,13 @@ export interface ActionPerformedThisTurnCondition {
   source?: "SELF_CARD";
 }
 
-export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO";
+// CARD_TRASHED_FROM_HAND_BY_EFFECT (OPT-1034): a card left `controller`'s hand
+// for the trash because of an effect (the CARD_TRASHED_FROM_HAND event's
+// predicate, so activation-cost discards count and Counter/rule disposal does
+// not). `controller` scopes whose hand it was; the causing player is ignored
+// (ST33-004 FAQ: an opponent's effect counts). Read from this turn's event
+// log rather than actionsPerformedThisTurn, so saved state is unchanged.
+export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO" | "CARD_TRASHED_FROM_HAND_BY_EFFECT";
 
 export interface PlayMethodCondition {
   type: "PLAY_METHOD";
@@ -926,8 +932,18 @@ export interface ActionParamsMap {
     source_filter?: TargetFilter;
   };
   DISTRIBUTE_DON: {
+    /** Legacy alias of `amount_per_target`. */
     amount?: number;
+    /** Each chosen target receives this many DON!! (as many as the pool allows). */
     amount_per_target?: number;
+    /**
+     * OPT-955: "give up to N DON!! to each of" — each target may receive 0..N
+     * from one shared pool, and the controller chooses the split. Replaces
+     * `amount`/`amount_per_target`.
+     */
+    max_per_target?: number;
+    /** OPT-955: with `max_per_target`, at most this many DON!! in total. */
+    max_total?: number;
     don_state?: CardState;
   };
   RETURN_ATTACHED_DON_TO_COST: Record<string, never>;

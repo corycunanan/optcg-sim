@@ -3,6 +3,7 @@ import type {
   GameEventType,
   GameState,
 } from "../types.js";
+import { isHandTrashByEffect } from "../engine/hand-trash.js";
 
 /**
  * The authoritative checkpoint is the current GameState. Detailed event
@@ -106,6 +107,9 @@ export function compactGameStateEventLog(state: GameState): {
   for (let index = recentStart; index < state.eventLog.length; index++) {
     retainedIndices.add(index);
   }
+  for (const index of currentTurnFactIndices(state.eventLog)) {
+    retainedIndices.add(index);
+  }
 
   const retained: GameEvent[] = [];
   const compactedEvents: GameEvent[] = [];
@@ -150,6 +154,29 @@ export function summarizeCompactedEvents(
     byType,
     byPlayer,
   };
+}
+
+/**
+ * Events that conditions read as "this turn" facts and must survive
+ * compaction until the turn ends: the current turn's TURN_STARTED boundary and
+ * each player's latest hand trash by an effect after it (OPT-1034,
+ * handTrashedByEffectThisTurn). At most three events.
+ */
+function currentTurnFactIndices(eventLog: readonly GameEvent[]): number[] {
+  const indices: number[] = [];
+  const handTrashSeen: [boolean, boolean] = [false, false];
+  for (let index = eventLog.length - 1; index >= 0; index--) {
+    const event = eventLog[index];
+    if (event.type === "TURN_STARTED") {
+      indices.push(index);
+      break;
+    }
+    if (!handTrashSeen[event.playerIndex] && isHandTrashByEffect(event)) {
+      handTrashSeen[event.playerIndex] = true;
+      indices.push(index);
+    }
+  }
+  return indices;
 }
 
 function eventAnchorKey(

@@ -2,7 +2,7 @@
 
 exports[`OPT-775 target instructions > snapshots every authored action target and the distinct wording set 1`] = `
 {
-  "fallbackCount": 592,
+  "fallbackCount": 593,
   "fallbacks": [
     "EB01-008 :: ko_replacement :: replacement_actions[0] (TRASH_FROM_HAND)",
     "EB01-013 :: activate_play_and_draw :: actions[0] (PLAY_CARD)",
@@ -592,6 +592,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST31-004.effects.0.modifiers.0.target (non-action target)",
     "ST32-003 :: on_play_play_perona_or_slash :: actions[0] (PLAY_CARD)",
     "ST32-004.effects.0.modifiers.0.target (non-action target)",
+    "ST33-004.effects.1.modifiers.0.target (non-action target)",
     "ST33-005 :: on_play_play_blue_navy :: actions[0] (PLAY_CARD)",
     "ST35-004.effects.0.modifiers.0.target (non-action target)",
     "ST35-004.effects.0.modifiers.1.target (non-action target)",
@@ -1311,6 +1312,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your cards in hand.",
     "Trash your opponent's Life cards.",
   ],
-  "targetCount": 2654,
+  "targetCount": 2655,
 }
 `;
