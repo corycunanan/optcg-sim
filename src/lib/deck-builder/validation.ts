@@ -9,6 +9,7 @@ import { cardNameAliases } from "../../../shared/card-names";
  * - Max 4 copies of any card, unless card effect schema overrides it
  * - Color affinity: all cards share at least one color with the Leader
  * - Format legality: no banned cards (restricted cards within limits)
+ * - Banned pairs: no two cards the ban list forbids in the same deck
  * - Block rotation: if format is block-specific, all cards must be legal
  * - Leader deck restrictions: leader-authored card filters may constrain the main deck
  */
@@ -19,6 +20,7 @@ import {
   type SharedTargetFilterCard,
 } from "@shared/target-filter";
 import { z } from "zod";
+import { BANNED_PAIRS, type BannedPair } from "./banned-pairs";
 
 export const DEFAULT_COPY_LIMIT = 4;
 export const MAIN_DECK_SIZE = 50;
@@ -366,6 +368,48 @@ export function isCardAllowedByDeckRestrictionRules(
   return true;
 }
 
+export function validateBannedPairs(
+  leader: Pick<DeckLeader, "id" | "name"> | null,
+  cards: DeckCard[],
+  pairs: readonly BannedPair[] = BANNED_PAIRS
+): ValidationResult {
+  // Base number -> display name and the deck rows (or leader) that carry it.
+  const present = new Map<string, { name: string; cardIds: string[] }>();
+  const note = (cardId: string, name: string) => {
+    const number = stripVariantSuffix(cardId);
+    const entry = present.get(number);
+    if (entry) entry.cardIds.push(cardId);
+    else present.set(number, { name, cardIds: [cardId] });
+  };
+  if (leader) note(leader.id, leader.name);
+  for (const dc of cards) {
+    if (dc.quantity > 0) note(dc.cardId, dc.card.name);
+  }
+
+  const violations: string[] = [];
+  const cardIds = new Set<string>();
+  for (const pair of pairs) {
+    const [a, b] = pair.cardIds.map((id) => present.get(id));
+    if (!a || !b) continue;
+    violations.push(
+      `${a.name} (${pair.cardIds[0]}) and ${b.name} (${pair.cardIds[1]})`
+    );
+    for (const id of [...a.cardIds, ...b.cardIds]) cardIds.add(id);
+  }
+
+  return {
+    id: "banned-pair",
+    rule: "Banned Pairs",
+    message:
+      violations.length > 0
+        ? `${violations.join("; ")} cannot be in the same deck`
+        : "No banned pairs",
+    severity: "error",
+    passed: violations.length === 0,
+    ...(cardIds.size > 0 ? { cardIds: [...cardIds] } : {}),
+  };
+}
+
 export function validateDeck(
   leader: DeckLeader | null,
   cards: DeckCard[]
@@ -478,6 +522,10 @@ export function validateDeck(
     passed: bannedCards.length === 0,
     cardIds: bannedCards.map((dc) => dc.cardId),
   });
+
+  // Rule 5b: Banned pairs — two cards that cannot be in the same deck,
+  // matched by base number across alternate arts, Leader included.
+  results.push(validateBannedPairs(leader, cards));
 
   // Rule 6: Restricted cards (max 1 copy across all art variants)
   const restrictedNumbers = new Set(

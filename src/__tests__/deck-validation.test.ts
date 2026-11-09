@@ -7,6 +7,7 @@ import {
   type DeckCard,
   type DeckLeader,
 } from "../lib/deck-builder/validation";
+import { BANNED_PAIRS } from "../lib/deck-builder/banned-pairs";
 
 const topLevelCopyLimitOverride = {
   rule_modifications: [
@@ -504,5 +505,99 @@ describe("OPT-788 alias deck restrictions", () => {
         card
       )
     ).toBe(false);
+  });
+});
+
+describe("OPT-1038 banned pairs", () => {
+  const legalFiller = (count: number) =>
+    Array.from({ length: Math.ceil(count / 4) }, (_, i) =>
+      makeCard(`FILL-${i}`, `Filler ${i}`, Math.min(4, count - i * 4))
+    );
+  const pairResult = (l: DeckLeader | null, cards: DeckCard[]) =>
+    validateDeck(l, cards).results.find((r) => r.id === "banned-pair")!;
+
+  it("lists exactly the 2026-10-12 pairs", () => {
+    expect(BANNED_PAIRS.map((p) => p.cardIds)).toEqual([
+      ["OP07-115", "EB04-058"],
+      ["OP11-040", "OP11-067"],
+      ["OP11-040", "OP08-069"],
+    ]);
+  });
+
+  it("fails OP07-115 with EB04-058 in the main deck and names both cards", () => {
+    const result = pairResult(leader, [
+      makeCard("OP07-115", "You're the One Who Should Disappear.", 1),
+      makeCard("EB04-058", "Jewelry Bonney", 1),
+      ...legalFiller(48),
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.severity).toBe("error");
+    expect(result.message).toContain("OP07-115");
+    expect(result.message).toContain("EB04-058");
+    expect(result.message).toContain("Jewelry Bonney");
+    expect(result.cardIds).toEqual(["OP07-115", "EB04-058"]);
+  });
+
+  it.each([
+    ["OP11-067", "Big Mom Character"],
+    ["OP08-069", "Life Character"],
+  ])("fails the OP11-040 Leader with %s", (cardId, name) => {
+    const luffy: DeckLeader = { ...leader, id: "OP11-040", name: "Luffy" };
+    const deck = [makeCard(cardId, name, 1), ...legalFiller(49)];
+    const result = pairResult(luffy, deck);
+    expect(result.passed).toBe(false);
+    expect(result.cardIds).toEqual(["OP11-040", cardId]);
+    expect(validateDeck(luffy, deck).isValid).toBe(false);
+  });
+
+  it("matches alternate-art rows and alternate-art Leaders by base number", () => {
+    const altLuffy: DeckLeader = { ...leader, id: "OP11-040_p1", name: "Luffy" };
+    expect(
+      pairResult(altLuffy, [makeCard("OP11-067_p2", "Alt", 1)]).cardIds
+    ).toEqual(["OP11-040_p1", "OP11-067_p2"]);
+    expect(
+      pairResult(leader, [
+        makeCard("OP07-115_r1", "Alt Event", 1),
+        makeCard("EB04-058", "Bonney", 1),
+        makeCard("EB04-058_p1", "Alt Bonney", 1),
+      ]).cardIds
+    ).toEqual(["OP07-115_r1", "EB04-058", "EB04-058_p1"]);
+  });
+
+  it("reports every violated pair in one result", () => {
+    const luffy: DeckLeader = { ...leader, id: "OP11-040", name: "Luffy" };
+    const result = pairResult(luffy, [
+      makeCard("OP11-067", "A", 1),
+      makeCard("OP08-069", "B", 1),
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.message).toContain("OP11-067");
+    expect(result.message).toContain("OP08-069");
+  });
+
+  it("keeps each card legal on its own", () => {
+    const luffy: DeckLeader = { ...leader, id: "OP11-040", name: "Luffy" };
+    for (const [l, deck] of [
+      [leader, [makeCard("OP07-115", "Event", 4), ...legalFiller(46)]],
+      [leader, [makeCard("EB04-058", "Bonney", 4), ...legalFiller(46)]],
+      [leader, [makeCard("OP11-067", "A", 4), makeCard("OP08-069", "B", 4), ...legalFiller(42)]],
+      [luffy, legalFiller(50)],
+    ] as const) {
+      const validation = validateDeck(l, [...deck]);
+      expect(validation.results.find((r) => r.id === "banned-pair")).toMatchObject({
+        passed: true,
+        message: "No banned pairs",
+      });
+      expect(validation.isValid).toBe(true);
+    }
+  });
+
+  it("does not count a zero-quantity row", () => {
+    expect(
+      pairResult(leader, [
+        makeCard("OP07-115", "Event", 0),
+        makeCard("EB04-058", "Bonney", 1),
+      ]).passed
+    ).toBe(true);
   });
 });
