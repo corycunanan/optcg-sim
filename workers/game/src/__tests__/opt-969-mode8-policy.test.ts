@@ -4,7 +4,8 @@
  * substitute payment. Rule-literal paid-portion outcome retains3 rested DON
  * (8-3-1-3-1); consuming use (10-2-13-5) for replaced costs remains an assumed
  * reading, without a specific official multicost ruling. This passing
- * compatibility fixture is not conformance and does not close OPT-958.
+ * compatibility fixture is not conformance. Mode9 implements the rule-literal
+ * outcome (opt-958-mode9-replaced-cost.test.ts); mode8 keeps this behavior.
  */
 import { expect, it } from "vitest";
 import { rig } from "./opt-960-rig.js";

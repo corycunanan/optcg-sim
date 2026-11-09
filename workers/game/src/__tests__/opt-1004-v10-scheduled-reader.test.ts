@@ -237,7 +237,7 @@ it.each([8, 9, 10] as const)("source%s COST roots reject independent capability 
     expect(() => convertPersistedGameState(bad, "state")).toThrow(/fieldTrashSemanticsVersion/);
   }
 });
-it.each([undefined, null, 5, 9, "8"])("native10 rejects invalid cost mode %s independently of valid field mode", mode => {
+it.each([undefined, null, 5, 10, "8"])("native10 rejects invalid cost mode %s independently of valid field mode", mode => {
   const raw = { ...wire(rig().state), schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: mode };
   expect(() => convertPersistedGameState(raw, "state")).toThrow(/native10 requires explicit costSemanticsVersion/);
 });

@@ -1,4 +1,4 @@
-import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+import { hasNativeCostSemantics, retainsReplacedCostPrefix } from "../../native-cost-semantics.js";
 import { buildDonIdentityPlans } from "../don-identity-plans.js";
 import { decodeDonReturnIds } from "../actions/don.js";
 import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
@@ -102,14 +102,14 @@ export function payCostsWithSelection(
     };
     nextState = ownerIndex === undefined ? pushFrame(nextState, owned) : insertFrameAt(nextState, ownerIndex, owned);
   };
-  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer, committedReplacement = false): CostSelectionResult => {
+  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer, committedReplacement = false, replacementSuspension = false): CostSelectionResult => {
     if (isGameTerminated(nextState)) return terminated();
     // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
     // frame on top of the cost frame pushed just before.
     // Accepted mandatory substitutes already execute on the root baseline.
     // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      hasNativeCostSemantics(nextState) && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
+      (hasNativeCostSemantics(nextState) && committedReplacement) || (replacementSuspension && retainsReplacedCostPrefix(nextState)) ? nextState : applyCostTransactionState(nextState, baseline),
       pendingPrompt,
       offer,
     );
@@ -708,7 +708,7 @@ export function payCostsWithSelection(
       }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        applyCostTransactionState(nextState, baseline),
+        retainsReplacedCostPrefix(nextState) ? nextState : applyCostTransactionState(nextState, baseline),
         fixedExitTarget,
         controller,
         cardDb,
@@ -732,9 +732,10 @@ export function payCostsWithSelection(
         };
         pushCostFrame(frame, stagedBeforeReplacement, hasNativeCostSemantics(nextState) ? stagedBeforeReplacement.effectStack.length : undefined);
         if (isGameTerminated(nextState)) return cannotPay();
-        return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
+        return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced, true);
       }
       if (replacement.replaced) {
+        if (retainsReplacedCostPrefix(nextState)) return { state: nextState, events, costResult, replaced: true };
         return { state: nextState, events: replacement.events, cannotPay: true };
       }
       nextState = stagedBeforeReplacement;

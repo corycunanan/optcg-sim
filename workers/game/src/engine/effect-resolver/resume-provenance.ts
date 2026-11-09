@@ -21,7 +21,7 @@ export function prepareResumeProvenance(
   if (isGameTerminated(state) || !actionsCanSchedule(_actions)) return { state, refs };
   // Session ingress, not this producer, owns historical normalization.
   if ((state.schemaVersion === 8 || state.schemaVersion === 9) &&
-      (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8)) {
+      (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8 || state.costSemanticsVersion === 9)) {
     state = { ...state, schemaVersion: 10, fieldTrashSemanticsVersion: state.schemaVersion === 9 ? 9 : 8 };
   }
   if ((state.schemaVersion !== 10 && state.schemaVersion !== 11)) return { state, refs };

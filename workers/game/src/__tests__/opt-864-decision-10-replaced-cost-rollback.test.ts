@@ -43,9 +43,10 @@
  * empties the deck stops the next cost from being paid") and in the
  * `terminated()` branch of `payCostsWithSelection` (cost/orchestrator.ts).
  *
- * Disposition (Decision 10): retained. Next review: OPT-948 acceptance
- * (replacement-aware activation-cost search), or earlier if an authored card
- * reaches this path or a ruling changes the interpretation.
+ * Disposition (OPT-958, 2026-11-09): Decision 10 is kept for cost modes 6–8,
+ * which this file pins, so recorded games never change behavior mid-game.
+ * Cost mode 9 implements the rule-literal outcome stated beside each retained
+ * assertion; see opt-958-mode9-replaced-cost.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import type { CardInstance } from "../types.js";

@@ -1,5 +1,5 @@
 import { prepareResumeProvenance, settleResumeProvenance, abandonedResume } from "../resume-provenance.js";
-import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+import { hasNativeCostSemantics, retainsReplacedCostPrefix } from "../../native-cost-semantics.js";
 import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
 import { updateFrameById } from "../../damage-frames.js";
 import { decodeDonReturnIds } from "../actions/don.js";
@@ -123,6 +123,24 @@ export function abortReplacedCost(
     frameOnStack ? popFrame(state) : state,
     frame
   );
+  // OPT-958 mode9: the earlier payment stays paid (8-3-1-3-1), the use is
+  // spent (10-2-13-5) and the effect after the colon is skipped (8-3-1-7).
+  // The staged payment events were held on the frame and are published now.
+  if (retainsReplacedCostPrefix(nextState))
+    return finishReplacedLifeCost(
+      nextState,
+      [...frame.accumulatedEvents, ...events],
+      frame.effectBlock,
+      frame.sourceCardInstanceId,
+      frame.controller,
+      frame.pendingTriggers,
+      cardDb,
+      services,
+      new Map(frame.resultRefs),
+      frame.triggerOrderingGroup,
+      !frame.oncePerTurnMarked &&
+        !(nextState.turn.oncePerTurnUsed[frame.effectBlock.id]?.includes(frame.sourceCardInstanceId) ?? false),
+    );
   return abandonedResume(services.reportTriggers(
     nextState,
     frame.pendingTriggers,
@@ -483,6 +501,7 @@ function handleAwaitingCostSelectionCore(
     stagedState: GameState = stateWithFrame,
     offer?: ReplacementOffer,
     committedReplacement = false,
+    replacementSuspension = false,
   ): HandlerResult => {
     const withTransaction = updateCostOwner(stateWithFrame, {
       accumulatedEvents: [...stagedEvents],
@@ -493,7 +512,7 @@ function handleAwaitingCostSelectionCore(
     // Accepted mandatory substitutes already execute on the root baseline.
     // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      hasNativeCostSemantics(withTransaction) && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
+      (hasNativeCostSemantics(withTransaction) && committedReplacement) || (replacementSuspension && retainsReplacedCostPrefix(withTransaction)) ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
       pendingPrompt,
       offer,
     );
@@ -928,7 +947,7 @@ function handleAwaitingCostSelectionCore(
         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        applyCostTransactionState(nextState, transactionBaseline),
+        retainsReplacedCostPrefix(nextState) ? nextState : applyCostTransactionState(nextState, transactionBaseline),
         sourceCardInstanceId,
         controller,
         cardDb,
@@ -952,6 +971,7 @@ function handleAwaitingCostSelectionCore(
           stagedBeforeReplacement,
           replacement.offer,
           replacement.replaced,
+          true,
         );
       }
       if (replacement.replaced)
@@ -1004,7 +1024,7 @@ function handleAwaitingCostSelectionCore(
         ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        applyCostTransactionState(nextState, transactionBaseline),
+        retainsReplacedCostPrefix(nextState) ? nextState : applyCostTransactionState(nextState, transactionBaseline),
         sourceCardInstanceId,
         controller,
         cardDb,
@@ -1030,6 +1050,7 @@ function handleAwaitingCostSelectionCore(
           stagedBeforeReplacement,
           replacement.offer,
           replacement.replaced,
+          true,
         );
       }
       if (replacement.replaced)
@@ -1171,7 +1192,7 @@ function handleAwaitingCostSelectionCore(
         ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        applyCostTransactionState(nextState, transactionBaseline),
+        retainsReplacedCostPrefix(nextState) ? nextState : applyCostTransactionState(nextState, transactionBaseline),
         placedIds[0],
         controller,
         cardDb,
@@ -1185,7 +1206,7 @@ function handleAwaitingCostSelectionCore(
           costReplacementChecked: true,
           ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
-        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced);
+        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced, true);
       }
       if (replacement.replaced) {
         return abortReplacedCost(nextState, topFrame, replacement.events, cardDb, services);
@@ -1370,10 +1391,9 @@ function handleAwaitingCostSelectionCore(
       const replay = hasNativeCostSemantics(nextState)
         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
-      const replacementInput = applyCostTransactionState(
-        nextState,
-        transactionBaseline,
-      );
+      const replacementInput = retainsReplacedCostPrefix(nextState)
+        ? nextState
+        : applyCostTransactionState(nextState, transactionBaseline);
       let replacement =
         cost.type === "KO_OWN_CHARACTER"
           ? checkReplacementForKO(
@@ -1424,6 +1444,7 @@ function handleAwaitingCostSelectionCore(
           stagedBeforeReplacement,
           replacement.offer,
           replacement.replaced,
+          true,
         );
       }
       if (replacement.replaced) {
