@@ -288,7 +288,7 @@ function evaluateSimple(
           if (!matchesNumericRange(power, cond.property.power)) return false;
         }
         if (cond.property.cost) {
-          if (!matchesNumericRange(data.cost ?? 0, cond.property.cost))
+          if (!matchesNumericRange(ctx.queries.getEffectiveCostForRead(c, data, state, ctx.cardDb), cond.property.cost))
             return false;
         }
         return true;

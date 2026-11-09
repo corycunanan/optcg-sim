@@ -29,7 +29,7 @@ import {
   type ConditionContext,
 } from "./conditions.js";
 import { findCardInState, findCardInstance } from "./state.js";
-import { isCardNegated } from "./modifiers.js";
+import { getEffectiveCostForRead, isCardNegated } from "./modifiers.js";
 import { isBlockerProhibited } from "../../../../shared/blocker-prohibition.js";
 
 function isConditionOverride(
@@ -507,7 +507,9 @@ function matchesProhibition(
 
       // Check cost_filter on scope
       if (scope.cost_filter) {
-        const cardCost = data.cost ?? 0;
+        // The hand card's cost as the value-layer evaluator reads it, so a
+        // while-in-hand cost change counts (VALUE-LAYER-CONTRACT.md).
+        const cardCost = getEffectiveCostForRead(card, data, state, cardDb);
         if (!compareScopeNum(cardCost, scope.cost_filter.operator, scope.cost_filter.value)) return null;
       }
 

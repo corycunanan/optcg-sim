@@ -36,6 +36,7 @@ import { findDrawProhibitionIntentViolations } from "../schema-draw-prohibition-
 import { findThisWaySourceIntentViolations } from "../schema-this-way-source-lint.js";
 import { findSearchAndPlayRevealIntentViolations } from "../schema-search-reveal-lint.js";
 import { findConditionExcludeSelfIntentViolations } from "../schema-exclude-self-lint.js";
+import { findPermanentModifierTypeViolations } from "../schema-permanent-modifier-lint.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -381,6 +382,7 @@ async function main(): Promise<void> {
     ...findDrawProhibitionIntentViolations(schemas),
     ...findThisWaySourceIntentViolations(schemas),
     ...findConditionExcludeSelfIntentViolations(schemas),
+    ...findPermanentModifierTypeViolations(schemas),
     ...findSearchAndPlayRevealIntentViolations(loadCanonicalCardBlocks(), schemas),
     // Full runs walk the generated registry; a single-file run checks only
     // that file's schemas and skips the missing-card disposition check.

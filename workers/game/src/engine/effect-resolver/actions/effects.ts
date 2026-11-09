@@ -17,7 +17,7 @@ import type {
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { terminateGame } from "../../terminal.js";
-import { matchesFilterInBattle } from "../../conditions.js";
+import { matchesFilter } from "../../conditions.js";
 import {
   resolveAmount,
   computeExpiry,
@@ -258,8 +258,8 @@ export function executeApplyReplacement(
     ...(player.stage ? [player.stage] : []),
   ]);
   const protectedIds = fieldCards
-    // Same battle-power read as the shared scan (OPT-909).
-    .filter((card) => matchesFilterInBattle(card, filter, cardDb, state, controller))
+    // Same power read as the shared scan, Counter power included (OPT-909).
+    .filter((card) => matchesFilter(card, filter, cardDb, state, undefined, undefined, controller))
     .map((card) => card.instanceId);
   if (protectedIds.length === 0) return { state, events, succeeded: true };
 

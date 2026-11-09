@@ -2809,8 +2809,10 @@ export const OP15_070_FUZA: EffectSchema = {
       modifiers: [
         {
           type: "GRANT_KEYWORD",
+          // "[Shura] cards" include a Leader treated as having every name
+          // (faq_op15-eb04.md, OP15-07x ruling).
           target: {
-            type: "CHARACTER",
+            type: "LEADER_OR_CHARACTER",
             controller: "SELF",
             count: { all: true },
             filter: { name: "Shura" },
@@ -2825,19 +2827,22 @@ export const OP15_070_FUZA: EffectSchema = {
       source_text: "[Opponent's Turn] All of your [Shura] cards' base power and this Character's base power become 6000.",
       modifiers: [
         {
-          type: "SET_BASE_POWER",
+          // OPT-953: a base-power aura is SET_POWER with params.value (value
+          // layer 1). "[Shura] cards" include a Leader treated as having every
+          // name (faq_op15-eb04.md, OP15-07x ruling: base power becomes 6000).
+          type: "SET_POWER",
           target: {
-            type: "CHARACTER",
+            type: "LEADER_OR_CHARACTER",
             controller: "SELF",
             count: { all: true },
             filter: { name: "Shura" },
           },
-          params: { amount: 6000 },
+          params: { value: 6000 },
         },
         {
-          type: "SET_BASE_POWER",
+          type: "SET_POWER",
           target: { type: "SELF" },
-          params: { amount: 6000 },
+          params: { value: 6000 },
         },
       ],
       duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
@@ -2863,8 +2868,10 @@ export const OP15_071_HOLLY: EffectSchema = {
       modifiers: [
         {
           type: "GRANT_KEYWORD",
+          // "[Ohm] cards" include a Leader treated as having every name
+          // (faq_op15-eb04.md, OP15-07x ruling).
           target: {
-            type: "CHARACTER",
+            type: "LEADER_OR_CHARACTER",
             controller: "SELF",
             count: { all: true },
             filter: { name: "Ohm" },
@@ -2879,19 +2886,22 @@ export const OP15_071_HOLLY: EffectSchema = {
       source_text: "[Opponent's Turn] All of your [Ohm] cards' base power and this Character's base power become 6000.",
       modifiers: [
         {
-          type: "SET_BASE_POWER",
+          // OPT-953: a base-power aura is SET_POWER with params.value (value
+          // layer 1). "[Ohm] cards" include a Leader treated as having every
+          // name (faq_op15-eb04.md, OP15-07x ruling: base power becomes 6000).
+          type: "SET_POWER",
           target: {
-            type: "CHARACTER",
+            type: "LEADER_OR_CHARACTER",
             controller: "SELF",
             count: { all: true },
             filter: { name: "Ohm" },
           },
-          params: { amount: 6000 },
+          params: { value: 6000 },
         },
         {
-          type: "SET_BASE_POWER",
+          type: "SET_POWER",
           target: { type: "SELF" },
-          params: { amount: 6000 },
+          params: { value: 6000 },
         },
       ],
       duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },

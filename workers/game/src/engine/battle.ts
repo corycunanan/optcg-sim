@@ -36,7 +36,6 @@ import {
 import {
   getEffectivePower,
   getEffectiveCost,
-  getBattleDefenderPower,
   getGrantedAttributes,
 } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
@@ -346,30 +345,27 @@ export function executeUseCounter(
   if (!moved) return { state, events };
   let nextState = moved.state;
 
-  // Add counter power to battle context
+  // Add counter power to battle context. getEffectivePower reads it from the
+  // battle (value layer 4), so record it first and then re-read the target.
   const battle = nextState.turn.battle!;
   const targetFound = findCardInState(nextState, battle.targetInstanceId);
   if (targetFound) {
     const targetData = cardDb.get(targetFound.card.cardId);
-    const newCounterPower = battle.counterPowerAdded + counterValue;
-    const newDefenderPower = targetData
-      ? getBattleDefenderPower(
-          targetFound.card,
-          targetData,
-          newCounterPower,
-          nextState
-        )
-      : battle.defenderPower + counterValue;
-
-    nextState = {
+    const counted: GameState = {
       ...nextState,
       turn: {
         ...nextState.turn,
-        battle: {
-          ...battle,
-          counterPowerAdded: newCounterPower,
-          defenderPower: newDefenderPower,
-        },
+        battle: { ...battle, counterPowerAdded: battle.counterPowerAdded + counterValue },
+      },
+    };
+    const newDefenderPower = targetData
+      ? getEffectivePower(targetFound.card, targetData, counted, cardDb)
+      : battle.defenderPower + counterValue;
+    nextState = {
+      ...counted,
+      turn: {
+        ...counted.turn,
+        battle: { ...counted.turn.battle!, defenderPower: newDefenderPower },
       },
     };
   }
@@ -1006,10 +1002,9 @@ export function recalculateBattlePowers(
     state,
     cardDb
   );
-  const newDefenderPower = getBattleDefenderPower(
+  const newDefenderPower = getEffectivePower(
     defenderFound.card,
     defenderData,
-    battle.counterPowerAdded,
     state,
     cardDb
   );

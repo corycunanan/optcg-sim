@@ -41,7 +41,7 @@ import type {
 import { findCardInstance } from "./state.js";
 import { CONTINUATION_EFFECT_BLOCK, generateFrameId, pushFrame } from "./effect-stack.js";
 import { insertFrameAt } from "./damage-frames.js";
-import { evaluateCondition, matchesFilterInBattle } from "./conditions.js";
+import { evaluateCondition, matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
@@ -341,10 +341,10 @@ function replacementMatchesTarget(
   if (params.target_filter) {
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
-    // OPT-909: a battle K.O. reads the defender's battle power, including the
-    // Counter Step power added in this battle (rules §7-1-3-2-1; qa_op05
+    // OPT-909: a battle K.O. reads the defender's power including the Counter
+    // Step power added in this battle (value layer 4, rules §7-1-3-2-1; qa_op05
     // OP05-001: a base-4000 Character raised to 5000+ by a Counter qualifies).
-    if (!matchesFilterInBattle(targetCard, params.target_filter, cardDb, state, effect.controller)) return false;
+    if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;
   }
 
   if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {

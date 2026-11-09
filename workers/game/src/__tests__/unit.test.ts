@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../types.js";
-import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "../engine/modifiers.js";
+import { getEffectivePower, getEffectiveCost } from "../engine/modifiers.js";
 import { checkDefeat } from "../engine/defeat.js";
 import {
   moveCard, findCardInState, removeTopLifeCard,
@@ -56,12 +56,22 @@ describe("getEffectiveCost", () => {
   });
 });
 
-describe("getBattleDefenderPower", () => {
-  it("adds counter power to effective power", () => {
+describe("getEffectivePower Counter layer", () => {
+  const battle = (targetInstanceId: string, counterPowerAdded: number) => ({
+    battleId: "b1", attackerInstanceId: "attacker", targetInstanceId,
+    attackerPower: 5000, defenderPower: 5000, counterPowerAdded,
+    blockerActivated: false, step: "COUNTER_STEP" as const,
+    redirectWindow: false, blockerLocked: false, targetLocked: false,
+  });
+
+  it("adds the battle's counter power to its target only", () => {
     const { state } = setupGame();
     const leader = state.players[0].leader;
-    const power = getBattleDefenderPower(leader, CARDS.LEADER, 2000, state);
-    expect(power).toBe(5000 + 2000);
+    const inBattle: GameState = { ...state, turn: { ...state.turn, battle: battle(leader.instanceId, 2000) } };
+    expect(getEffectivePower(leader, CARDS.LEADER, inBattle)).toBe(5000 + 2000);
+    const other = state.players[1].leader;
+    expect(getEffectivePower(other, CARDS.LEADER, inBattle)).toBe(5000);
+    expect(getEffectivePower(leader, CARDS.LEADER, state)).toBe(5000);
   });
 });
 

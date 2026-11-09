@@ -1,5 +1,7 @@
 # OPT-909 — Power reads during a battle
 
+> **Superseded by OPT-1035.** Counter power is now value layer P4 inside `getEffectivePower`, so every row below sees it. `getBattlePower`, `getBattleDefenderPower` and `matchesFilterInBattle` are gone. The contract is [VALUE-LAYER-CONTRACT.md](../../VALUE-LAYER-CONTRACT.md). This file stays as the inventory taken before that change.
+
 Inventory of the engine checks that read a card's power while a battle is in progress, and whether each sees the power a [Symbol Counter] added in the Counter Step. Taken on main `d1ecbfa` (2026-11-08).
 
 ## The rule
