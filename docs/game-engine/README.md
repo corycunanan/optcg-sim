@@ -45,6 +45,7 @@
 | [SESSION-CAPTURE-EXPORT.md](./SESSION-CAPTURE-EXPORT.md) | Signed read-only capture protocol, sanitization, and the incomplete real-session fixture inventory (OPT-971) | — |
 | [NEGATION-SCOPE.md](./NEGATION-SCOPE.md) | What negation removes (printed effects) and keeps (granted effects, resolved results), [On K.O.] after negation, duration, and bounds on conditional resolved negation (OPT-954, OPT-1012) | — |
 | [ZONE-TRANSITION-CONTRACT.md](./ZONE-TRANSITION-CONTRACT.md) | Authoritative cross-zone identity, cleanup, event, atomicity, and ordering contract | — |
+| [BATCH-CONTRACT.md](./BATCH-CONTRACT.md) | One instruction affecting many cards: step order, who orders simultaneous placements (rule 3-1-7), per-card vs per-batch events (rule 3-2-3), rule-processing checkpoints, and one-pool DON!! distribution (`DISTRIBUTE_DON max_per_target`, OP18-046 clause A) (OPT-955) | — |
 | [VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md) | Binding layer order for power and cost (base settings, modifiers, DON!!, Counter power), the one evaluator, and the FAQ ruling behind each layer (OPT-953, OPT-1035) | — |
 | [GAME-ENGINE-REQUIREMENTS.md](./GAME-ENGINE-REQUIREMENTS.md) | Complete rules-to-engine mapping from Comprehensive Rules v1.2.0 | 1,079 |
 | [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) | ~200 distinct card effect patterns identified across 51 sets (the original analysis corpus; the authored corpus is now 56 schema set modules) | 1,168 |

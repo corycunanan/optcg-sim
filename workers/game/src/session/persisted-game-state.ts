@@ -468,6 +468,12 @@ export const StackFrameCore = z.strictObject({
   giveDonIdentity: z
     .strictObject({ owner: PlayerIndex, recipient: z.string() })
     .optional(),
+  donDistribution: z
+    .strictObject({
+      round: z.number().int().positive(),
+      allocation: z.array(z.tuple([z.string(), z.number().int().nonnegative()])),
+    })
+    .optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   phaseBoundaryContinuation: PhaseBoundaryContinuation.optional(),
