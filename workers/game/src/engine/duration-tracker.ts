@@ -16,7 +16,12 @@ import type {
   Action,
 } from "./effect-types.js";
 import type { GameState, CardData } from "../types.js";
-import { cleanupConsumedOneTimeModifiers, expireOneTimeModifiers } from "./modifiers.js";
+import {
+  cleanupConsumedOneTimeModifiers,
+  evaluateNegationFlagGate,
+  expireOneTimeModifiers,
+  isNegationFlagEffect,
+} from "./modifiers.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
 
 /**
@@ -430,7 +435,12 @@ export function evaluateWhileConditions(
       cardDb,
     };
 
-    return evaluateCondition(state, duration.condition, condCtx);
+    const condition = duration.condition;
+    const met = () => evaluateCondition(state, condition, condCtx);
+    // OPT-1012: a negation flag's duration is read with that flag set aside.
+    return isNegationFlagEffect(e)
+      ? evaluateNegationFlagGate(e, state, cardDb, met)
+      : met();
   });
 
   if (remaining.length === effects.length) return state;

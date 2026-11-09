@@ -405,7 +405,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **8-2-1 to 8-2-4.** Effect invalidation rules | **PARTIAL** | `conditions.ts`, `duration-tracker.ts` | While-condition effects re-evaluated; no explicit "invalidate other effects" mechanism |
+| **8-2-1 to 8-2-4.** Effect invalidation rules | **PARTIAL** | `modifiers.ts` (`isCardNegated`), `keywords.ts`, `triggers.ts`, `prohibitions.ts`, `duration-tracker.ts` | Negation removes printed effects and keeps granted effects and resolved results (8-2-2, 8-2-3, 8-2-4); contract in [NEGATION-SCOPE.md](./NEGATION-SCOPE.md). While-condition effects re-evaluated |
 
 ### 8-3. Activation Cost and Conditions
 

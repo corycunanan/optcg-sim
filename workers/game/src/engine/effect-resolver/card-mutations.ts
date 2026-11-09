@@ -6,7 +6,7 @@ import type { GameState, PendingEvent, DonInstance, CardData } from "../../types
 import { transitionCard, type ZoneTransitionFact } from "../zone-transition.js";
 
 import { findCardInstance } from "../state.js";
-import { getEffectiveBasePower } from "../modifiers.js";
+import { getEffectiveBasePower, isCardNegated } from "../modifiers.js";
 import { lastKnownKeywordsIfChanged } from "../keywords.js";
 
 type CardMutationResult = {
@@ -32,6 +32,9 @@ export function koCharacter(
   const preKO_keywords = card && data
     ? lastKnownKeywordsIfChanged(card, data, snapshotState, cardDb)
     : undefined;
+  // OPT-954: a Character negated when K.O.'d does not activate its [On K.O.]
+  // (qa_op09.md:166). Stamped only when true so other events stay unchanged.
+  const preKO_negated = !!card && isCardNegated(card, snapshotState, cardDb);
   const moved = transitionCard(state, instanceId, "TRASH", {
     position: "TOP",
     preserveSourceTriggers: true,
@@ -56,6 +59,7 @@ export function koCharacter(
         preKO_donCount: moved.fact.detachedDonInstanceIds.length,
         ...(preKO_basePower !== undefined ? { preKO_basePower } : {}),
         ...(preKO_keywords !== undefined ? { preKO_keywords } : {}),
+        ...(preKO_negated ? { preKO_negated: true as const } : {}),
         ...(moved.fact.source === "STAGE" ? { cardType: "STAGE" as const } : {}),
       },
     }],
