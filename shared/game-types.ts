@@ -244,6 +244,14 @@ export type EngineLimitDiagnostic =
       sourceCardInstanceId: string;
     }
   | {
+      /** Rule 11-1-1-1 (OPT-952): the budget ran out after a repeated game state. */
+      kind: "INFINITE_LOOP";
+      limit: number;
+      observed: number;
+      actionType: string;
+      sourceCardInstanceId: string;
+    }
+  | {
       kind: "ENGINE_CONTRACT";
       contract: "ACTION_HANDLER" | "REPLACEMENT_DISPATCH";
       actionType?: string;
@@ -255,8 +263,8 @@ export interface EngineTerminalOutcome {
   /**
    * ENGINE_LIMIT: a bounded engine guard (effect stack depth or action budget)
    * stopped resolution. It is not a rules draw (Decision 5).
-   * INFINITE_LOOP_DRAW: reserved for rule 11-1-1-1 (neither player can stop a
-   * loop); no writer emits it until the declared-count protocol (OPT-952).
+   * INFINITE_LOOP_DRAW: rule 11-1-1-1, a loop neither player can stop
+   * (OPT-952): the action budget ran out after a repeated game state.
    * ENGINE_ERROR_DRAW: an engine contract failure.
    */
   type: "ENGINE_LIMIT" | "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
@@ -288,6 +296,8 @@ export const GAME_END_REASON_CODES = [
   "ENGINE_LIMIT",
   /** An engine contract failure ended the game in a draw. */
   "ENGINE_CONTRACT",
+  /** Rule 11-1-1-1: an infinite loop neither player can stop (OPT-952). */
+  "INFINITE_LOOP_DRAW",
 ] as const;
 
 export type GameEndReasonCode = (typeof GAME_END_REASON_CODES)[number];

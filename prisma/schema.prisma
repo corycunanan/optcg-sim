@@ -477,6 +477,7 @@ enum GameEndReasonCode {
   PREGAME_LEAVE
   ENGINE_LIMIT
   ENGINE_CONTRACT
+  INFINITE_LOOP_DRAW
 }
 
 model GameSession {

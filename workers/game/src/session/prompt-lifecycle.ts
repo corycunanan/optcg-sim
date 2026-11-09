@@ -50,6 +50,7 @@ import { translateBlindHandSelection } from "../engine/effect-resolver/blind-han
 import { isGameTerminated, publishBeforeGameOver } from "../engine/terminal.js";
 import { runRuleProcessingAfterMove } from "../engine/defeat.js";
 import { frameKindOf } from "./game-state-schema.js";
+import { admitPromptReplyBudget } from "../engine/loop-protocol.js";
 
 export interface PromptLifecycleServices {
   drainPregame(state: GameState): GameState;
@@ -98,13 +99,21 @@ export function resumePromptLifecycle(
   ) {
     return { state: stateBeforeResume, responseRejected: true };
   }
+  // OPT-952: a reply to a prompt the player could decline starts a new action
+  // budget (rule 11-1-1-2: that player can stop the loop, so their answers
+  // are its count). Validation failures below still return the original state.
+  const admitted = stateBeforeResume.pendingPrompt
+    ? admitPromptReplyBudget(stateBeforeResume, stateBeforeResume.pendingPrompt)
+    : stateBeforeResume;
   const result = resumePromptLifecycleUnreleased(
-    stateBeforeResume,
+    admitted,
     reply,
     cardDb,
     services
   );
-  if (result.responseRejected) return result;
+  if (result.responseRejected) {
+    return result.state === admitted ? { ...result, state: stateBeforeResume } : result;
+  }
   // Rule 3-1-6-1 catch-all for prompt resumes (OPT-792): any DON!! a resume
   // handler moved — including handlers that call leave-field helpers such as
   // trashCharacter directly (rule-trash for play, replacement finalization,
