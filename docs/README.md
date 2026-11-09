@@ -40,7 +40,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 ## Game Engine
 
 - [Game Engine Index](./game-engine/README.md) — full index for the effect schema spec (11 spec files, ~12,000 lines)
-- [Rules → Engine Map](./game-engine/RULES-TO-ENGINE-MAP.md) — every rule from Comprehensive Rules v1.2.0 mapped to engine functions, with gap analysis
+- [Rules → Engine Map](./game-engine/RULES-TO-ENGINE-MAP.md) — every rule from Comprehensive Rules v1.2.1 mapped to engine functions, with gap analysis
 - [Effect Schema Spec](./game-engine/01-SCHEMA-OVERVIEW.md) — start here: EffectBlock structure, categories, costs, chains, durations
 - [Engine Architecture](./game-engine/08-ENGINE-ARCHITECTURE.md) — action pipeline, modifier layers, trigger system, event bus
 - [Encoding Guide](./game-engine/11-ENCODING-GUIDE.md) — condensed pattern-matching reference for card encoding
@@ -74,7 +74,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 ## Reference
 
 - [PRD](./project/PRD.md) — product requirements document (source of truth)
-- [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
+- [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.1 ([changes from v1.2.0](./rules/CHANGES-v1.2.1.md))
 - [Rule Index](./rules/RULE-INDEX.md) — concept-to-rule lookup table (start here, then read specific rules)
 - [Card Set Data](./cards/) — effect text for 55 card sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` (alongside `EFFECT-FACET-TAXONOMY.md`); ST-31 and ST-32 contain preview cards only ("the rest of this set is not yet imported"; full import is OPT-831)
 

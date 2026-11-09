@@ -1,12 +1,12 @@
 /**
  * Timing baseline F12 (README §2). Oracle = README, never the engine.
  *
- * Rule 8-6-2-1 (line 864): the Trigger suspends damage processing; Decision 2 (rev4 §10):
+ * Rule 8-6-2-1 (line 868): the Trigger suspends damage processing; Decision 2 (rev4 §10):
  * the Trigger choice is inside the damage point, before the next instruction.
  * OP06-116 Reject, option 2: "If your opponent has 1 Life card, deal 1 damage to your
  * opponent. Then, add 1 card from the top of your Life cards to your hand."
  * FAQ qa_op06.md:367-371 (F12d: option 2 while the opponent did not have 1 Life: cannot add from Life).
- * F15: rule 8-6-2-1 line 864; Decision 2; the Trigger effect's own prompt completes before the next instruction.
+ * F15: rule 8-6-2-1 line 868; Decision 2; the Trigger effect's own prompt completes before the next instruction.
  */
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameEvent, GameState, LifeCard, PlayerState } from "../../types.js";
@@ -176,7 +176,7 @@ function expectWindowOpenBeforeLifeToHand(rig: Rig): void {
   expect(rig.state.players[1].life.length).toBe(0);
 }
 
-describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:367-371] Reject: defender's Trigger window completes before the activator's Life-to-hand", () => {
+describe("F12 [Rule 8-6-2-1 line 868; Decision 2; OP06-116 text; FAQ qa_op06.md:367-371] Reject: defender's Trigger window completes before the activator's Life-to-hand", () => {
   const oneTrigger = () => [life("p1-life-trig", SYN_TRIGGER_LIFE.id)];
 
   // OPT-963: DEAL_DAMAGE pauses on its EFFECT_DAMAGE frame with the chain parked below it, so
@@ -263,9 +263,9 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
   });
 });
 
-describe("F15 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text] nested prompt inside the accepted Trigger, reload before the nested reply", () => {
+describe("F15 [Rule 8-6-2-1 line 868; Decision 2; OP06-116 text] nested prompt inside the accepted Trigger, reload before the nested reply", () => {
   // OPT-963: the EFFECT_DAMAGE frame moves to TRIGGER_EFFECT below the Trigger's own prompt frame and
-  // the chain stays parked below both; rule 8-6-2-1 (line 864) / Decision 2.
+  // the chain stays parked below both; rule 8-6-2-1 (line 868) / Decision 2.
   it("F15 accept, nested SELECT_TARGET, reload, reply: p0 Life stays 2 until the reply, then the K.O. and the Life-to-hand (flipped by OPT-963)", async () => {
     const rig = setup([life("p1-life-ko", SYN_TRIGGER_KO.id)]);
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);

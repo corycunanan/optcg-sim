@@ -1625,7 +1625,7 @@ function endBattle(
   };
 }
 
-/** Rules 7-1-1-4, 7-1-2-3, 7-1-3-3. Called only by the drain once
+/** Rules 7-1-1-4, 7-1-2-3, 7-1-3-1-3. Called only by the drain once
  * suspended work has popped, before exposing another battle command. */
 export function checkpointBattleStepEnd(state: GameState): ExecuteResult {
   const battle = state.turn.battle;

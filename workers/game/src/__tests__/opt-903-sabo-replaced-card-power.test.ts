@@ -427,7 +427,7 @@ describe("OP05-001 Sabo — battle K.O.", () => {
   });
 
   // OPT-909: the WOULD_BE_KO power_min filter reads the defender's battle
-  // power, which includes BattleContext.counterPowerAdded (rules §7-1-3-2-1).
+  // power, which includes BattleContext.counterPowerAdded (rules §7-1-3-1-1).
   it("qa_op05: base 4000 raised to 6000 in the Counter Step qualifies (effective power)", () => {
     const f = fixture();
     sabo(f);

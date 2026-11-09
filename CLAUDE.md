@@ -40,7 +40,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `docs/game-engine/` | Game engine design — effect schema spec, rules-to-engine map, encoding guide |
 | `docs/design/` | UI/UX design — branding guidelines, audits, critiques, game board layout |
 | `docs/project/` | Project management — PRD, planning, workflows, learnings |
-| `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
+| `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.1 |
 | `docs/cards/` | Canonical card effect text organized by set |
 | `docs/research/` | Technical investigations and evaluations |
 

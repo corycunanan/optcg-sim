@@ -1,8 +1,8 @@
 /**
  * Timing baseline F11 (README §2). Oracle = README, never the engine.
  *
- * F11a  Rule 7-1-1-4 (line 640): end of the Attack Step, a combatant moved -> End of Battle, no Block Step.
- * F11b  Rule 7-1-2-3 (line 648): end of the Block Step (leave happens inside a prompt, OPT-951) -> End of Battle, no Counter Step.
+ * F11a  Rule 7-1-1-4 (line 646): end of the Attack Step, a combatant moved -> End of Battle, no Block Step.
+ * F11b  Rule 7-1-2-3 (line 654): end of the Block Step (leave happens inside a prompt, OPT-951) -> End of Battle, no Counter Step.
  * FAQ   qa_rules.md Basic Rules (leg-7 R20): "Yes. The battle ends without the next step."
  */
 import { describe, it, expect } from "vitest";
@@ -45,9 +45,9 @@ function putChar(state: GameState, owner: 0 | 1, data: CardData, instanceId: str
 const log = (s: GameState, from: number): readonly GameEvent[] => s.eventLog.slice(from);
 const count = (events: readonly GameEvent[], type: string) => events.filter((e) => e.type === type).length;
 
-describe("F11a [Rule 7-1-1-4 line 640; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d in the Attack Step: no Block Step", () => {
+describe("F11a [Rule 7-1-1-4 line 646; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d in the Attack Step: no Block Step", () => {
   // OPT-967 corrects the historical next-step notification before the zone checkpoint.
-  // Rule 7-1-1-4 (line 640): a moved combatant sends the battle to End of Battle, not the Block Step.
+  // Rule 7-1-1-4 (line 646): a moved combatant sends the battle to End of Battle, not the Block Step.
   it("F11a battle ends at the end of the Attack Step (corrected OPT-967)", () => {
     const db = new Map(createTestCardDb());
     // Stands in for a p1 Character with [On Your Opponent's Attack]: K.O. the attacker by name.
@@ -98,9 +98,9 @@ describe("F11a [Rule 7-1-1-4 line 640; FAQ qa_rules.md Basic Rules leg-7 R20] at
   });
 });
 
-describe("F11b [Rule 7-1-2-3 line 648; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d inside a Block Step prompt: no Counter Step", () => {
+describe("F11b [Rule 7-1-2-3 line 654; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d inside a Block Step prompt: no Counter Step", () => {
   // OPT-967 holds the next-step notification until the prompted window finishes.
-  // Rule 7-1-2-3 (line 648): a moved combatant sends the battle to End of Battle, not the Counter Step.
+  // Rule 7-1-2-3 (line 654): a moved combatant sends the battle to End of Battle, not the Counter Step.
   it("F11b battle ends at the end of the Block Step (corrected OPT-967)", () => {
     const db = new Map(createTestCardDb());
     // Stands in for a p1 [Blocker] Character with [On Block]: K.O. up to 1 opponent Character (prompt).

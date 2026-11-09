@@ -1693,7 +1693,7 @@ export const PROHIBITION_FEASIBILITY_TIMING: Readonly<
   CANNOT_BLOCK: "ACTIVATION",
   CANNOT_ACTIVATE_BLOCKER: "ACTIVATION",
   CANNOT_USE_BLOCKER: "ACTIVATION",
-  // 7-1-3-2: activating a Counter is the prohibited declaration.
+  // 7-1-3-1: activating a Counter is the prohibited declaration.
   CANNOT_USE_COUNTER: "ACTIVATION",
   // 6-5-5 (manual give) and the GIVE_DON cost (OPT-869 cost targets).
   CANNOT_ATTACH_DON: "ACTIVATION",

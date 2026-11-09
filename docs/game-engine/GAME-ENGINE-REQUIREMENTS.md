@@ -492,11 +492,11 @@ ATTACK_STEP → BLOCK_STEP → COUNTER_STEP → DAMAGE_STEP → END_OF_BATTLE
 
 > Ref: §7-1-3
 
-1. Effects of the defending player reading "when attacked" activate (§7-1-3-1) — **Note:** this is different from [When Attacked] in the Attack Step. "when attacked" without the keyword brackets triggers here in Counter Step.
+1. _(Removed in v1.2.1: v1.2.0 §7-1-3-1 activated "when attacked" effects here. v1.2.1 lists 「When Attacked」 only in the Attack Step, §7-1-1-3. The engine keeps the OP03-001 FAQ timing; see `docs/rules/CHANGES-v1.2.1.md`.)_
 2. Defending player may perform any number of times, in any order:
-   a. **Activate (Symbol) Counter:** Trash a Character card from hand that has Counter → increase power of their Leader or 1 Character by the Counter value **during this battle** (§7-1-3-2-1)
-   b. **Activate [Counter] Event:** Pay cost of a [Counter] Event from hand, trash it, activate its [Counter] effect (§7-1-3-2-2)
-3. **Bail-out check:** If at end of Counter Step, attacker or target has moved areas → skip to End of Battle (§7-1-3-3)
+   a. **Activate (Symbol) Counter:** Trash a Character card from hand that has Counter → increase power of their Leader or 1 Character by the Counter value **during this battle** (§7-1-3-1-1)
+   b. **Activate [Counter] Event:** Pay cost of a [Counter] Event from hand, trash it, activate its [Counter] effect (§7-1-3-1-2)
+3. **Bail-out check:** If at end of Counter Step, attacker or target has moved areas → skip to End of Battle (§7-1-3-1-3)
 
 ### 7.6 Damage Step
 

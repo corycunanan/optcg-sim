@@ -1,5 +1,5 @@
 /**
- * Rule 3-1-6-1 (docs/rules/rule_comprehensive.md:289): "When a DON!! card
+ * Rule 3-1-6-1 (docs/rules/rule_comprehensive.md:295): "When a DON!! card
  * moves from one area to another, all effects that were previously applied to
  * that DON!! card are removed."
  *

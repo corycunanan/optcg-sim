@@ -1,8 +1,8 @@
 /**
  * Timing baseline F9 / F10 (OPT-939 fixtures, README §2).
  *
- * F9:  Rule 8-1-3-1-3 (line 710), 8-6-1 (line 858); FAQ qa_op04.md:107-109 (OP04-024 Sugar).
- * F10: Rule 8-2-3 (line 774); FAQ qa_op04.md:113-115 (OP04-026 Senor Pink).
+ * F9:  Rule 8-1-3-1-3 (line 714), 8-6-1 (line 862); FAQ qa_op04.md:107-109 (OP04-024 Sugar).
+ * F10: Rule 8-2-3 (line 778); FAQ qa_op04.md:113-115 (OP04-026 Senor Pink).
  */
 
 import { describe, expect, it } from "vitest";
@@ -62,12 +62,12 @@ function run(b: Built, action: GameAction, player: 0 | 1 = 0): void {
 
 // ─── F9 ──────────────────────────────────────────────────────────────────────
 
-describe("F9 Sugar: a pending auto effect whose source left the field does not activate (rule 8-1-3-1-3 line 710, 8-6-1 line 858; FAQ qa_op04.md:107-109)", () => {
+describe("F9 Sugar: a pending auto effect whose source left the field does not activate (rule 8-1-3-1-3 line 714, 8-6-1 line 862; FAQ qa_op04.md:107-109)", () => {
   const SUGAR = "SYN-SUGAR"; // OP04-024 Sugar [Opponent's Turn] draw stand-in
   const MARCO = "SYN-MARCO"; // [On Play] K.O. Sugar
 
   // Engine: CARD_PLAYED -> CARD_KO(p1) -> CARD_DRAWN(p1); Sugar's effect still activates after Sugar was K.O.'d.
-  // Rule 8-1-3-1-3 (line 710): an auto effect whose source moved areas before activation does not activate.
+  // Rule 8-1-3-1-3 (line 714): an auto effect whose source moved areas before activation does not activate.
   it("F9 Marco's On Play K.O.s Sugar first, then Sugar's Opponent's Turn effect does not activate (ratchet OPT-964)", () => {
     const b = base([
       synCard(SUGAR, schema(SUGAR, [
@@ -100,7 +100,7 @@ describe("F9 Sugar: a pending auto effect whose source left the field does not a
   });
 });
 
-describe("F9 control: Sugar stays and draws when nothing K.O.s it (rule 8-1-3-1-3 line 710; FAQ qa_op04.md:107-109)", () => {
+describe("F9 control: Sugar stays and draws when nothing K.O.s it (rule 8-1-3-1-3 line 714; FAQ qa_op04.md:107-109)", () => {
   const SUGAR = "SYN-SUGAR";
 
   it("F9 control: p0 plays a plain vanilla Character; Sugar stays on the field and CARD_DRAWN:p1 is present", () => {
@@ -128,7 +128,7 @@ describe("F9 control: Sugar stays and draws when nothing K.O.s it (rule 8-1-3-1-
 
 // ─── F10 ─────────────────────────────────────────────────────────────────────
 
-describe("F10 Senor Pink: an effect already activated still resolves after its source leaves (rule 8-2-3 line 774; FAQ qa_op04.md:113-115)", () => {
+describe("F10 Senor Pink: an effect already activated still resolves after its source leaves (rule 8-2-3 line 778; FAQ qa_op04.md:113-115)", () => {
   const PINK = "SYN-SENOR-PINK"; // OP04-026 Senor Pink stand-in
   const KILLER = "SYN-PINK-KILLER"; // p1 [On Your Opponent's Attack] K.O. of Pink
   // README deviation: an attacking Character is not K.O.'d by a stronger defender (rule 7-1-4-2),

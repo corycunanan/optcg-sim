@@ -2,8 +2,8 @@
  * OPT-960 review round 1 — terminal stops in paths outside the resolver loop,
  * and the end-of-turn window placement.
  *
- * Rules v1.2.0, `docs/rules/rule_comprehensive.md`: 9-1-2 (line 876) rule
- * processing is immediate; 9-2-1-2 (line 884) 0 cards in deck; 10-1-5-3
+ * Rules v1.2.0, `docs/rules/rule_comprehensive.md`: 9-1-2 (line 880) rule
+ * processing is immediate; 9-2-1-2 (line 888) 0 cards in deck; 10-1-5-3
  * (line 914) the [Trigger] card is trashed after its effect; 7-1-4-1-1-3
  * (line 672) Double Attack repeats the Life step per damage; 6-6-1-4 (line
  * 624) the turn ends only after all End Phase processing. OP15-022 Brook
@@ -49,7 +49,7 @@ function attackAndReveal(r: Rig, attackerId: string) {
   r.state = result.state;
 }
 
-describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line 876, 10-1-5-3 line 914)", () => {
+describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line 880, 10-1-5-3 line 918)", () => {
   it("battle Trigger: the Trigger empties the defender's deck; the battle never continues after GAME_OVER", () => {
     const r = rig();
     r.life(1, 1);
@@ -107,7 +107,7 @@ describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line
   });
 });
 
-describe("End Phase stops after a scheduled action ends the game (rules 9-1-2 line 876, 6-6-1-4 line 624)", () => {
+describe("End Phase stops after a scheduled action ends the game (rules 9-1-2 line 880, 6-6-1-4 line 630)", () => {
   it("scheduled action: an END_OF_THIS_TURN MILL empties the ending player's deck; no hand-off follows", () => {
     const r = rig();
     r.deck(0, 1);
@@ -132,7 +132,7 @@ describe("End Phase stops after a scheduled action ends the game (rules 9-1-2 li
   });
 });
 
-describe("a resumed deck move runs rule processing before the remaining chain (rules 9-1-2 line 876, 9-2-1-2 line 884)", () => {
+describe("a resumed deck move runs rule processing before the remaining chain (rules 9-1-2 line 880, 9-2-1-2 line 888)", () => {
   it("resumed search: picking the last deck card after a reload ends the game before THEN WIN_GAME", async () => {
     const r = rig();
     r.deck(0, 1);

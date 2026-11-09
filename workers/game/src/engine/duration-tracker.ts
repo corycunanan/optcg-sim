@@ -75,7 +75,7 @@ export function expireEndOfTurnEffects(state: GameState): GameState {
  *
  * Card text uses "during this turn" (THIS_TURN), which rule 6-6-1-3 (line
  * 622) invalidates after all of 6-6-1-2. The "until the end of ... turn" and
- * "until the end of ... End Phase" durations are the 6-6-1-2 class (line 617):
+ * "until the end of ... End Phase" durations are the 6-6-1-2 class (line 623):
  * they end in the step of their controller, after that controller's "at the
  * end of this turn" obligations. Any other or legacy duration that is due at
  * an End Phase wave is treated as "during this turn", the later and more
@@ -147,7 +147,7 @@ function expireEndPhaseClause(
 }
 
 /**
- * Rule 6-6-1-2 (line 617), the invalidation half of step 1 (`TURN_PLAYER`) or
+ * Rule 6-6-1-2 (line 623), the invalidation half of step 1 (`TURN_PLAYER`) or
  * step 2 (`NON_TURN_PLAYER`): that player's "until the end of the turn" and
  * "until the end of the End Phase" effects become invalid.
  */
@@ -159,7 +159,7 @@ export function expireUntilEndOfTurn(
 }
 
 /**
- * Rule 6-6-1-3 (line 622): the turn player's "during this turn" effects
+ * Rule 6-6-1-3 (line 628): the turn player's "during this turn" effects
  * become invalid, then the non-turn player's. One-time modifiers scoped to
  * this turn end here too.
  */

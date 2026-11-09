@@ -1,8 +1,8 @@
 /**
  * Timing baseline F1 / F2 (OPT-939 fixtures, README §2).
  *
- * F1: Rule 8-6-1 (rule_comprehensive.md:858); FAQ qa_op07.md:206-210 (OP07-019).
- * F2: Rule 8-6-1-1 (rule_comprehensive.md:860); FAQ qa_op10.md:279-281 (OP10-042).
+ * F1: Rule 8-6-1 (rule_comprehensive.md:862); FAQ qa_op07.md:206-210 (OP07-019).
+ * F2: Rule 8-6-1-1 (rule_comprehensive.md:864); FAQ qa_op10.md:279-281 (OP10-042).
  */
 
 import { replayPauses } from "../fixtures/opt-966-replay.js";
@@ -193,8 +193,8 @@ function pickC(state: GameState): GameAction {
   return { type: "SELECT_TARGET", selectedInstanceIds: [c.instanceId], promptId: state.pendingPrompt?.promptId };
 }
 
-describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210)", () => {
-  // Rule 8-6-1 (line 858): the non-turn player's X resolves before the turn player's C.
+describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 862; FAQ qa_op07.md:206-210)", () => {
+  // Rule 8-6-1 (line 862): the non-turn player's X resolves before the turn player's C.
   it("F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966)", () => {
     const { b, attacker } = f1Setup(false);
     attack(b, attacker);
@@ -317,8 +317,8 @@ function pickRebecca(state: GameState): GameAction {
   return { type: "SELECT_TARGET", selectedInstanceIds: [r.instanceId], promptId: state.pendingPrompt?.promptId };
 }
 
-describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281)", () => {
-  // Rule 8-6-1-1 (line 860): A, then B, then C.
+describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 864; FAQ qa_op10.md:279-281)", () => {
+  // Rule 8-6-1-1 (line 864): A, then B, then C.
   it("F2a continuous (ratchet OPT-966)", () => {
     const { b, killer } = f2Setup(false);
     activate(b, killer);

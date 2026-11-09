@@ -711,7 +711,7 @@ export function getEffectivePower(
  * Layer 4 of the value-layer contract (docs/game-engine/VALUE-LAYER-CONTRACT.md):
  * the [Symbol Counter] power the current battle added to its target.
  *
- * Rules §7-1-3-2-1 makes it a power increase on the attacked Leader or
+ * Rules §7-1-3-1-1 makes it a power increase on the attacked Leader or
  * Character "during that battle". It is additive, so it sits above any base
  * setting: OP06-009 Shuraiya's On Block "base power becomes 8000" can still
  * be raised by a Counter (qa_op06.md, OP06-009 second ruling). The engine

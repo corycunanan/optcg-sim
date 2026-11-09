@@ -1,6 +1,6 @@
 /**
  * OPT-962 review finding B: an End Phase expiry belongs to the step of the
- * player who controls the effect (rule 6-6-1-2, rule_comprehensive.md:619-620:
+ * player who controls the effect (rule 6-6-1-2, rule_comprehensive.md:625-626:
  * step 1 invalidates "the turn player's effects", step 2 "the non-turn
  * player's effects"), not to the player a prohibition restricts.
  *
