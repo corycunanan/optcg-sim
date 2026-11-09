@@ -62,6 +62,7 @@ const SharedTargetFilterSchema: z.ZodType<SharedTargetFilter> = z.lazy(() =>
       exclude_self: z.boolean().optional(),
       name_matching_ref: z.string().optional(),
       keywords: z.array(z.string()).optional(),
+      keywords_not: z.array(z.string()).optional(),
       has_trigger: z.boolean().optional(),
       attribute: z.string().optional(),
       attribute_not: z.string().optional(),

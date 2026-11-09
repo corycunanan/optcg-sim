@@ -38,6 +38,7 @@ import type {
 import { expireSourceLeftZone, expireTargetLeftZone } from "./duration-tracker.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter, hasBaseEffect } from "./conditions.js";
+import { printedFilterKeywords } from "./keywords.js";
 import { hasGrantedAttribute, isCardNegated } from "./modifiers.js";
 import { allocateEngineId, allocateEngineRecord } from "./execution-context.js";
 
@@ -726,6 +727,14 @@ function matchesCustomTrigger(
       if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
       filter = { ...filter, controller: undefined, cause: undefined };
     }
+    // OPT-1033: "one of your Characters is K.O.'d" compares the K.O.'d
+    // card's field controller, like CHARACTER_REMOVED_FROM_FIELD above.
+    if (trigger.event === "ANY_CHARACTER_KO" && event.type === "CARD_KO" && filter.controller) {
+      const removedController = event.payload.sourceController ?? event.playerIndex;
+      if (filter.controller === "SELF" && removedController !== sourceCard.controller) return false;
+      if (filter.controller === "OPPONENT" && removedController === sourceCard.controller) return false;
+      filter = { ...filter, controller: undefined };
+    }
     if (trigger.event === "DAMAGE_TAKEN") {
       // Controller was compared against the damaged player in matchesDamageTaken.
       filter = { ...filter, controller: undefined };
@@ -1151,10 +1160,19 @@ function matchesEventFilter(
       "targetInstanceId" in event.payload ? (event.payload as { targetInstanceId?: string }).targetInstanceId : undefined
     );
     if (targetId) {
-      const basePowerSnapshot = event.type === "CARD_KO" ? event.payload.preKO_basePower : undefined;
+      // Last-known information stamped by the K.O.: the card has already
+      // left the field. OPT-1033: keywords are stamped only when they differ
+      // from the printed ones, so an unstamped K.O. reads the printed set.
+      const koData = event.type === "CARD_KO" ? cardDb.get(event.payload.cardId) : undefined;
+      const lki = event.type === "CARD_KO"
+        ? {
+            basePower: event.payload.preKO_basePower,
+            keywords: event.payload.preKO_keywords ?? (koData ? printedFilterKeywords(koData) : undefined),
+          }
+        : undefined;
       const card = findCardInstance(state, targetId);
       if (card) {
-        if (!matchesFilter(card, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
+        if (!matchesFilter(card, filter.target_filter, cardDb, state, undefined, undefined, undefined, lki)) return false;
       } else {
         // OPT-453: field exits into the deck re-id the card (rules §3-1-6),
         // so the event's pre-transition instanceId is unresolvable by design
@@ -1175,7 +1193,7 @@ function matchesEventFilter(
           controller: event.playerIndex,
           owner: event.playerIndex,
         };
-        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
+        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state, undefined, undefined, undefined, lki)) return false;
       }
     }
   }

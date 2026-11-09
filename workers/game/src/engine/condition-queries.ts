@@ -1048,6 +1048,16 @@ export function cardTreatsAsAll(
 }
 
 /**
+ * Values a field-exit event captured before the card left the field. A
+ * watcher's filter reads these instead of the card's post-exit state.
+ */
+export interface LastKnownFilterInfo {
+  basePower?: number;
+  /** Runtime keywords at exit (`lastKnownKeywordsIfChanged`, else printed). */
+  keywords?: readonly string[];
+}
+
+/**
  * Check if a card instance matches a TargetFilter.
  * Used by condition evaluator and target resolver.
  */
@@ -1095,13 +1105,13 @@ export function matchesFilter(
   costOverride?: number,
   filterController?: 0 | 1,
   queries?: ConditionQueryServices,
-  basePowerOverride?: number
+  lki?: LastKnownFilterInfo
 ): boolean {
   const data = cardDb.get(card.cardId);
   if (!data) return false;
 
   const sharedCard = toSharedTargetFilterCard(card, data, () =>
-    basePowerOverride ?? queries?.getEffectiveBasePower(card, data, state, cardDb) ?? data.power ?? 0
+    lki?.basePower ?? queries?.getEffectiveBasePower(card, data, state, cardDb) ?? data.power ?? 0
   );
   const getReferencedCard = (
     ref: string
@@ -1139,6 +1149,7 @@ export function matchesFilter(
           ) {
             return true;
           }
+          if (lki?.keywords) return lki.keywords.includes(keyword);
           return queries.hasEffectiveKeyword(
             card,
             data,

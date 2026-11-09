@@ -44,6 +44,7 @@ export interface SharedTargetFilter {
   exclude_self?: boolean;
   name_matching_ref?: string;
   keywords?: string[];
+  keywords_not?: string[];
   has_trigger?: boolean;
   attribute?: string;
   attribute_not?: string;
@@ -91,6 +92,7 @@ export const TARGET_FILTER_KEYS = Object.freeze([
   "exclude_self",
   "name_matching_ref",
   "keywords",
+  "keywords_not",
   "has_trigger",
   "attribute",
   "attribute_not",
@@ -201,6 +203,16 @@ function matchesNumber(
   }
   const resolved = context.resolveDynamicValue?.(expected, card);
   return resolved == null || compareNum(actual, operator, resolved);
+}
+
+/** `keywords: ["RUSH"]` is also satisfied by [Rush: Character]. */
+function cardHasFilterKeyword(
+  card: SharedTargetFilterCard,
+  keyword: string,
+  context: SharedTargetFilterContext
+): boolean {
+  if (context.hasKeyword?.(card, keyword)) return true;
+  return keyword === "RUSH" && context.hasKeyword?.(card, "RUSH_CHARACTER") === true;
 }
 
 function normalized(values: readonly string[]): string[] {
@@ -399,19 +411,19 @@ export function matchesTargetFilter(
     if (referenced && !cardsShareName(card, referenced)) return false;
   }
 
-  if (filter.keywords) {
-    for (const keyword of filter.keywords) {
-      if (keyword === "RUSH") {
-        if (
-          !context.hasKeyword?.(card, "RUSH") &&
-          !context.hasKeyword?.(card, "RUSH_CHARACTER")
-        )
-          return false;
-      } else if (!context.hasKeyword?.(card, keyword)) {
-        return false;
-      }
-    }
-  }
+  if (
+    filter.keywords &&
+    !filter.keywords.every((keyword) => cardHasFilterKeyword(card, keyword, context))
+  )
+    return false;
+  // OPT-1033: "without [Keyword]" is the exact negation of `keywords`, read
+  // through the same runtime adapter (a negated printed keyword is absent; an
+  // externally granted one is present).
+  if (
+    filter.keywords_not &&
+    filter.keywords_not.some((keyword) => cardHasFilterKeyword(card, keyword, context))
+  )
+    return false;
   if (filter.has_trigger === true && !card.hasTrigger) return false;
   if (filter.has_trigger === false && card.hasTrigger) return false;
 

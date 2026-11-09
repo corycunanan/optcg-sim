@@ -257,6 +257,7 @@ interface TargetFilter {
 
   // --- Keyword / ability filters ---
   keywords?: Keyword[];
+  keywords_not?: Keyword[];
   has_trigger?: boolean;
   attribute?: Attribute;
   has_effect?: boolean;
@@ -364,6 +365,7 @@ Name matching respects name aliasing (rule 10.1): a card with "Also treat this c
 | Field | Type | Card Text | Example |
 |---|---|---|---|
 | `keywords` | `Keyword[]` | "a Character with [Blocker]" | OP09-084 |
+| `keywords_not` | `Keyword[]` | "a Character without [Blocker]" | EB05-010 |
 | `has_trigger` | `boolean` | "a card with a [Trigger]" | OP03-022, OP13-110 |
 | `attribute` | `Attribute` | "a <Special> attribute Character" | OP11-006 |
 | `has_effect` | `boolean` | "a Character with an effect" | (inverse of no_base_effect) |
@@ -383,6 +385,7 @@ type TriggerEffectType =
 ```
 
 - `no_base_effect` — true when the card has zero printed effect blocks. This checks the original card definition, not the current in-game state (granted effects do not disqualify).
+- `keywords_not` — the card has none of the listed keywords at runtime (the exact negation of `keywords`, through the same check as `keywords.ts` `hasEffectiveKeyword`). A printed or self-granted keyword is absent while the card is negated; a keyword granted by another card's effect still counts (OPT-253). On a K.O. watcher (`ANY_CHARACTER_KO`, `OPPONENT_CHARACTER_KO`) both `keywords` and `keywords_not` read the K.O.'d card's keywords as they were when it left the field (`CARD_KO.preKO_keywords`). `CAN_ATTACK_ACTIVE` is not allowed. EB05-010 Nico Robin: "one of your Characters with the <Wisdom> attribute and without [Blocker] is K.O.'d."
 - `lacks_effect_type` — the card does not have a printed effect block with the specified trigger type. EB03-001 Vivi: "up to 1 of your Characters without a [When Attacking] effect."
 - `has_trigger` — the card has the [Trigger] keyword. Used as a filter for search/play effects (OP03-022, ST29-014).
 
