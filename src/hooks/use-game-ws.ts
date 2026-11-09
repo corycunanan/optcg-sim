@@ -31,6 +31,24 @@ const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
   "PASS",
 ]);
 
+/**
+ * A prompt-less `game:state` is a full snapshot, so it normally ends any held
+ * prompt (OPT-905). The exception is the Blocker prompt: the server derives it
+ * from the battle step and sends it only as `game:prompt`, never on
+ * `state.pendingPrompt`, and it does not re-send it after the bare state
+ * broadcasts for an opponent's connect or disconnect. Keep it while the
+ * snapshot still shows that Block Step.
+ */
+function keepsDerivedBlockerPrompt(
+  prompt: PromptOptions | null,
+  state: GameState
+): boolean {
+  return (
+    prompt?.promptType === "SELECT_BLOCKER" &&
+    state.turn.battleSubPhase === "BLOCK_STEP"
+  );
+}
+
 const SPECTATOR_TOAST_BATCH_MS = 500;
 const SPECTATOR_RECONNECT_WINDOW_MS = 5_000;
 const SPECTATOR_CHURN_COOLDOWN_MS = 30_000;
@@ -195,6 +213,7 @@ export function useGameWs(
   const [canUndo, setCanUndo] = useState(false);
   const [gameError, setGameError] = useState<string | null>(null);
   const activePromptIdRef = useRef<string | null>(null);
+  const activePromptRef = useRef<PromptOptions | null>(null);
   const rejectionSequenceRef = useRef(0);
   const [actionRejection, setActionRejection] =
     useState<ActionRejection | null>(null);
@@ -231,9 +250,12 @@ export function useGameWs(
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
           const promptId = msg.state.pendingPrompt.promptId ?? null;
+          activePromptRef.current = msg.state.pendingPrompt.options;
           setActivePromptId(promptId);
           activePromptIdRef.current = promptId;
-        } else {
+        } else if (!keepsDerivedBlockerPrompt(activePromptRef.current, msg.state)) {
+          setActivePrompt(null);
+          activePromptRef.current = null;
           setActivePromptId(null);
           activePromptIdRef.current = null;
         }
@@ -258,10 +280,12 @@ export function useGameWs(
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
           const promptId = msg.state.pendingPrompt.promptId ?? null;
+          activePromptRef.current = msg.state.pendingPrompt.options;
           setActivePromptId(promptId);
           activePromptIdRef.current = promptId;
         } else {
           setActivePrompt(null);
+          activePromptRef.current = null;
           setActivePromptId(null);
           activePromptIdRef.current = null;
         }
@@ -277,6 +301,7 @@ export function useGameWs(
         break;
       case "game:prompt":
         setActivePrompt(msg.options);
+        activePromptRef.current = msg.options;
         setActivePromptId(msg.promptId ?? null);
         activePromptIdRef.current = msg.promptId ?? null;
         break;

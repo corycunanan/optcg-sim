@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -572,5 +573,53 @@ describe("BoardLayout bottom-player perspective", () => {
       renderer!.root.findByProps({ "data-testid": "mid-zone" }).props.onClick();
     });
     expect(onAction).toHaveBeenCalledWith({ type: "PASS" });
+  });
+});
+
+describe("BoardLayout Block Step with an in-place target prompt (OPT-897)", () => {
+  const inPlaceTargetPrompt = {
+    promptType: "SELECT_TARGET" as const,
+    cards: [players[1].characters[0]!],
+    validTargets: ["player-1-character"],
+    effectDescription: "Choose up to 1 of your opponent's Characters.",
+    countMin: 0,
+    countMax: 1,
+    ctaLabel: "Confirm",
+  };
+
+  function blockStepProps() {
+    return {
+      mid: renderer!.root.findByProps({ "data-testid": "mid-zone" }).props,
+      field: renderer!.root.findByProps({ "data-testid": "player-field" })
+        .props,
+    };
+  }
+
+  it("hides Block/Skip while the target prompt is pending and restores them after it resolves", () => {
+    renderComposition(0, {
+      interactionMode: "full",
+      activePrompt: inPlaceTargetPrompt,
+    });
+
+    const pending = blockStepProps();
+    expect(pending.mid["data-active-prompt"]).toBe("SELECT_TARGET");
+    expect(pending.mid["data-blocker-mode"]).toBe("false");
+    expect(pending.field["data-in-block-step"]).toBe("false");
+
+    act(() => {
+      renderer!.update(
+        React.createElement(BoardLayout, {
+          ...baseProps,
+          interactionMode: "full",
+          activePrompt: null,
+          bottomPlayerIndex: 0,
+        }),
+      );
+    });
+
+    const resolved = blockStepProps();
+    expect(resolved.mid["data-active-prompt"]).toBe("none");
+    expect(resolved.mid["data-blocker-mode"]).toBe("true");
+    expect(resolved.field["data-in-block-step"]).toBe("true");
   });
 });
