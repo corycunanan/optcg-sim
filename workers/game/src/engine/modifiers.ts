@@ -37,6 +37,23 @@ import { resolvePermanentDynamicValue } from "./dynamic-values.js";
 
 type ConditionContext = Omit<QueryConditionContext, "queries">;
 
+/**
+ * Modifier types an authored permanent block may carry, and the param each
+ * value-layer modifier reads. Anything else in a permanent `modifiers` list is
+ * never read by this module, so `schema-permanent-modifier-lint.ts` rejects it
+ * (OPT-953: OP15-070/071 authored an inert `SET_BASE_POWER` aura).
+ */
+export const PERMANENT_MODIFIER_PARAM: Readonly<Record<string, "value" | "amount" | null>> = {
+  SET_POWER: "value",
+  MODIFY_POWER: "amount",
+  SET_COST: "value",
+  MODIFY_COST: "amount",
+  GRANT_KEYWORD: null,
+  REMOVE_KEYWORD: null,
+  GRANT_ATTRIBUTE: null,
+  NEGATE_EFFECTS: null,
+};
+
 export interface CostEvaluationDiagnostics {
   layer2Iterations: number;
 }
@@ -631,7 +648,12 @@ export function getEffectiveBasePower(
   return power;
 }
 
-/** Total field power adds adjustments and DON!! to the effective base. */
+/**
+ * The one power evaluator. Total field power is the effective base (layers
+ * 0-1), plus additive modifiers (layer 2), DON!! (layer 3), and the current
+ * battle's Counter power on its target (layer 4). See
+ * docs/game-engine/VALUE-LAYER-CONTRACT.md.
+ */
 export function getEffectivePower(
   card: CardInstance,
   cardData: CardData,
@@ -682,7 +704,26 @@ export function getEffectivePower(
     power += card.attachedDon.length * 1000;
   }
 
-  return power;
+  return power + getCounterStepPower(card, state);
+}
+
+/**
+ * Layer 4 of the value-layer contract (docs/game-engine/VALUE-LAYER-CONTRACT.md):
+ * the [Symbol Counter] power the current battle added to its target.
+ *
+ * Rules §7-1-3-2-1 makes it a power increase on the attacked Leader or
+ * Character "during that battle". It is additive, so it sits above any base
+ * setting: OP06-009 Shuraiya's On Block "base power becomes 8000" can still
+ * be raised by a Counter (qa_op06.md, OP06-009 second ruling). The engine
+ * keeps it on `BattleContext.counterPowerAdded`; folding it in here gives
+ * every power read (filters, conditions, aggregates, set-to-0, copy, the
+ * battle result, and the client projection) the same value (OPT-1035).
+ */
+function getCounterStepPower(card: CardInstance, state: GameState): number {
+  const battle = state.turn.battle;
+  if (!battle || battle.targetInstanceId !== card.instanceId) return 0;
+  if (card.zone !== "CHARACTER" && card.zone !== "LEADER") return 0;
+  return battle.counterPowerAdded;
 }
 
 /**
@@ -849,16 +890,20 @@ export function getEffectiveCostForRead(
 }
 
 /**
- * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
+ * Layer 2 of cost (docs/game-engine/VALUE-LAYER-CONTRACT.md): MODIFY_COST.
  *
- * Each iteration, any un-included Layer 2 modifier whose filter now matches the
- * accumulated cost is included and applied. Iteration stops when a full pass
- * adds nothing. Once included, a modifier stays included for the remainder of
- * this evaluation (no un-applying), per Bandai ruling.
+ * OP10-042 Usopp (qa_op10.md, Bartolomeo rulings): permanent effects are
+ * processed first, then resolved auto effects in the order they resolved.
+ * A permanent whose threshold no longer holds after the auto effects drops
+ * off: base 3, Usopp "+1 to cost 2 or more", Kaku −3 → 0 (Usopp lost);
+ * with Tsuru −2 instead → 2 (Usopp kept).
  *
- * This resolves threshold scenarios like OP10-042 Usopp ("your {Dressrosa}
- * Characters with cost ≥2 get +1 cost") interacting with auto cost-reduction:
- * the filter sees the post-reduction cost rather than the base cost.
+ * Permanents use include-once fixed-point iteration (OPT-242, §8-1-3-3-5:
+ * turn player's first, repeated until nothing changes). A permanent is never
+ * removed by its own contribution (a "cost 4 or less → +1" stays on a base-4
+ * card at 5); it is removed only when the value without its contribution also
+ * fails its filter. Intermediate values may be negative (§1-3-6-2, OP02-121
+ * Kuzan); only the caller clamps the final value.
  */
 const MAX_COST_LAYER2_ITERATIONS = 16;
 
@@ -872,52 +917,101 @@ function applyLayer2CostModifiers(
   turnPlayerIndex: 0 | 1,
   diagnostics?: CostEvaluationDiagnostics
 ): number {
-  let cost = startingCost;
-
-  // Candidates: effects carrying a MODIFY_COST modifier. Block and
-  // modifier-level gates plus applicability are re-evaluated each pass.
   const rawCandidates = effects.filter(
     (e) => e.modifiers?.some((m) => m.type === "MODIFY_COST")
   );
-  const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
+  // §8-1-3-3-5: the turn player's permanents first, then the non-turn player's.
+  const permanents = sortByTurnPlayerPriority(
+    rawCandidates.filter((e) => e.category === "permanent"),
+    turnPlayerIndex
+  );
+  // Resolved (one-shot) cost changes keep the order they resolved in.
+  const resolved = rawCandidates.filter((e) => e.category !== "permanent");
 
-  const includedModifierKeys = new Set<string>();
-  for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
-    if (diagnostics) diagnostics.layer2Iterations = iter + 1;
-    let addedThisPass = false;
-    for (const effect of candidates) {
-      for (const [modifierIndex, mod] of (
-        effect.modifiers ?? []
-      ).entries()) {
-        const inclusionKey = `${effect.id}:${modifierIndex}`;
-        if (includedModifierKeys.has(inclusionKey)) continue;
+  const appliesAt = (
+    effect: RuntimeActiveEffect,
+    mod: Modifier,
+    cost: number,
+  ): boolean =>
+    (card && cardDb
+      ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
+      : effect.appliesTo?.includes(cardInstanceId) ?? false) &&
+    isModifierConditionMet(effect, mod, state, cardDb);
+  const amountOf = (effect: RuntimeActiveEffect, mod: Modifier) =>
+    permanentModifierParam(
+      mod,
+      "amount",
+      state,
+      effect.controller,
+      cardDb,
+      effect.sourceEffectBlockId,
+    );
 
-        if (mod.type !== "MODIFY_COST") continue;
-        const applies =
-          card && cardDb
-            ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
-            : effect.appliesTo?.includes(cardInstanceId);
-        if (!applies || !isModifierConditionMet(effect, mod, state, cardDb))
-          continue;
-        const amount = permanentModifierParam(
-          mod,
-          "amount",
-          state,
-          effect.controller,
-          cardDb,
-          effect.sourceEffectBlockId,
-        );
-        if (amount !== undefined) {
-          cost += amount;
-          includedModifierKeys.add(inclusionKey);
+  // Running total = start + included permanents + applied resolved changes.
+  let resolvedTotal = 0;
+  const included = new Map<string, number>();
+  const dropped = new Set<string>();
+  const current = () =>
+    startingCost + resolvedTotal + [...included.values()].reduce((a, b) => a + b, 0);
+
+  const includePermanents = (countPasses: boolean): boolean => {
+    let changed = false;
+    for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
+      if (countPasses && diagnostics) diagnostics.layer2Iterations = iter + 1;
+      let addedThisPass = false;
+      for (const effect of permanents) {
+        for (const [modifierIndex, mod] of (effect.modifiers ?? []).entries()) {
+          if (mod.type !== "MODIFY_COST") continue;
+          const key = `${effect.id}:${modifierIndex}`;
+          if (included.has(key) || dropped.has(key)) continue;
+          if (!appliesAt(effect, mod, current())) continue;
+          const amount = amountOf(effect, mod);
+          if (amount === undefined) continue;
+          included.set(key, amount);
           addedThisPass = true;
+          changed = true;
         }
       }
+      if (!addedThisPass) break;
     }
-    if (!addedThisPass) break;
+    return changed;
+  };
+
+  // Step 1: permanent effects.
+  includePermanents(true);
+
+  // Step 2: resolved auto effects, in resolution order.
+  for (const effect of resolved) {
+    for (const mod of effect.modifiers ?? []) {
+      if (mod.type !== "MODIFY_COST") continue;
+      if (!appliesAt(effect, mod, current())) continue;
+      const amount = amountOf(effect, mod);
+      if (amount !== undefined) resolvedTotal += amount;
+    }
+  }
+  if (resolved.length === 0) return current();
+
+  // Step 3: re-check the permanents against the post-auto value (OP10-042
+  // Kaku ruling), then let newly eligible permanents in, until stable.
+  for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
+    let changed = false;
+    for (const effect of permanents) {
+      for (const [modifierIndex, mod] of (effect.modifiers ?? []).entries()) {
+        const key = `${effect.id}:${modifierIndex}`;
+        const amount = included.get(key);
+        if (amount === undefined) continue;
+        const total = current();
+        if (appliesAt(effect, mod, total) || appliesAt(effect, mod, total - amount)) continue;
+        included.delete(key);
+        dropped.add(key);
+        changed = true;
+      }
+    }
+    if (includePermanents(false)) changed = true;
+    if (!changed) break;
   }
 
-  return cost;
+  return current();
 }
 
 // ─── Hand-Zone Modifiers ────────────────────────────────────────────────────
@@ -1064,46 +1158,6 @@ export function hasRemovedKeyword(
           isModifierConditionMet(e, m, state, cardDb)
       )
   );
-}
-
-/**
- * Returns the power contributed by symbol counters played this battle.
- * Stored on BattleContext.counterPowerAdded, not on the card.
- */
-export function getBattleDefenderPower(
-  defenderCard: CardInstance,
-  defenderCardData: CardData,
-  counterPowerAdded: number,
-  state: GameState,
-  cardDb?: Map<string, CardDataType>
-): number {
-  return (
-    getEffectivePower(defenderCard, defenderCardData, state, cardDb) +
-    counterPowerAdded
-  );
-}
-
-/**
- * Power of a card as the current battle sees it (OPT-909). Rules §7-1-3-2-1:
- * a [Symbol Counter] raises the attacked card's power "during that battle", so
- * the battle target reads its effective power plus
- * `BattleContext.counterPowerAdded`. Every other card, and every card outside
- * a battle, reads plain effective power.
- *
- * Use this for checks that run inside a battle against the card being
- * attacked, such as replacement target filters at the battle K.O.
- */
-export function getBattlePower(
-  card: CardInstance,
-  cardData: CardData,
-  state: GameState,
-  cardDb?: Map<string, CardDataType>
-): number {
-  const battle = state.turn.battle;
-  const power = getEffectivePower(card, cardData, state, cardDb);
-  if (!battle || battle.targetInstanceId !== card.instanceId) return power;
-  if (card.zone !== "CHARACTER" && card.zone !== "LEADER") return power;
-  return power + battle.counterPowerAdded;
 }
 
 // ─── One-Time Modifiers ──────────────────────────────────────────────────────

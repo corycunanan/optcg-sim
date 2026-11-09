@@ -98,7 +98,7 @@ Scheduled entries retain source identity/controller and their stored action/snap
 
 ## Effective values and limits
 
-`modifiers.ts` derives effective power/cost from printed values, supported base-setting and additive effects, conditions, and DON!! rules. Cost floors at zero; power may be negative. Supported layer ordering is implementation-specific; this document makes no universal set-to-zero or simultaneous rest/activate winner guarantee. Keyword queries and applicable prohibitions retain their own timing.
+`modifiers.ts` is the one evaluator for power and cost. Its layer order (printed, base-power settings with the highest winning, additive modifiers, DON!!, then Counter power on the battle target; for cost, settings, permanent then resolved changes with a threshold re-check) is the binding contract in [VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md), with one fixture per FAQ ruling. Cost floors at zero only at the final value; power may be negative. This document makes no simultaneous rest/activate winner guarantee. Keyword queries and applicable prohibitions retain their own timing.
 
 Effect stack depth remains 100 and the persisted per-resolution action budget remains 1,000. Engine exhaustion writes an `ENGINE_LIMIT` terminal outcome, distinct from the Comprehensive Rules unstoppable-loop draw. Repeated-state detection and player-declared loop counts remain unimplemented (OPT-952). GE-11/12 guard immutable service construction, cost-module boundaries, work-only production scheduling, discriminated unions, and stored snapshot parsing; their existing protections remain alongside the new drain guards.
 

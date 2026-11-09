@@ -107,7 +107,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **1-3-6.** Cost/power floor rules | **IMPL** | `modifiers.ts` clamps cost to ≥ 0; power has no floor per **1-3-6-1** | |
 | **1-3-6-1.** Power can be negative | **IMPL** | `modifiers.ts:17–18` comment; no `Math.max` on power | Correctly allows negative power |
 | **1-3-6-1-1.** Negative power doesn't trash | **IMPL** | No zero-power KO check exists | Correct by omission — no auto-KO at 0 power |
-| **1-3-6-2.** Cost can go negative during calculation | **IMPL** | `modifiers.ts → getEffectiveCost()` | Mid-calculation negatives allowed, clamped at final value |
+| **1-3-6-2.** Cost can go negative during calculation | **IMPL** | `modifiers.ts → getEffectiveCost()` | Mid-calculation negatives allowed, clamped at final value. OP02-121 fixture in [opt-953-value-layer-rulings.test.ts](../../workers/game/src/__tests__/opt-953-value-layer-rulings.test.ts); see [VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md) |
 | **1-3-7.** Effects processed top-to-bottom | **IMPL** | `effect-resolver/resolver.ts` | Actions processed sequentially from schema |
 | **1-3-8.** Rest takes precedence over activate | **PARTIAL** | — | No explicit conflict resolution for simultaneous rest+activate on same card |
 | **1-3-9-1.** Cost definition | **IMPL** | `CardData.cost`, `getEffectiveCost()` in `modifiers.ts` | |
@@ -229,7 +229,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **4-9-2.** Base power can be changed by effects | **IMPL** | `modifiers.ts` `getEffectiveBasePower` reads the highest applicable setting, otherwise printed power; excludes additive/DON. Field filters and K.O. event snapshots use changed base; off-field identity reads printed power. | OPT-833; OP17-112 / OP14-053 FAQs |
-| **4-9-2-1.** Multiple base-setting effects: use highest | **IMPL** | `modifiers.ts → getEffectivePower()` Layer 1 | Base-setting effects resolved; highest value wins |
+| **4-9-2-1.** Multiple base-setting effects: use highest | **IMPL** | `modifiers.ts → getEffectiveBasePower()` layer P1 | Highest value wins; resolved settings capture their value and survive the source leaving ([VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md)) |
 | **4-9-2-2.** Multiple base-setting effects for cost: use highest | **IMPL** | `modifiers.ts → getEffectiveCost()` Layer 1 | Same as above for cost |
 
 ### 4-10/4-11/4-12. "If"/"Then", "Remove", "Set Power to 0"
@@ -238,7 +238,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **4-10.** If/Then clause dependencies | **IMPL** | `conditions.ts` | 40+ condition types including compound (all_of, any_of, not) |
 | **4-11.** "Remove" = move to another area | **IMPL** | `effect-resolver/actions/removal.ts` | KO, RETURN_TO_HAND, TRASH_CARD, RETURN_TO_DECK, REMOVE_FROM_GAME actions |
-| **4-12.** «Set Power to 0» = reduce by current power | **IMPL** | `effect-resolver/actions/modifiers.ts` | SET_BASE_POWER action handler |
+| **4-12.** «Set Power to 0» = reduce by current power | **IMPL** | `effect-resolver/actions/modifiers.ts → executeSetPowerToZero()` | Captured reduction by `getEffectivePower`, so a battle target's Counter power is included (OPT-1035) |
 
 ---
 
@@ -355,7 +355,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **7-1-3-1.** "When attacked" effects activate during Counter Step | **IMPL** | `triggers.ts` | WHEN_ATTACKED trigger fires during counter step |
 | **7-1-3-2.** Defender can use Symbol Counters and Counter Events | **IMPL** | `executeUseCounter()`, `executeUseCounterEvent()` in `battle.ts` | |
-| **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts:140–182`, `getBattlePower()` in `modifiers.ts` | Trashes card, adds `counterValue` to `counterPowerAdded`. Replacement `target_filter` power checks read the battle target's power with it (OPT-909, [opt-903-sabo-replaced-card-power.test.ts](../../workers/game/src/__tests__/opt-903-sabo-replaced-card-power.test.ts)); other battle-time power reads are inventoried in [evidence/opt-909](./evidence/opt-909/battle-power-reads.md) |
+| **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts → executeUseCounter()`, `getEffectivePower()` layer P4 in `modifiers.ts` | Trashes card, adds `counterValue` to `counterPowerAdded`. Every power read sees it on the battle target, above base-power settings (OPT-1035, OP06-009 ruling; [opt-1035-counter-power-reads.test.ts](../../workers/game/src/__tests__/opt-1035-counter-power-reads.test.ts), [opt-903-sabo-replaced-card-power.test.ts](../../workers/game/src/__tests__/opt-903-sabo-replaced-card-power.test.ts)) |
 | **7-1-3-2-2.** Counter Event: pay cost, trash, activate [Counter] | **IMPL** | `battle.ts:186–211` + `effect-resolver/` | Cost paid, card trashed, effect resolved via schema |
 | **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **IMPL** | `pending-work-drain.ts`, `battle.ts → checkpointBattleStepEnd()` | OPT-967: Counter children complete before Damage entry; removal emits one aborted End of Battle with no damage/result events; `opt-967-step-end.test.ts` |
 
