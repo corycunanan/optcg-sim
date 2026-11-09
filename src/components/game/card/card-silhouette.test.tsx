@@ -114,6 +114,7 @@ describe("board card silhouette (OPT-720)", () => {
       "eligible",
       "attacker",
       "defender",
+      "defender-selected",
       "counter",
       "winner",
       "redirected",
