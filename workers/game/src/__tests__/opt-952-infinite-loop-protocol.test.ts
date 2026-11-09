@@ -38,7 +38,7 @@ function frame(state: GameState, id: string, block: EffectBlock = loopBlock): Ef
     sourceCardInstanceId: state.players[0].leader.instanceId,
     controller: 0,
     effectBlock: block,
-    phase: "EXECUTING",
+    phase: "AWAITING_TARGET_SELECTION",
     pausedAction: null,
     remainingActions: [],
     resultRefs: [],
@@ -51,7 +51,7 @@ function frame(state: GameState, id: string, block: EffectBlock = loopBlock): Ef
     pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
-  } as EffectStackFrame;
+  };
 }
 
 /** Each loop action activates the same effect, does `actionsPerLoop` actions, and finishes. */
