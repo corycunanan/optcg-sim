@@ -401,7 +401,7 @@ it("rejects missing provenance and misplaced/duplicate completion owners atomica
   expect(() =>
     parseStoredSession({
       state,
-      undoHistory: [{ ...state, costSemanticsVersion: 9 }],
+      undoHistory: [{ ...state, costSemanticsVersion: 10 }],
       cardDb: Object.fromEntries(r.db),
     })
   ).toThrow(/undoHistory\[0\].*costSemanticsVersion/);

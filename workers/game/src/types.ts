@@ -116,7 +116,7 @@ export interface GameState extends Omit<
   /** Native10 retains field-trash rollout independently of cost semantics. */
   fieldTrashSemanticsVersion?: 8 | 9;
   /** Required for native8: recorded game-wide capability, never upgraded on load. */
-  costSemanticsVersion?: 6 | 7 | 8;
+  costSemanticsVersion?: 6 | 7 | 8 | 9;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];

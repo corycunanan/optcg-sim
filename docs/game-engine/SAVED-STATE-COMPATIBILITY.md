@@ -1228,3 +1228,24 @@ OPT-1032 adds the replacement event `WOULD_TAKE_DAMAGE` (EB05-052 Gloriosa). It 
 An effect damage offer parks the issuing chain as an ordinary `INTERRUPTED_BY_TRIGGERS` continuation with the DEAL_DAMAGE / SELF_TAKE_DAMAGE as its `pausedAction`.
 
 **Rollback floor:** this PR's merge. An earlier build rejects a save holding a pending damage offer by its enum value (`SessionLoadError`, §5.2). Every other save is unaffected, so the writer golden is byte-identical. No reader-first split was made: an earlier engine that could load the offer still could not resume it (it has no `WOULD_TAKE_DAMAGE` matching, so a resumed battle continuation would deal no damage), so a reader-only release would not give a correct rollback target.
+
+## Cost mode 9: replaced cost keeps the paid portion (OPT-958)
+
+`costSemanticsVersion: 9` keeps every mode 8 rule and changes one thing: what happens when a printed activation cost is replaced after payment has started. Example: ST22-005 Kouzuki Oden rests 3 DON!!, then returns OP17-043 Ganzui, and the player accepts Ganzui's "trash 2 cards from your hand instead".
+
+| | Modes 6–8 (Decision 10, kept) | Mode 9 |
+|---|---|---|
+| Cost paid before the replacement (the 3 DON!!) | Rolled back to active | Stays paid (8-3-1-3-1) |
+| [Once Per Turn] use | Not spent; the player may retry | Spent (10-2-13-5) |
+| Effect after the colon | Not processed (8-3-1-7) | Not processed (8-3-1-7) |
+| Board while the replacement offer is open | Activation baseline | Staged payment (the 3 DON!! already rested) |
+
+Spending the use on a replaced cost reads 10-2-13-5 as covering a cost that was not paid as printed. No ruling addresses the multi-cost case directly; the Life-cost replacement path (`finishReplacedLifeCost`, OPT-822) already uses this reading in every mode, so mode 9 makes the two replacement paths agree.
+
+Unchanged in mode 9: initial infeasibility (8-3-1-3) still blocks activation before anything is paid; declining the replacement pays the printed cost and resolves the effect; inability after payment starts with no replacement still rolls back to the activation baseline; and a terminal checkpoint during payment ends the game with the paid costs standing.
+
+**Implementation.** `retainsReplacedCostPrefix()` (`engine/native-cost-semantics.ts`) is the only gate. Under it, the five cost-exit replacement sites (`cost/orchestrator.ts` fixed exit; `resume/cost.ts` place-to-deck, arrange, place-to-Life and the selected field exit) evaluate the replacement on the staged payment instead of the baseline overlay, the offer is materialized on that state, and `abortReplacedCost()` finishes through `finishReplacedLifeCost()`: it spends the use once, publishes the staged payment events held on the COST frame and drains waiting triggers. No new key, frame kind or stage is written; a mode 9 save differs from mode 8 only by its `costSemanticsVersion` value and the board it holds while an offer is open.
+
+**Reader and writer.** The reader PR accepts `costSemanticsVersion: 9` on schema 8–11 envelopes and runs it; setup still writes mode 8, so no production game uses mode 9 until the writer PR switches `setupGame` to 9 after the reader is deployed. Mode is never promoted on load: a mode 8 game keeps Decision 10 until it ends. **Rollback floor after the writer ships:** the reader merge. Every earlier build rejects `costSemanticsVersion: 9` at load (`SessionLoadError`).
+
+Tests: `opt-958-mode9-replaced-cost.test.ts` (authored Oden/Ganzui accept/decline with reload at every prompt, synthetic fixed exit, synthetic K.O. cost with authored OP08-045 Thatch, initial infeasibility), the mode 9 case in `opt-824-give-don-cost.test.ts` (OP13-007). The mode 8 deviation suites (`opt-864-decision-10-replaced-cost-rollback.test.ts`, `opt-969-mode8-policy.test.ts`, the Decision 10 cases in `opt-1001-field-trash.test.ts` and the frozen mode 8 corpora) stay unchanged.

@@ -306,6 +306,31 @@ describe("OPT-824 GIVE_DON cost — OP13-007", () => {
     expect(donGivenEvents(f)).toHaveLength(0);
   });
 
+  it("OPT-958 mode9: keeps the given DON!! when the later trash-this-Character cost is replaced (8-3-1-3-1, 8-3-1-7)", () => {
+    const { f, asl, foe } = setupAsl();
+    f.state = { ...f.state, schemaVersion: 8, costSemanticsVersion: 9 };
+    withLeaveFieldReplacement(f, asl);
+    const leader = f.state.players[P0].leader;
+    const before = power(f, foe);
+    activateAsl(f, asl);
+    f.accept();
+    f.select([leader.instanceId]);
+    // Mode9 offers the replacement on the staged payment: the give is already paid.
+    expect(prompt(f)?.promptType).toBe("OPTIONAL_EFFECT");
+    expect(f.state.players[P0].leader.attachedDon).toHaveLength(1);
+    expect(activeCostDon(f)).toBe(2);
+    f.persist();
+    f.accept();
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.effectStack).toHaveLength(0);
+    expect(f.state.players[P0].characters.some((c) => c?.instanceId === asl.instanceId)).toBe(true);
+    expect(f.state.players[P0].leader.attachedDon).toHaveLength(1);
+    expect(activeCostDon(f)).toBe(2);
+    // The effect after the colon (−3000) is not processed.
+    expect(power(f, foe)).toBe(before);
+    expect(donGivenEvents(f)).toHaveLength(1);
+  });
+
   it("commits the give exactly once when the trash cost's replacement is declined", () => {
     const { f, asl, foe } = setupAsl();
     withLeaveFieldReplacement(f, asl);

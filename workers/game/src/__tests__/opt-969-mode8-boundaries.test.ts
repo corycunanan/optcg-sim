@@ -55,7 +55,7 @@ for (const mode of [6, 7, 8] as const) for (const embedded of [false, true]) it(
   expect(loaded.undoHistory.map(s => s.costSemanticsVersion)).toEqual(saved.undoHistory.map(() => mode));
 });
 
-for (const badMode of [undefined, null, 0, 9, "8"]) for (const location of ["live", "oldest-undo"] as const) it(`rejects ${String(badMode)} in ${location} before bounding/IDs/storage/metrics`, async () => {
+for (const badMode of [undefined, null, 0, 10, "8"]) for (const location of ["live", "oldest-undo"] as const) it(`rejects ${String(badMode)} in ${location} before bounding/IDs/storage/metrics`, async () => {
   const rt = await runtime(); const r = fixture(8); const m = memory(rt);
   const invalid = structuredClone(r.state) as GameState;
   (invalid as unknown as Record<string, unknown>).costSemanticsVersion = badMode;
@@ -71,7 +71,7 @@ for (const badMode of [undefined, null, 0, 9, "8"]) for (const location of ["liv
 
 for (const embedded of [false, true]) it(`unknown undo mode rejects raw load atomically embedded=${embedded}`, async () => {
   const rt = await runtime(); const r = fixture(8); const bytes = await save(rt, r.state, r.db);
-  const bad = structuredClone(toPersistedGameState(r.state)) as unknown as Record<string, unknown>; bad.costSemanticsVersion = 9;
+  const bad = structuredClone(toPersistedGameState(r.state)) as unknown as Record<string, unknown>; bad.costSemanticsVersion = 10;
   if (embedded) (bytes.session as Record<string, unknown>).undoHistory = [bad];
   else bytes["session:undo-history"] = [bad];
   const m = memory(rt, bytes); const before = structuredClone(m.values);

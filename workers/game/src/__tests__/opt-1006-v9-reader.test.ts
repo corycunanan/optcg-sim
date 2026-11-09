@@ -22,7 +22,7 @@ for (const mode of [6, 7, 8] as const) it(`OPT-1006 v9 preserves explicit cost m
   expect(prior.schemaVersion).toBe(8);
   expect(toPersistedGameState(snapshot.state).schemaVersion).toBe(9);
 });
-for (const mode of [undefined, null, 5, 9, "8"]) for (const undo of [false, true]) it(`OPT-1006 v9 invalid cost mode ${mode}, ${undo ? "undo" : "live"}, rejects atomically`, async () => {
+for (const mode of [undefined, null, 5, 10, "8"]) for (const undo of [false, true]) it(`OPT-1006 v9 invalid cost mode ${mode}, ${undo ? "undo" : "live"}, rejects atomically`, async () => {
   const r = rig(); const valid = { ...toPersistedGameState(r.state), schemaVersion: 8, costSemanticsVersion: 8 };
   const bad = { ...valid, schemaVersion: 9, costSemanticsVersion: mode };
   const storage = new MemorySessionStorage();

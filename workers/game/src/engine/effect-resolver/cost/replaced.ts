@@ -27,6 +27,9 @@ import type { EffectResolverServices } from "../types.js";
  * handleAwaitingOptionalResponse), complete hand-trash cost attribution from
  * the frame's source snapshot, then admit canonical hand trash to this scan so
  * its watchers queue alongside `pendingTriggers` (OPT-795, OPT-857).
+ * Used by Life-cost replacements in every mode and, from cost mode9, by
+ * cost-exit replacements (OPT-958). `markUse` is false when the use is
+ * already recorded.
  */
 export function finishReplacedLifeCost(
   state: GameState,
@@ -38,9 +41,10 @@ export function finishReplacedLifeCost(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices,
   resultRefs: Map<string, EffectResult>,
-  triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
+  triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"],
+  markUse = true,
 ) {
-  if (isOncePerTurnBlock(block))
+  if (markUse && isOncePerTurnBlock(block))
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   completeHandTrashCostSources(
     events,
