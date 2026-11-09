@@ -524,8 +524,8 @@ export function convertToCurrentShape(
   validateFieldTrashCapability(raw, version, reason => { throw new SessionLoadError(location, reason); });
   validateScheduledSourceSnapshots(raw, version, reason => { throw new SessionLoadError(location, reason); });
   validateFieldTrashDiscriminators(raw, fieldTrashSemanticsVersion(raw, version), reason => { throw new SessionLoadError(location, reason); });
-  if (version >= 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
-    throw new SessionLoadError(location, `native${version} requires explicit costSemanticsVersion 6, 7 or 8`);
+  if (version >= 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8 && raw.costSemanticsVersion !== 9) {
+    throw new SessionLoadError(location, `native${version} requires explicit costSemanticsVersion 6, 7, 8 or 9`);
   }
   if (version < 8 && "costSemanticsVersion" in raw) {
     throw new SessionLoadError(location, "costSemanticsVersion requires schemaVersion 8");

@@ -517,7 +517,7 @@ export const StackFrameCore = z.strictObject({
 
 export const PersistedGameStateV3 = z.strictObject({
   fieldTrashSemanticsVersion: z.union([z.literal(8), z.literal(9)]).optional(),
-  costSemanticsVersion: z.union([z.literal(6), z.literal(7), z.literal(8)]).optional(),
+  costSemanticsVersion: z.union([z.literal(6), z.literal(7), z.literal(8), z.literal(9)]).optional(),
   id: z.string(),
   executionContext: ExecutionContext,
   players: z.tuple([PlayerState, PlayerState]),

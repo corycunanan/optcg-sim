@@ -395,7 +395,7 @@ export function executeTrashCard(
   const fieldMode = fieldTrashSemanticsVersion(state);
   const nativeFieldTrash = (state.schemaVersion === 10 || state.schemaVersion === 11) || fieldMode === 9 ||
     (state.schemaVersion === 8 && (state.costSemanticsVersion === 6 ||
-      state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8));
+      state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8 || state.costSemanticsVersion === 9));
   if (nativeFieldTrash && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
     state = (state.schemaVersion === 10 || state.schemaVersion === 11)
       ? { ...state, fieldTrashSemanticsVersion: 9 }

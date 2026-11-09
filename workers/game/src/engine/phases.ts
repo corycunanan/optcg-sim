@@ -361,7 +361,7 @@ function continueEndPhase(
   // historical callers must pass through session ingress, not invent a mode here.
   if (!legacy && queue.length > 1 && !selectedObligation &&
       (state.schemaVersion === 8 || state.schemaVersion === 9 || state.schemaVersion === 10) &&
-      (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8)) {
+      (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8 || state.costSemanticsVersion === 9)) {
     state = { ...state, schemaVersion: 11, fieldTrashSemanticsVersion: fieldTrashSemanticsVersion(state) };
   }
   // Already-resolved obligations must not pass through trigger activation gates.
