@@ -1028,8 +1028,8 @@ The `target_effect` field names the EffectBlock to activate, either by its block
 
 | Text Pattern | Target Effect | Example Cards |
 |-------------|---------------|---------------|
-| "[Trigger] Activate this card's [Counter] effect." | `COUNTER_EVENT` | ST03-016, OP01-028, OP01-030 |
-| "[Trigger] Activate this card's [Main] effect." | `MAIN_EVENT` | ST21-017, EB01-020, EB01-051, EB04-049 |
+| "[Trigger] Activate this card's [Counter] effect." | `COUNTER_EVENT` | ST03-016, OP01-028 |
+| "[Trigger] Activate this card's [Main] effect." | `MAIN_EVENT` | OP01-030, ST21-017, EB01-020, EB01-051, EB04-049 |
 | "[Trigger] Activate this card's [On Play] effect." | `ON_PLAY` | OP13-113, OP14-108 |
 
 Example — ST03-016 (Trigger activates Counter):

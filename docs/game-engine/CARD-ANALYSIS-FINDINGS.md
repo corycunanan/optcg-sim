@@ -196,10 +196,10 @@ Generic ON_KO fires on any K.O. The card pool shows cause-specific variants:
 
 ### 1.6 Self-Referencing Effect Reuse
 
-Trigger effects that invoke a different effect on the same card:
+Trigger effects that invoke a different effect on the same card. The card's own type and its referenced block are listed separately: the reusing card is classified by what it is, and the `[Trigger]` only points back at one of its blocks.
 
-- "[Trigger] Activate this card's [Counter] effect." — ST03-016, OP01-028, OP01-030
-- "[Trigger] Activate this card's [Main] effect." — ST21-017, EB01-020, EB01-051, EB04-049
+- "[Trigger] Activate this card's [Counter] effect." — ST03-016 and OP01-028, both [Counter] Events (`docs/cards/ST-03.md`, `docs/cards/OP-01.md`). The `[Trigger]` block reuses the card's `COUNTER_EVENT` block; it is not a separate effect category (OPT-956).
+- "[Trigger] Activate this card's [Main] effect." — OP01-030, ST21-017, EB01-020, EB01-051, EB04-049, all [Main] Events
 - "[Trigger] Activate this card's [On Play] effect." — OP13-113, OP14-108
 
 **Schema requirement:** A `REUSE_EFFECT` action primitive that references another effect block on the same card by its trigger type.
@@ -495,7 +495,7 @@ The initial plan had ~25 action primitives. The full card pool requires approxim
 |-----------|-------------|---------------|
 | `ACTIVATE_EVENT_FROM_HAND` | Resolve an Event's effect from hand via another card's effect | OP12-041 Sanji, OP15-014 Bartolomeo, OP15-046 Sabo |
 | `ACTIVATE_EVENT_FROM_TRASH` | Execute Event effect from trash (flashback) | EB03-031 Vinsmoke Reiju |
-| `REUSE_EFFECT` | Activate another effect on the same card by reference | ST03-016, ST21-017, OP01-028, OP13-113, OP14-108 |
+| `REUSE_EFFECT` | Activate another effect on the same card by reference | [Counter] Events ST03-016 and OP01-028 (Trigger → `COUNTER_EVENT`); ST21-017 (Trigger → `MAIN_EVENT`); Characters OP13-113 and OP14-108 (Trigger → `ON_PLAY`) |
 | `NEGATE_TRIGGER_TYPE` | Blanket negate all effects of a given trigger type | OP09-081 Marshall.D.Teach: "Your [On Play] effects are negated" |
 | `WIN_GAME` | Trigger win condition | OP09-118 Gol.D.Roger |
 | `GRANT_ATTRIBUTE` | Give a card an attribute (Slash, Strike, etc.) | OP15-093 The Risky Brothers |
