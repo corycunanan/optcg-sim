@@ -5,7 +5,7 @@ import { runtime, memory, save, command } from "./native7-producer-support.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 
 for (const activeCount of [0, 1, 2]) it(`current EB02-061 requires two active DON through actual attack/reload: active=${activeCount}`, async () => {
-  const r = rig(); expect(r.state.costSemanticsVersion).toBe(8);
+  const r = rig(); r.state.costSemanticsVersion = 8;
   r.deck(0, 5); r.deck(1, 5); r.life(0, 1);
   const luffy = r.put("EB02-061", 0, "CHARACTER");
   const p = r.state.players[0]; const all = p.donCostArea;
@@ -37,7 +37,7 @@ for (const activeCount of [0, 1, 2]) it(`current EB02-061 requires two active DO
 
 for (const cardId of ["OP12-070", "OP15-069"]) for (const domain of ["leader", "character", "stage-only", "none"] as const)
 it(`current ${cardId} field substitute ${domain} through public removal/reload`, async () => {
-  const r = rig(); expect(r.state.costSemanticsVersion).toBe(8); r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); r.state.costSemanticsVersion = 8; r.deck(0, 5); r.deck(1, 5);
   const victim = r.put(cardId, 0, "CHARACTER"); const p = r.state.players[0];
   const [donor, ...reserve] = p.donCostArea; p.donCostArea = []; p.donDeck.push(...reserve);
   const host = domain === "character" ? victim : domain === "stage-only" ? r.put("writer-donor-stage", 0, "STAGE") : p.leader;

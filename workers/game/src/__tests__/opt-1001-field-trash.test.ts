@@ -16,8 +16,8 @@ let floor: Runtime;
 beforeAll(async () => { floor = await runtime(process.env.OPT1006_WRITER_FLOOR_ROOT); });
 const captures: { r: Rig; initial: GameState; starts: GameState[]; replies: GameAction[]; history: GameState[][] }[] = [];
 function setup(mode: 6 | 7 | 8 = 8) {
-  expect(setupGame().state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
-  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 }); r.deck(0, 10); r.deck(1, 10); r.leader(0, "OP11-001");
+  expect(setupGame().state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
+  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 }); r.deck(0, 10); r.deck(1, 10); r.leader(0, "OP11-001");
   r.state = { ...r.state, schemaVersion: 8, costSemanticsVersion: mode };
   const capture = { r, initial: structuredClone(r.state), starts: [] as GameState[], replies: [] as GameAction[], history: [] as GameState[][] }; captures.push(capture);
   const coordinator = new SessionCoordinator(); let undo: GameState[] = [];

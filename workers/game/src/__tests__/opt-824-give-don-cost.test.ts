@@ -285,8 +285,9 @@ describe("OPT-824 GIVE_DON cost — OP13-007", () => {
     f.state = { ...f.state, activeEffects: [...f.state.activeEffects, replacement as never] };
   }
 
-  it("rolls back the given DON!! when the later trash-this-Character cost is replaced (8-3-1-7)", () => {
+  it("cost mode 8 (Decision 10): rolls back the given DON!! when the later trash-this-Character cost is replaced (8-3-1-7)", () => {
     const { f, asl, foe } = setupAsl();
+    f.state = { ...f.state, schemaVersion: 8, costSemanticsVersion: 8 };
     withLeaveFieldReplacement(f, asl);
     const leader = f.state.players[P0].leader;
     const before = power(f, foe);

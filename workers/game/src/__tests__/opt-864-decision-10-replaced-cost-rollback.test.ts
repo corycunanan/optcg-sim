@@ -69,6 +69,8 @@ const REST_THEN_TRASH_SELF: EffectBlock = {
 
 function setup(): { r: Rig; ganzui: CardInstance } {
   const r = rig();
+  // Decision 10 is the cost mode 6–8 behavior; new games use mode 9.
+  r.state.costSemanticsVersion = 8;
   r.deck(P0, 5);
   for (let i = 0; i < 3; i++) r.put(`opt958-hand-${i}`, P0, "HAND");
   const authored = getEffectSchema("OP17-043")!;
