@@ -13,6 +13,7 @@ import {
   terminateForEngineLimit,
 } from "./engine-limits.js";
 import { allocateEngineId } from "./execution-context.js";
+import { observeFramePush } from "./loop-protocol.js";
 
 /** Typed placeholder for continuation frames that do not own a schema block. */
 export const CONTINUATION_EFFECT_BLOCK: EffectBlock = {
@@ -32,6 +33,7 @@ export function pushFrame(state: GameState, frame: EffectStackFrame): GameState 
       attemptedFrameId: frame.id,
     });
   }
+  observeFramePush(state, frame);
   return {
     ...state,
     effectStack: [...state.effectStack, frame],

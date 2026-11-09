@@ -21,6 +21,7 @@ type EngineLimitKind = Extract<
   EngineLimitDiagnostic,
   { kind: "EFFECT_STACK_DEPTH" | "ACTION_BUDGET" }
 >;
+type InfiniteLoopKind = Extract<EngineLimitDiagnostic, { kind: "INFINITE_LOOP" }>;
 type EngineContractKind = Extract<EngineLimitDiagnostic, { kind: "ENGINE_CONTRACT" }>;
 
 export type TerminalOutcome =
@@ -45,6 +46,8 @@ export type TerminalOutcome =
   | { kind: "EXTERNAL_RESULT"; winner: 0 | 1; reason: string }
   /** A bounded engine guard stopped resolution; not a rules draw (Decision 5). */
   | { kind: "ENGINE_LIMIT"; diagnostic: EngineLimitKind }
+  /** Rule 11-1-1-1: a loop neither player can stop (OPT-952). */
+  | { kind: "INFINITE_LOOP"; diagnostic: InfiniteLoopKind }
   | { kind: "ENGINE_CONTRACT"; diagnostic: EngineContractKind };
 
 /** How the losing player lost at a single-winner rules checkpoint. */
@@ -70,6 +73,8 @@ export function terminalReasonCode(outcome: TerminalOutcome): GameEndReasonCode 
       return "FALLBACK_CONCEDE";
     case "ENGINE_LIMIT":
       return "ENGINE_LIMIT";
+    case "INFINITE_LOOP":
+      return "INFINITE_LOOP_DRAW";
     case "ENGINE_CONTRACT":
       return "ENGINE_CONTRACT";
   }
@@ -77,6 +82,8 @@ export function terminalReasonCode(outcome: TerminalOutcome): GameEndReasonCode 
 
 export const ENGINE_LIMIT_REASON =
   "Engine resolution limit reached — the game ended with no winner";
+export const INFINITE_LOOP_REASON =
+  "Infinite loop that neither player can stop — the game is a draw (rule 11-1-1-1)";
 export const ENGINE_CONTRACT_REASON = "Engine contract failure — game ends in a draw";
 
 export function winGameReason(winner: 0 | 1): string {
@@ -121,6 +128,14 @@ function describe(outcome: TerminalOutcome): {
         winner: null,
         reason: ENGINE_LIMIT_REASON,
         engineOutcome: { type: "ENGINE_LIMIT", diagnostic: outcome.diagnostic },
+        diagnostic: outcome.diagnostic,
+      };
+    case "INFINITE_LOOP":
+      return {
+        status: "FINISHED",
+        winner: null,
+        reason: INFINITE_LOOP_REASON,
+        engineOutcome: { type: "INFINITE_LOOP_DRAW", diagnostic: outcome.diagnostic },
         diagnostic: outcome.diagnostic,
       };
     case "ENGINE_CONTRACT":
