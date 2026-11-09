@@ -5,8 +5,15 @@ import { findCardInstance } from "../state.js";
 import { isGameTerminated } from "../terminal.js";
 import type { HandlerResult } from "./types.js";
 
+/** Whether executing these actions can register a scheduled action. An
+ * APPLY_PROHIBITION's conditional_override.action only describes what the
+ * prohibition still allows; it never runs from this block, so it cannot
+ * schedule. Static walkers (lint, inventory, registry refs) keep using
+ * getNestedActions directly and still see the override (OPT-1031).
+ */
 export function actionsCanSchedule(actions: readonly Action[] | undefined): boolean {
-  return actions?.some(action => action.type === "SCHEDULE_ACTION" || actionsCanSchedule(getNestedActions(action))) ?? false;
+  return actions?.some(action => action.type === "SCHEDULE_ACTION" ||
+    (action.type !== "APPLY_PROHIBITION" && actionsCanSchedule(getNestedActions(action)))) ?? false;
 }
 
 /** Reader10 resumes already activated work. The future writer activates10 at
