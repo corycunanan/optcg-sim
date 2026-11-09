@@ -576,6 +576,7 @@ const EventPayloadSchemas = {
     preKO_donCount: FiniteNumber,
     preKO_basePower: FiniteNumber.optional(),
     preKO_keywords: z.array(z.string()).optional(),
+    preKO_negated: z.literal(true).optional(),
     cardType: z.literal("STAGE").optional(),
   }),
   CARD_DRAWN: z.strictObject({

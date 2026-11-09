@@ -149,7 +149,7 @@ describe("OPT-1008 bounded conditional permanent negation", () => {
     vi.stubGlobal("Set", CountingSet);
     try {
       expect(isCardNegated(ally, r.state, r.db)).toBe(false);
-      expect(allocations).toBe(1); // a fresh root guard after the exception
+      expect(allocations).toBe(2); // fresh root guards (visiting, excludedFlags) after the exception
     } finally { vi.unstubAllGlobals(); r.state.activeEffects = effects; }
     expect(isCardNegated(ally, r.state, r.db)).toBe(true);
     aura.conditions = { type: "IS_MY_TURN", controller: "OPPONENT" };

@@ -452,9 +452,11 @@ export function matchTriggersForEvent(
     // OPT-253: skip triggers whose source Character is currently effect-negated.
     // [Trigger] on Life (ON_TRIGGER_FROM_LIFE) is exempt — field-level negation
     // cannot affect Life-zone cards, and the source is normally in Life at fire
-    // time. Likewise ON_KO triggers from the just-KO'd card are allowed through
-    // the zone exception above; any negation the card carried into the trash
-    // effectively ended with the zone change.
+    // time. ON_KO triggers from the just-KO'd card pass the zone exception
+    // above, so their negation is read from the K.O. snapshot instead: a card
+    // negated when it was K.O.'d does not activate [On K.O.] (OPT-954,
+    // qa_op09.md:166, qa_op10.md:211, qa_op06.md:206).
+    if (isOnKOSelfTrigger && event.type === "CARD_KO" && event.payload.preKO_negated) continue;
     if (!isOnKOSelfTrigger && isCardInValidZone(sourceCard, "FIELD") && isCardNegated(sourceCard, state, cardDb)) continue;
 
     // Check once-per-turn / lock-on-decline: both flags consult the same
