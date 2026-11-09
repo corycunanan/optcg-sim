@@ -1,36 +1,51 @@
 # Adventure on Kami's Island [OP15-EB04]
 
+> Source: `docs/FAQs/pdfs/faq_op15-eb04.pdf`. Entries marked _Corrected (OPT-957)_ were garbled by the original conversion and have been re-extracted from the PDF's text layer (2026-11-09).
+
 
 ## OP15-001 — Krieg
 
-**Q:** Can I still use this [Opponent's Turn] effect my opponent's Characters −2000 power if I have Characters on my field?
+**Q:** Can I still use this [Opponent's Turn] effect to give all my opponent's Characters −2000 power if I have 0 Characters on my field?
 
-**A:** to give all No, you cannot. 0
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-002 — Lucy
 
-**Q:** If I take damage, causing the [Trigger] for an with a base cost of 3 or more to be activated my turn, can I use this card's [Activate: Main draw a card?
+**Q:** If I take damage, causing the [Trigger] for an Event with a base cost of 3 or more to be activated during my turn, can I use this card's [Activate: Main] effect to draw a card?
 
-**A:** Event No, you cannot. Activating an Event through a during [Trigger] is considered different from activating the ] effect to Event card itself.
+**A:** No, you cannot. Activating an Event through a [Trigger] is considered different from activating the Event card itself.
 
-
-## OP15-003 OP15-003 — Alvida Alvida
-
-**Q:** Can I use this "Give up to 1 rested DON!! card owner's Leader or 1 of their Characters." effe either give one of my rested DON!! cards to my Leader or Characters, or to give one of my opp rested DON!! cards to their Leader or Characte When using this card's [Activate: Main] effect one of my opponent's rested DON!! cards to the Leader or one of their Characters, which playe which DON!! card is given?
-
-**A:** to its Yes, either one is possible. ct to own onent's rs? to give The player who activated the effect chooses a rested ir DON!! card from their opponent's cost area. r decides
+_Corrected (OPT-957)._
 
 
 ## OP15-003 — Alvida
 
-**Q:** Can I use this "Give up to 1 rested DON!! card owner's Leader or 1 of their Characters." effe my opponent's DON!! cards to my Leader or Characters, or give my DON!! cards to my oppon Leader or Characters?
+**Q:** Can I use this "Give up to 1 rested DON!! card to its owner's Leader or 1 of their Characters." effect to either give one of my rested DON!! cards to my own Leader or Characters, or to give one of my opponent's rested DON!! cards to their Leader or Characters?
 
-**A:** to its No, you cannot. ct to give ent's
+**A:** Yes, either one is possible.
 
-**Q:** Can I still use this [Activate: Main] effect t my own rested DON!! cards to my Leader or one Characters when my opponent has 0 Characters, when there are no rested DON!! cards in my opponent's cost area?
+_Corrected (OPT-957)._
 
-**A:** o give one of No, you cannot. of my or
+**Q:** When using this card's [Activate: Main] effect to give one of my opponent's rested DON!! cards to their Leader or one of their Characters, which player decides which DON!! card is given?
+
+**A:** The player who activated the effect chooses a rested DON!! card from their opponent's cost area.
+
+_Corrected (OPT-957)._
+
+**Q:** Can I use this "Give up to 1 rested DON!! card to its owner's Leader or 1 of their Characters." effect to give my opponent's DON!! cards to my Leader or Characters, or give my DON!! cards to my opponent's Leader or Characters?
+
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
+
+**Q:** Can I still use this [Activate: Main] effect to give one of my own rested DON!! cards to my Leader or one of my Characters when my opponent has 0 Characters, or when there are no rested DON!! cards in my opponent's cost area?
+
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-008 — Krieg
@@ -214,11 +229,13 @@
 **A:** In this case, you can either choose to rest two of your cards to keep both Characters on the field, or do nothing and let your opponent remove both Characters from the field.
 
 
-## OP15-038 — It's an Order! Do Not DefyMe!!!
+## OP15-038 — It's an Order! Do Not Defy Me!!!
 
 **Q:** After I used this card's [Main] effect, the cost of my opponent's rested Character with a cost of 8 or less and 2 or more given DON!! cards that was selected as the target of the effect changed to having less than 2 given DON!! cards through other means. Will it become active during my opponent's next Refresh Phase?
 
 **A:** No, it will not become active.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-039 — Rebecca
@@ -257,21 +274,22 @@
 **A:** In this case, you can either choose to place 1 of your Characters at the bottom of the owner's deck to keep both Characters on the field, or do nothing and let your opponent remove both Characters from the field.
 
 
-##
+## OP15-056 — Would You Let Me Eat the Flame-Flame Fruit?
 
 **Q:** If my Leader isn't [Lucy], can I still use this card's [Main] effect to draw 2 cards?
 
 **A:** Yes, you can.
 
-
-## OP15-056 OP15-058 — Would You Let Me Eat theFlame-Flam Enel
-
-**Q:** e Fruit? After a match has started, if this Leader's effect is negated by another card, what happens to my DON!! deck?
-
-**A:** In this case, the number of cards in your DON!! deck will not change, and you can continue to use a total of 6 DON!! cards between your field and DON!! deck.
+_Corrected (OPT-957)._
 
 
 ## OP15-058 — Enel
+
+**Q:** After a match has started, if this Leader's effect is negated by another card, what happens to my DON!! deck?
+
+**A:** In this case, the number of cards in your DON!! deck will not change, and you can continue to use a total of 6 DON!! cards between your field and DON!! deck.
+
+_Corrected (OPT-957)._
 
 **Q:** What happens if I use this [Activate: Main] effect on my first turn?
 
@@ -433,19 +451,20 @@
 
 **A:** Yes, you can.
 
-
-## OP15-090 OP15-092 — Perona Monkey.D.Luffy
-
 **Q:** If two of my Characters with 7000 base power or less would be simultaneously removed from the field by my opponent's effect, can I choose to trash 2 cards from my hand instead?
 
-**A:** In this case, you can either choose to trash 1 of your cards to keep both Characters on the field, or do nothing and let your opponent remove both Characters from the field. In this case, all 3 effects (• If there are 10 or more What happens to this effect when I have 30 cards incards), (• If there are 20 or more cards), and (• If
+**A:** In this case, you can either choose to trash 1 of your cards to keep both Characters on the field, or do nothing and let your opponent remove both Characters from the field.
+
+_Corrected (OPT-957)._
 
 
-##
+## OP15-092 — Monkey.D.Luffy
 
-**Q:** my trash?
+**Q:** What happens to this effect when I have 30 cards in my trash?
 
-**A:** there are 30 or more cards), will all be applied one after the other.
+**A:** In this case, all 3 effects (• If there are 10 or more cards), (• If there are 20 or more cards), and (• If there are 30 or more cards), will all be applied one after the other.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-093 — The Risky Brothers
@@ -455,25 +474,31 @@
 **A:** Yes, you can.
 
 
-## OP15-094 OP15-095 — Roronoa Zoro Gum-Gum Storm
+## OP15-094 — Roronoa Zoro
 
 **Q:** If two of my {Straw Hat Crew} type Characters other than this Character would be simultaneously removed from the field by my opponent's effect, can I still choose to trash this Character instead?
 
-**A:** Yes, you can. Yes, you can. After using this card, you will have 15 If I have 14 cards in my trash, can I use this card'scards in your trash, and will subsequently be able to
+**A:** Yes, you can.
+
+_Corrected (OPT-957)._
 
 
-##
+## OP15-095 — Gum-Gum Storm
 
-**Q:** [Main] and [Counter] effects?
+**Q:** If I have 14 cards in my trash, can I use this card's [Main] and [Counter] effects?
 
-**A:** use the [Main] effect to give +3000 power, or the [Counter] effect to give +4000 power. In this case, if you were to activate the [Main] effect by using the Event from your hand, you would be able to use the "up to 1 of your opponent's Characters with a
+**A:** Yes, you can. After using this card, you will have 15 cards in your trash, and will subsequently be able to use the [Main] effect to give +3000 power, or the [Counter] effect to give +4000 power.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-097 — I Find It Embarrassing as a Human Being
 
 **Q:** Can I use this Event card's [Main] and [Trigger] effects if I have 9 cards in my trash?
 
-**A:** base cost of 5 or less cannot attack until the end of your opponent's next End Phase" effect. However, if you were to activate it using [Trigger], you would only have 9 cards in your trash, meaning nothing would happen.
+**A:** In this case, if you were to activate the [Main] effect by using the Event from your hand, you would be able to use the "up to 1 of your opponent's Characters with a base cost of 5 or less cannot attack until the end of your opponent's next End Phase" effect. However, if you were to activate it using [Trigger], you would only have 9 cards in your trash, meaning nothing would happen.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-098 — Monkey.D.Luffy
@@ -487,25 +512,37 @@
 **A:** No, you cannot.
 
 
-## OP15-099 OP15-100 — Urouge Kamakiri
+## OP15-099 — Urouge
 
 **Q:** If the top of my Life cards is face-down, or if I have 0 Life cards, can I still use this [Activate: Main] effect to give up to 1 rested DON!! card to my Leader or 1 of my Characters?
 
-**A:** No, you cannot. Yes, you can. In this case, you will be unable to add 1 Can I choose not to trash my Character when usingcard from the top of your Life to your hand or K.O. up
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
 
 
-##
+## OP15-100 — Kamakiri
 
-**Q:** this [On Play] effect?
+**Q:** Can I choose not to trash my Character when using this [On Play] effect?
 
-**A:** to 1 of your opponent's Characters with a cost of 6 or less.
+**A:** Yes, you can. In this case, you will be unable to add 1 card from the top of your Life to your hand or K.O. up to 1 of your opponent's Characters with a cost of 6 or less.
 
-
-## OP15-100 OP15-103 — Kamakiri Genbo
+_Corrected (OPT-957)._
 
 **Q:** If I have 0 Life cards, can I still use this [On Play] effect to K.O. up to 1 of my opponent's Characters with a cost of 6 or less?
 
-**A:** No, you cannot. If I have 3 Life cards including this card, can I still playthis Character card using this card's [Trigger] effect? Yes, you can.
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
+
+
+## OP15-103 — Genbo
+
+**Q:** If I have 3 Life cards including this card, can I still play this Character card using this card's [Trigger] effect?
+
+**A:** Yes, you can.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-105 — Jewelry Bonney
@@ -524,9 +561,11 @@
 
 ## OP15-109 — Nico Robin
 
-**Q:** If I have 0 Life cards, can I use this [On Play] effect add up to 1 card from the top of my deck to the top of my Life cards, then play up to 1 {Sky Island} type Character card with a cost of 5 or less from my hand?
+**Q:** If I have 0 Life cards, can I use this [On Play] effect to add up to 1 card from the top of my deck to the top of my Life cards, then play up to 1 {Sky Island} type Character card with a cost of 5 or less from my hand?
 
-**A:** to No, you cannot.
+**A:** No, you cannot.
+
+_Corrected (OPT-957)._
 
 
 ## OP15-113 — Roronoa Zoro
