@@ -22,6 +22,7 @@ import { isGameTerminated } from "./terminal.js";
 import { publishCommittedEvents, retainEventsOnFrame, retainPropagationBeforePrompt } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
 import { findBlockByKeyword } from "./trigger-keywords.js";
+import { resolveAmount } from "./effect-resolver/action-utils.js";
 
 export function popLifeForDamage(
   state: GameState,
@@ -572,4 +573,65 @@ export function completeEffectDamageFrame(
   };
   nextState = retainEventsOnFrame(nextState, parentIndex, [...parent.accumulatedEvents, ...events]);
   return { state: nextState, events: [], dealt, ...lethal };
+}
+
+/**
+ * OPT-1032: the damaged player declined every "If you would take damage ...
+ * instead" offer (EB05-052) for a DEAL_DAMAGE / SELF_TAKE_DAMAGE, so the
+ * instruction is dealt now (8-1-3-4-1). The issuing chain is parked directly
+ * below the answered offer with the instruction as its `pausedAction`
+ * (`replaceEffectDamage`). The points are dealt exactly as the handler would
+ * have: the chain's committed prefix is published before a [Trigger] window,
+ * a window's EFFECT_DAMAGE frame names the chain as its parent, and otherwise
+ * the count, success and events are recorded on the chain, as
+ * `completeEffectDamageFrame` does. Returns null when the caller is not such
+ * a chain.
+ */
+export function dealDamageAfterDeclinedReplacement(
+  state: GameState,
+  callerId: string,
+  cardDb: Map<string, CardData>
+): EffectDamageResult | null {
+  const caller = state.effectStack.find((candidate) => candidate.id === callerId);
+  const action = caller?.pausedAction;
+  if (!caller || (action?.type !== "DEAL_DAMAGE" && action?.type !== "SELF_TAKE_DAMAGE")) return null;
+  const controller = caller.controller;
+  const damagedPlayerIndex: 0 | 1 = action.type === "SELF_TAKE_DAMAGE" ? controller : controller === 0 ? 1 : 0;
+  const amount = resolveAmount(action.params?.amount ?? 1, new Map(caller.resultRefs), state, controller, cardDb);
+  const prefix = [...caller.accumulatedEvents];
+  const cleared = updateFrameById(state, callerId, (current) => ({ ...current, accumulatedEvents: [] }));
+  const cont = continueEffectDamageSequence(
+    cleared,
+    cardDb,
+    damagedPlayerIndex,
+    amount,
+    caller.sourceCardInstanceId,
+    controller,
+    true,
+    undefined,
+    (nextState) => publishCommittedEvents(nextState, prefix)
+  );
+  const merged = [...prefix, ...cont.events];
+  if (isGameTerminated(cont.state)) return { ...cont, events: merged };
+  const parentIndex = cont.state.effectStack.findIndex((candidate) => candidate.id === callerId);
+  if (cont.pendingPrompt) {
+    const window = cont.state.effectStack.at(-1)!;
+    const linked = updateFrameById(cont.state, window.id, (current) => ({
+      ...current,
+      effectDamage: { ...current.effectDamage!, parentFrameId: callerId },
+    }));
+    return { ...cont, state: retainEventsOnFrame(linked, parentIndex, merged), events: [] };
+  }
+  const parent = cont.state.effectStack[parentIndex];
+  const resultRefs: [string, EffectResult][] = [...parent.resultRefs];
+  const ref = action.result_ref;
+  if (ref) {
+    const existing = resultRefs.findIndex(([key]) => key === ref);
+    const value: [string, EffectResult] = [ref, { targetInstanceIds: [], count: cont.dealt }];
+    if (existing >= 0) resultRefs[existing] = value;
+    else resultRefs.push(value);
+  }
+  const succeeded = cont.dealt > 0 || cont.lethalDamagePlayerIndex !== undefined;
+  const recorded = updateFrameById(cont.state, callerId, (current) => ({ ...current, priorActionSucceeded: succeeded, resultRefs }));
+  return { ...cont, state: retainEventsOnFrame(recorded, parentIndex, merged), events: [] };
 }

@@ -1217,3 +1217,14 @@ The reader PR (#805) shipped the reader and the generator only: writers stayed a
 After the reader's verified deployment (squash merge `4bbf3ee6b948bb248fff4ce698bc614a40549758`, Deploy Cloudflare Workers run 42455376845, success 2026-11-08), `createProductionExecutionContext` creates every new game at `NEW_GAME_EXECUTION_CONTEXT_VERSION = 2`. Nothing else is promoted: existing version 1 games keep their context, and `createDeterministicExecutionContext` still defaults to `DETERMINISTIC_EXECUTION_CONTEXT_VERSION = 1`, so fixtures, the opt-940 writer golden, and the `legacy:<gameId>` hydration of pre-context saves (`ensureExecutionContext`, OPT-1013 admission) reproduce their historical streams. `GAME_STATE_SCHEMA_VERSION` is unchanged.
 
 **Rollback floor:** `4bbf3ee` or newer. Every earlier build rejects a version 2 context in the strict core shape, which would fail to load every game started after this writer deploys.
+
+## Damage replacement offers (OPT-1032)
+
+OPT-1032 adds the replacement event `WOULD_TAKE_DAMAGE` (EB05-052 Gloriosa). It writes no new key, frame kind, stage or version; it writes one new value in two existing places, and only while a damage replacement offer is pending:
+
+* `replacement.event: "WOULD_TAKE_DAMAGE"` on the REPLACEMENT frame of the offer. The strict reader's `ReplacementEvent` enum (`persisted-game-state.ts`) now accepts it.
+* A BATTLE_DAMAGE `CHARACTER_KO_REPLACEMENT` continuation whose `targetInstanceId` is the defending Leader. The field shapes are unchanged; `finishCharacterBattleResult` tells the Leader case apart by the target's zone, and the attack's damage count is already on `turn.battle.damagesRemaining`.
+
+An effect damage offer parks the issuing chain as an ordinary `INTERRUPTED_BY_TRIGGERS` continuation with the DEAL_DAMAGE / SELF_TAKE_DAMAGE as its `pausedAction`.
+
+**Rollback floor:** this PR's merge. An earlier build rejects a save holding a pending damage offer by its enum value (`SessionLoadError`, §5.2). Every other save is unaffected, so the writer golden is byte-identical. No reader-first split was made: an earlier engine that could load the offer still could not resume it (it has no `WOULD_TAKE_DAMAGE` matching, so a resumed battle continuation would deal no damage), so a reader-only release would not give a correct rollback target.
