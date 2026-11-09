@@ -243,6 +243,41 @@ describe("requirePlayableDeck", () => {
     await expectInvalidDetail("ban-status");
   });
 
+  it("rejects a banned pair with the Leader before game start (OPT-1038)", async () => {
+    const luffy = makeCard({
+      id: "OP11-040_p1",
+      name: "Monkey.D.Luffy",
+      type: "Leader",
+      life: 4,
+    });
+    const rows = [
+      { cardId: "OP08-069", quantity: 1, selectedArtUrl: null },
+      ...mainDeckRows(49),
+    ];
+    mockDeck(rows, { leaderId: luffy.id });
+    mockCards([luffy, ...mainDeckCards(rows)]);
+
+    await expect(requirePlayableDeck("deck-1", "user-1")).rejects.toMatchObject({
+      details: [{
+        id: "banned-pair",
+        passed: false,
+        cardIds: ["OP11-040_p1", "OP08-069"],
+      }],
+    });
+  });
+
+  it("rejects a banned pair in the main deck before game start (OPT-1038)", async () => {
+    const rows = [
+      { cardId: "OP07-115", quantity: 1, selectedArtUrl: null },
+      { cardId: "EB04-058_p1", quantity: 1, selectedArtUrl: null },
+      ...mainDeckRows(48),
+    ];
+    mockDeck(rows);
+    mockCards([leader, ...mainDeckCards(rows)]);
+
+    await expectInvalidDetail("banned-pair");
+  });
+
   it("rejects an otherwise playable deck with restricted alternate-art copies", async () => {
     const rows = [
       { cardId: "OP01-075", quantity: 1, selectedArtUrl: null },
