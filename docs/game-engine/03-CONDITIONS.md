@@ -843,7 +843,9 @@ was. It uses the `CARD_TRASHED_FROM_HAND` trigger's predicate (see
 [02-TRIGGERS.md](02-TRIGGERS.md#hand-trash-effect-watchers-opt-795)), so
 activation-cost discards count and symbol Counters, rule disposal, and Event
 disposal do not. It reads the event log back to this turn's `TURN_STARTED`
-instead of `actionsPerformedThisTurn`, so saved state is unchanged.
+instead of `actionsPerformedThisTurn`, so saved state is unchanged. Event-log
+compaction (`session/history.ts`) keeps the current `TURN_STARTED` and each
+player's latest such trash after it, so the fact survives a long turn.
 
 | Text Pattern | Action | Filter | Example Cards |
 |-------------|--------|--------|---------------|

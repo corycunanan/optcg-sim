@@ -6,6 +6,8 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { getEffectiveCost } from "../engine/modifiers.js";
 import { handTrashedByEffectThisTurn } from "../engine/hand-trash.js";
+import { compactGameStateEventLog, RECENT_EVENT_LOG_LIMIT } from "../session/history.js";
+import type { GameState } from "../types.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -99,6 +101,9 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: GameState) {
+      state = next;
+    },
   };
 }
 
@@ -187,5 +192,29 @@ describe("OPT-1034 hand-trash turn record — ST33-004 Borsalino", () => {
     // MAIN → END → next turn: the turn record resets (phases.ts).
     while (f.state.turn.activePlayerIndex === 0) f.act({ type: "ADVANCE_PHASE" });
     expect(f.cost(b)).toBe(5);
+  });
+
+  it("the record survives event-log compaction within the turn", () => {
+    const f = fixture();
+    const b = f.borsalino(0);
+    const a = f.put("discard-a", 0, "HAND");
+    const c = f.put("discard-b", 0, "HAND");
+    f.act({ type: "PLAY_CARD", cardInstanceId: f.put("OP12-046", 0, "HAND", { types: ["Navy"] }).instanceId });
+    if (f.state.pendingPrompt) f.select([a.instanceId, c.instanceId]);
+    f.done();
+    const filler = Array.from({ length: RECENT_EVENT_LOG_LIMIT + 50 }, (_, i) => ({
+      type: "PHASE_CHANGED" as const,
+      playerIndex: 0 as const,
+      payload: { from: "MAIN", to: "MAIN" },
+      timestamp: 100000 + i,
+    }));
+    const compacted = compactGameStateEventLog({
+      ...f.state,
+      eventLog: [...f.state.eventLog, ...filler],
+    }).state;
+    expect(compacted.eventLog.length).toBeLessThan(f.state.eventLog.length + filler.length);
+    f.state = compacted;
+    expect(handTrashedByEffectThisTurn(f.state, 0)).toBe(true);
+    expect(f.cost(b)).toBe(2);
   });
 });
