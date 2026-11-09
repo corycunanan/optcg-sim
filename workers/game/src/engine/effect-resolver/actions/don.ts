@@ -9,6 +9,8 @@ import { buildDonIdentityPlans } from "../don-identity-plans.js";
 import type { ActionOf, DynamicValue, EffectResult } from "../../effect-types.js";
 import type {
   CardData,
+  CardInstance,
+  DonDistributionProgress,
   DonInstance,
   GameState,
   PendingEvent,
@@ -32,6 +34,7 @@ import { donIdentityChoiceMatters } from "../cost/targets.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 import { isDonActivationProhibitedByEffect, isDonAttachProhibited } from "../../prohibitions.js";
+import { findCardInstance } from "../../state.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -858,6 +861,14 @@ export function executeDistributeDon(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  // OPT-955: "up to N to each" — the controller chooses the split.
+  if (params.max_per_target !== undefined) {
+    return continueDonSplit(
+      state, action, { round: 1, allocation: targetIds.map((id) => [id, 0]) },
+      sourceCardInstanceId, controller, cardDb, resultRefs,
+    );
+  }
+
   let nextState = state;
   let totalGiven = 0;
   for (const targetId of targetIds) {
@@ -874,6 +885,177 @@ export function executeDistributeDon(
   }
 
   return { state: nextState, events, succeeded: totalGiven > 0, result: { targetInstanceIds: targetIds, count: totalGiven } };
+}
+
+// ─── DISTRIBUTE_DON split (OPT-955) ──────────────────────────────────────────
+
+/**
+ * DON!! the split may still hand out: the unattached cost-area DON!! in the
+ * action's state, capped by `max_total`, minus what is already planned.
+ */
+function donSplitRemaining(
+  state: GameState,
+  action: ActionOf<"DISTRIBUTE_DON">,
+  controller: 0 | 1,
+  progress: DonDistributionProgress,
+): number {
+  const params = action.params ?? {};
+  const pool = giveableDon(state, controller, params.don_state ?? "ACTIVE").length;
+  const budget = Math.min(pool, params.max_total ?? Infinity);
+  const planned = progress.allocation.reduce((sum, [, n]) => sum + n, 0);
+  return Math.max(0, budget - planned);
+}
+
+/**
+ * The recipients round `progress.round` offers: those holding round-1 DON!!
+ * from this split, still on the field and not under CANNOT_ATTACH_DON.
+ */
+function donSplitEligible(
+  state: GameState,
+  progress: DonDistributionProgress,
+  cardDb: Map<string, CardData>,
+  controller: 0 | 1,
+): string[] {
+  const candidates = progress.allocation
+    .filter(([id, n]) => n === progress.round - 1 && fieldSideOf(state, id) !== null)
+    .map(([id]) => id);
+  return donGiveRecipients(state, candidates, cardDb, controller);
+}
+
+/**
+ * Ask the next round of a split, or apply it when no round is left: the cap is
+ * reached, the pool is spent, or nobody is eligible. Applying attaches every
+ * planned DON!! in recipient order and fires one DON_GIVEN_TO_CARD for the
+ * batch (BATCH-CONTRACT.md §3, §5).
+ */
+export function continueDonSplit(
+  state: GameState,
+  action: ActionOf<"DISTRIBUTE_DON">,
+  progress: DonDistributionProgress,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const params = action.params ?? {};
+  const maxPerTarget = params.max_per_target ?? 1;
+  const remaining = donSplitRemaining(state, action, controller, progress);
+  const eligible = progress.round <= maxPerTarget
+    ? donSplitEligible(state, progress, cardDb, controller)
+    : [];
+  const countMax = Math.min(remaining, eligible.length);
+  if (countMax > 0) {
+    return buildDonSplitPrompt(
+      state, action, progress, eligible, countMax, sourceCardInstanceId, controller, cardDb, resultRefs,
+    );
+  }
+  return applyDonSplit(state, action, progress, controller, cardDb);
+}
+
+export function applyDonSplit(
+  state: GameState,
+  action: ActionOf<"DISTRIBUTE_DON">,
+  progress: DonDistributionProgress,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ActionResult {
+  const donState = action.params?.don_state ?? "ACTIVE";
+  let nextState = state;
+  let totalGiven = 0;
+  const recipients: string[] = [];
+  for (const [id, n] of progress.allocation) {
+    // Rule 1-3-3: a prohibition that appeared while the split was asked wins.
+    if (n === 0 || isDonAttachProhibited(nextState, id, cardDb, controller)) continue;
+    let given = 0;
+    for (let i = 0; i < n; i++) {
+      const result = attachDonToCard(nextState, controller, id, donState);
+      if (!result) break;
+      nextState = result;
+      given++;
+    }
+    if (given > 0) recipients.push(id);
+    totalGiven += given;
+  }
+  const events: PendingEvent[] = totalGiven > 0
+    ? [{ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: totalGiven } }]
+    : [];
+  return {
+    state: nextState,
+    events,
+    succeeded: totalGiven > 0,
+    result: { targetInstanceIds: recipients, count: totalGiven },
+  };
+}
+
+function buildDonSplitPrompt(
+  state: GameState,
+  action: ActionOf<"DISTRIBUTE_DON">,
+  progress: DonDistributionProgress,
+  eligible: string[],
+  countMax: number,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const donState = action.params?.don_state ?? "ACTIVE";
+  const donLabel = donState === "RESTED" ? "rested DON!!" : "active DON!!";
+  const more = progress.round > 1 ? " more" : "";
+  const cards: CardInstance[] = [];
+  for (const id of eligible) {
+    const card = findCardInstance(state, id);
+    if (card) cards.push(card);
+  }
+  const resumeContext: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [], // filled in by executeActionChain / the resume frame
+    resultRefs: [...resultRefs.entries()],
+    validTargets: eligible,
+    donDistribution: progress,
+  };
+  const pendingPrompt: PendingPromptState = {
+    options: {
+      promptType: "SELECT_TARGET",
+      cards,
+      validTargets: eligible,
+      effectDescription: promptEffectDescription(state, cardDb, sourceCardInstanceId) || "",
+      instruction: `Choose up to ${countMax} card${countMax === 1 ? "" : "s"} to give 1${more} ${donLabel} each`,
+      countMin: 0,
+      countMax,
+      ctaLabel: "Give DON!!",
+    },
+    respondingPlayer: controller,
+    resumeContext,
+  };
+  return { state, events: [], succeeded: false, pendingPrompt };
+}
+
+/**
+ * Apply one round's reply: every pick gains one planned DON!!. An empty reply
+ * ends the split. Returns null for a reply the round did not offer.
+ */
+export function advanceDonSplit(
+  progress: DonDistributionProgress,
+  offered: readonly string[],
+  countMax: number,
+  selected: readonly string[],
+): DonDistributionProgress | "done" | null {
+  if (
+    selected.length > countMax ||
+    new Set(selected).size !== selected.length ||
+    selected.some((id) => !offered.includes(id))
+  ) {
+    return null;
+  }
+  const picked = new Set(selected);
+  const allocation = progress.allocation.map(
+    ([id, n]): [string, number] => [id, picked.has(id) ? n + 1 : n],
+  );
+  return selected.length === 0
+    ? "done"
+    : { round: progress.round + 1, allocation };
 }
 
 // ─── REDISTRIBUTE_DON ────────────────────────────────────────────────────────

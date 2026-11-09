@@ -32,8 +32,11 @@ import {
 } from "../target-resolver.js";
 import { resolveSourceTarget } from "../actions/modifiers.js";
 import {
+  advanceDonSplit,
+  applyDonSplit,
   applyRedistributeDonTransfers,
   attachOpponentDonById,
+  continueDonSplit,
   donGiveRecipients,
   fieldSideOf,
   giveableDon,
@@ -227,6 +230,68 @@ export function handleGiveDonIdentity(
     });
   }
   return { kind: "continued", state: nextState, succeeded: true };
+}
+
+/**
+ * OPT-955: one round of a DISTRIBUTE_DON split (`max_per_target`). The reply
+ * names the offered recipients that each get one more DON!!; an empty reply
+ * ends the split. The next round is asked from the same paused action, or the
+ * planned DON!! attach as one batch and the chain continues. A reply the round
+ * did not offer (or above its count) is rejected and the prompt stays.
+ */
+export function handleDonSplit(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[]
+): TargetBranchResult {
+  const { pausedAction, controller, validTargets, donDistribution, effectSourceInstanceId, effectDescription } =
+    resumeCtx;
+  if (
+    action.type !== "SELECT_TARGET" ||
+    pausedAction?.type !== "DISTRIBUTE_DON" ||
+    !donDistribution
+  ) {
+    return null;
+  }
+  const remaining = Math.min(
+    pausedAction.params?.max_total ?? Infinity,
+    giveableDon(state, controller, pausedAction.params?.don_state ?? "ACTIVE").length,
+  ) - donDistribution.allocation.reduce((sum, [, n]) => sum + n, 0);
+  const next = advanceDonSplit(
+    donDistribution,
+    validTargets,
+    Math.max(0, remaining),
+    action.selectedInstanceIds ?? [],
+  );
+  if (next === null) {
+    return {
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
+    };
+  }
+  const result = next === "done"
+    ? applyDonSplit(state, pausedAction, donDistribution, controller, cardDb)
+    : continueDonSplit(state, pausedAction, next, effectSourceInstanceId, controller, cardDb, resultRefs);
+  if (result.pendingPrompt) {
+    return {
+      kind: "handled",
+      result: {
+        kind: "waiting",
+        state,
+        events,
+        resolved: false,
+        pendingPrompt: withPromptDescription(result.pendingPrompt, effectDescription),
+      },
+    };
+  }
+  events.push(...result.events);
+  if (result.result && pausedAction.result_ref) {
+    resultRefs.set(pausedAction.result_ref, result.result);
+  }
+  return { kind: "continued", state: result.state, succeeded: result.succeeded };
 }
 
 /**
