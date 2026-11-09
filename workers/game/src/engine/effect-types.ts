@@ -932,8 +932,18 @@ export interface ActionParamsMap {
     source_filter?: TargetFilter;
   };
   DISTRIBUTE_DON: {
+    /** Legacy alias of `amount_per_target`. */
     amount?: number;
+    /** Each chosen target receives this many DON!! (as many as the pool allows). */
     amount_per_target?: number;
+    /**
+     * OPT-955: "give up to N DON!! to each of" — each target may receive 0..N
+     * from one shared pool, and the controller chooses the split. Replaces
+     * `amount`/`amount_per_target`.
+     */
+    max_per_target?: number;
+    /** OPT-955: with `max_per_target`, at most this many DON!! in total. */
+    max_total?: number;
     don_state?: CardState;
   };
   RETURN_ATTACHED_DON_TO_COST: Record<string, never>;

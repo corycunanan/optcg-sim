@@ -1190,26 +1190,25 @@ Attach DON!! card(s) from the cost area to a card on the field.
 
 ```typescript
 interface GiveDonParams {
-  amount: number;
-  source_state?: "ACTIVE" | "RESTED" | "ANY";
-  target_state?: "ACTIVE" | "RESTED";
+  amount?: number;                    // DON!! per target, default 1
+  don_state?: "ACTIVE" | "RESTED";    // which cost-area DON!! may be given, default "ACTIVE"
 }
 ```
 
 | Field | Value |
 |-------|-------|
-| **Target** | A [Target](./05-TARGETING.md) specifying which card receives the DON!! |
-| **Failure mode** | If no DON!! cards exist in the cost area in the required state, the action is ignored. |
-| **Fired events** | `DON_GIVEN_TO_CARD` |
-| **Example cards** | OP01-061 Kaido, ST08-001 |
+| **Target** | A [Target](./05-TARGETING.md) specifying which card(s) receive the DON!! |
+| **Failure mode** | Each target receives `amount` unattached cost-area DON!! in `don_state`, target by target, as many as the pool allows. With none in that state, nothing is given and no event fires. A target under `CANNOT_ATTACH_DON` is never offered (rule 1-3-3). |
+| **Fired events** | `DON_GIVEN_TO_CARD` once, with the total `count` |
+| **Example cards** | EB01-002 Izo |
 
-`source_state` filters which DON!! in the cost area can be used. Defaults to `"ANY"`.
+Giving the opponent's DON!! to the opponent's card is `GIVE_OPPONENT_DON_TO_OPPONENT`. Splitting one pool over several targets is `DISTRIBUTE_DON` with `max_per_target` ([BATCH-CONTRACT.md §5](./BATCH-CONTRACT.md#5-distribution-one-pool-over-many-targets)).
 
 ```json
 {
   "type": "GIVE_DON",
-  "target": { "controller": "SELF", "card_type": "LEADER" },
-  "params": { "amount": 1, "source_state": "RESTED" }
+  "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "up_to": 1 } },
+  "params": { "amount": 1, "don_state": "RESTED" }
 }
 ```
 
@@ -1454,32 +1453,47 @@ This is a disruptive action — giving DON!! to an opponent's Character makes it
 
 ### DISTRIBUTE_DON
 
-Give up to M DON!! card(s) each to up to N different targets. A batch version of `GIVE_DON` where multiple recipients each get DON!! in a single action.
+Give DON!! from one cost-area pool to several targets in one action. Two forms ([BATCH-CONTRACT.md §5](./BATCH-CONTRACT.md#5-distribution-one-pool-over-many-targets)):
+
+- **Fixed:** "give N DON!! each to …" (`amount_per_target`). Each chosen target receives N, as many as the pool allows.
+- **Split:** "give up to N DON!! to your Leader and all of your Characters" (`max_per_target`, OP18-046 clause A). Each target may receive 0 to N from the shared pool, and the controller chooses the split in rounds of `SELECT_TARGET` prompts.
 
 ```typescript
 interface DistributeDonParams {
-  don_per_target: number;
-  max_targets: number;
-  source_state?: "ACTIVE" | "RESTED" | "ANY";
+  amount_per_target?: number;         // fixed form: DON!! per target, default 1
+  amount?: number;                    // legacy alias of amount_per_target
+  max_per_target?: number;            // split form: up to N per target; replaces amount/amount_per_target
+  max_total?: number;                 // split form only: at most this many in total
+  don_state?: "ACTIVE" | "RESTED";    // which cost-area DON!! may be given, default "ACTIVE"
 }
 ```
 
 | Field | Value |
 |-------|-------|
-| **Target** | A [Target](./05-TARGETING.md) for eligible recipients |
-| **Failure mode** | If no valid targets or no DON!! available, the action is ignored. The controller distributes as much as they can. |
-| **Fired events** | `DON_GIVEN_TO_CARD` per recipient |
-| **Example cards** | OP08-001 Tony Tony.Chopper, EB03-026 Boa Hancock, OP14-105 |
+| **Target** | A [Target](./05-TARGETING.md) for the eligible recipients (`count: { all: true }` for "all of your …") |
+| **Failure mode** | No recipient or no DON!! in `don_state`: nothing is given, no prompt, no event. A recipient under `CANNOT_ATTACH_DON` is never offered and never receives (rule 1-3-3). In the split form nothing attaches until the last round; an empty reply ends the split. |
+| **Fired events** | `DON_GIVEN_TO_CARD` once, with the total `count` |
+| **Result** | `{ targetInstanceIds: recipients that received DON!!, count: total }` |
+| **Example cards** | OP04-004 Karoo, OP08-001 Tony Tony.Chopper, EB03-026 Boa Hancock, OP14-105 (fixed); OP18-046 clause A (split, not yet in card data) |
 
 ```json
 {
   "type": "DISTRIBUTE_DON",
   "target": {
+    "type": "CHARACTER",
     "controller": "SELF",
-    "card_type": ["CHARACTER", "LEADER"],
-    "count": { "up_to": 2 }
+    "count": { "up_to": 3 },
+    "filter": { "traits_any_of": ["Animal", "Drum Kingdom"] }
   },
-  "params": { "don_per_target": 1, "max_targets": 2 }
+  "params": { "amount_per_target": 1, "don_state": "RESTED" }
+}
+```
+
+```json
+{
+  "type": "DISTRIBUTE_DON",
+  "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "all": true } },
+  "params": { "max_per_target": 2, "don_state": "RESTED" }
 }
 ```
 

@@ -54,6 +54,7 @@ import {
   handleSelectTargetRuleTrashForPlay,
   handleSelectTarget,
   handleGiveDonIdentity,
+  handleDonSplit,
 } from "./resume/target.js";
 import {
   handlePlayerChoiceStateDistribution,
@@ -335,11 +336,17 @@ function resumeEffectChainCore(
     events
   );
   if (giveDonIdentity?.kind === "handled") return giveDonIdentity.result;
-  if (giveDonIdentity?.kind === "continued") {
+  // OPT-955: a DISTRIBUTE_DON split round is not a target re-selection either.
+  const donSplit = giveDonIdentity
+    ? null
+    : handleDonSplit(nextState, action, resumeCtx, resultRefs, cardDb, events);
+  if (donSplit?.kind === "handled") return donSplit.result;
+  const completedDonStep = giveDonIdentity ?? donSplit;
+  if (completedDonStep?.kind === "continued") {
     // The identity choice completed the paused GIVE_DON; the generic
     // SELECT_TARGET branch must not re-run it with the DON!! id as a target.
-    nextState = giveDonIdentity.state;
-    pausedActionSucceeded = giveDonIdentity.succeeded;
+    nextState = completedDonStep.state;
+    pausedActionSucceeded = completedDonStep.succeeded;
   } else {
     const ruleTrash = handleSelectTargetRuleTrashForPlay(
       nextState,
@@ -566,6 +573,7 @@ function resumeFromStackCore(
         returnToDeckArrangement: topFrame.returnToDeckArrangement,
         fieldToLifeTargetIds: topFrame.fieldToLifeTargetIds,
         giveDonIdentity: topFrame.giveDonIdentity,
+        donDistribution: topFrame.donDistribution,
         ruleTrashForPlay: topFrame.playOverflow,
         stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
@@ -646,6 +654,7 @@ function resumeFromStackCore(
             returnToDeckArrangement: promptCtx.returnToDeckArrangement,
             fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
             giveDonIdentity: promptCtx.giveDonIdentity,
+            donDistribution: promptCtx.donDistribution,
             accumulatedEvents: [...events],
             playOverflow: promptCtx.ruleTrashForPlay,
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,

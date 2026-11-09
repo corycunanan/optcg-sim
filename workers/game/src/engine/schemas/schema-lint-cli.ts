@@ -37,6 +37,7 @@ import { findThisWaySourceIntentViolations } from "../schema-this-way-source-lin
 import { findSearchAndPlayRevealIntentViolations } from "../schema-search-reveal-lint.js";
 import { findConditionExcludeSelfIntentViolations } from "../schema-exclude-self-lint.js";
 import { findPermanentModifierTypeViolations } from "../schema-permanent-modifier-lint.js";
+import { findDonSplitParamViolations } from "../schema-don-split-lint.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -383,6 +384,7 @@ async function main(): Promise<void> {
     ...findThisWaySourceIntentViolations(schemas),
     ...findConditionExcludeSelfIntentViolations(schemas),
     ...findPermanentModifierTypeViolations(schemas),
+    ...findDonSplitParamViolations(schemas),
     ...findSearchAndPlayRevealIntentViolations(loadCanonicalCardBlocks(), schemas),
     // Full runs walk the generated registry; a single-file run checks only
     // that file's schemas and skips the missing-card disposition check.

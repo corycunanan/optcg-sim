@@ -1430,6 +1430,7 @@ function executeActionChainCore(
         returnToDeckArrangement: ctx.returnToDeckArrangement,
         fieldToLifeTargetIds: ctx.fieldToLifeTargetIds,
         giveDonIdentity: ctx.giveDonIdentity,
+        donDistribution: ctx.donDistribution,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true, // costs already paid before action chain

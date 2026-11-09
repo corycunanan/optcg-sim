@@ -317,6 +317,20 @@ export type EffectDamageContinuation = {
   | { stage: "TRIGGER_EFFECT"; lifeCardInstanceId: string }
 );
 
+/**
+ * OPT-955: a DISTRIBUTE_DON with `max_per_target` ("give up to N DON!! to each
+ * of these cards from one pool") asks the split one round at a time. Round k
+ * offers the recipients that already hold k-1 DON!! from this split; each pick
+ * adds one. Nothing is attached until the split ends, so the whole distribution
+ * is one move with one DON_GIVEN_TO_CARD event. `allocation` lists every
+ * recipient with its planned count (0 for not yet chosen), in recipient order.
+ * See docs/game-engine/BATCH-CONTRACT.md §5.
+ */
+export interface DonDistributionProgress {
+  round: number;
+  allocation: [string, number][];
+}
+
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
@@ -342,6 +356,8 @@ export interface ResumeContext {
    * validTargets instead; both forms resume.
    */
   giveDonIdentity?: { owner: 0 | 1; recipient: string };
+  /** OPT-955: a DISTRIBUTE_DON split in progress (see DonDistributionProgress). */
+  donDistribution?: DonDistributionProgress;
   // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
   // the controller to pick one of their own Characters to trash before the play
   // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
@@ -488,6 +504,8 @@ export interface EffectStackFrame {
    * validTargets instead; both forms resume.
    */
   giveDonIdentity?: { owner: 0 | 1; recipient: string };
+  /** OPT-955: mirror of ResumeContext.donDistribution. */
+  donDistribution?: DonDistributionProgress;
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
   /** AND transaction waiting for all snapshot-locked target choices. */

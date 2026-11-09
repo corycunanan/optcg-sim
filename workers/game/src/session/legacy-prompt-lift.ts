@@ -13,7 +13,7 @@ export function liftLegacyPrompt(state: GameState, location: string): GameState 
   const allowed = new Set([
     "effectSourceInstanceId", "controller", "effectDescription", "remainingActionsController",
     "pausedAction", "remainingActions", "resultRefs", "validTargets", "returnToDeckArrangement",
-    "fieldToLifeTargetIds", "giveDonIdentity", "ruleTrashForPlay", "stateDistributionForPlay", "batchResumeMarker",
+    "fieldToLifeTargetIds", "giveDonIdentity", "donDistribution", "ruleTrashForPlay", "stateDistributionForPlay", "batchResumeMarker",
   ]);
   const unknown = Object.keys(context).find(key => !allowed.has(key));
   if (unknown) throw new SessionLoadError(location, `structural resume context contains unknown field ${unknown}`);
@@ -45,6 +45,7 @@ export function liftLegacyPrompt(state: GameState, location: string): GameState 
     returnToDeckArrangement: ctx.returnToDeckArrangement,
     fieldToLifeTargetIds: ctx.fieldToLifeTargetIds,
     giveDonIdentity: ctx.giveDonIdentity,
+    donDistribution: ctx.donDistribution,
     playOverflow: ctx.ruleTrashForPlay,
     stateDistributionForPlay: ctx.stateDistributionForPlay,
     batchResumeMarker: ctx.batchResumeMarker,
