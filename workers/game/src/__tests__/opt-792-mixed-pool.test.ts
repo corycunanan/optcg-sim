@@ -823,6 +823,7 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
         validTargets: [c.instanceId],
       },
       new Map(),
+      f.db,
       []
     );
     expect(result?.kind).toBe("continued");
@@ -1015,6 +1016,7 @@ describe("OPT-792 DON!! areas follow the rules areas (review C)", () => {
         validTargets: [b.instanceId],
       },
       new Map(),
+      f.db,
       []
     );
     const next = result?.kind === "continued" ? result.state : f.state;

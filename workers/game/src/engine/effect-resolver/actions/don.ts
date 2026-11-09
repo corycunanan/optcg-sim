@@ -9,6 +9,7 @@ import { buildDonIdentityPlans } from "../don-identity-plans.js";
 import type { ActionOf, DynamicValue, EffectResult } from "../../effect-types.js";
 import type {
   CardData,
+  DonInstance,
   GameState,
   PendingEvent,
   PendingPromptState,
@@ -89,7 +90,7 @@ export function executeGiveDon(
       const pool = giveableDon(state, owner, donState);
       if (donIdentityChoiceMatters(state, pool)) {
         return buildGiveDonIdentityPrompt(
-          state, action, owner, recipient, pool.map((d) => d.instanceId),
+          state, action, owner, recipient, pool.map((d) => d.instanceId), 1,
           sourceCardInstanceId, controller, cardDb, resultRefs,
         );
       }
@@ -151,12 +152,37 @@ export function giveableDon(state: GameState, owner: 0 | 1, donState: "ACTIVE" |
   return state.players[owner].donCostArea.filter((d) => d.state === donState && !d.attachedTo);
 }
 
+/**
+ * OPT-931: the recipients a DON!!-giving effect may use — `candidates` minus
+ * any card covered by CANNOT_ATTACH_DON for the giving player. Rule 1-3-3: the
+ * prohibition takes precedence over the effect, so the give is not carried
+ * out for that card. One predicate (`isDonAttachProhibited`, shared with
+ * manual attach) for GIVE_DON, DISTRIBUTE_DON, REDISTRIBUTE_DON and
+ * GIVE_OPPONENT_DON_TO_OPPONENT, on both the offer and the resumed reply.
+ */
+export function donGiveRecipients(
+  state: GameState,
+  candidates: readonly string[],
+  cardDb: Map<string, CardData>,
+  givingPlayer: 0 | 1,
+): string[] {
+  return candidates.filter((id) => !isDonAttachProhibited(state, id, cardDb, givingPlayer));
+}
+
+/**
+ * The identity step of a give of the OPPONENT's DON!!: the activating player
+ * chooses exactly `count` of `donIds` (the eligible pool at offer time) for
+ * the recipient bound in `giveDonIdentity`. GIVE_DON (OPT-868) always gives
+ * 1; GIVE_OPPONENT_DON_TO_OPPONENT (OPT-932) gives up to its printed amount,
+ * so the resume re-derives `count` as min(amount, offered pool).
+ */
 function buildGiveDonIdentityPrompt(
   state: GameState,
-  action: ActionOf<"GIVE_DON">,
+  action: ActionOf<"GIVE_DON"> | ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT">,
   owner: 0 | 1,
   recipient: string,
   donIds: string[],
+  count: number,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -177,9 +203,11 @@ function buildGiveDonIdentityPrompt(
       cards: [],
       validTargets: donIds,
       effectDescription: promptEffectDescription(state, cardDb, sourceCardInstanceId) || "",
-      instruction: "Choose 1 of your opponent's DON!! cards to give",
-      countMin: 1,
-      countMax: 1,
+      instruction: count === 1
+        ? "Choose 1 of your opponent's DON!! cards to give"
+        : `Choose ${count} of your opponent's DON!! cards to give`,
+      countMin: count,
+      countMax: count,
       ctaLabel: "Give DON!!",
     },
     respondingPlayer: controller,
@@ -815,7 +843,15 @@ export function executeDistributeDon(
   const amountPerTarget = params.amount_per_target ?? params.amount ?? 1;
   const donState = params.don_state ?? "ACTIVE";
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  // OPT-931: rule 1-3-3 — a CANNOT_ATTACH_DON prohibition takes precedence
+  // over "give DON!! to each", exactly as for GIVE_DON: a prohibited card is
+  // neither offered nor accepted from a resumed (preselected) reply.
+  const allValidIds = donGiveRecipients(
+    state,
+    preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs),
+    cardDb,
+    controller,
+  );
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
@@ -899,14 +935,14 @@ export function executeRedistributeDon(
     return { state, events, succeeded: false };
   }
 
-  // Compute valid recipient cards per the action's target filter.
-  const validTargetIds = computeAllValidTargets(
+  // Compute valid recipient cards per the action's target filter. OPT-931:
+  // a card under CANNOT_ATTACH_DON is never a redistribution recipient (rule
+  // 1-3-3); the resume re-checks each transfer against the current state.
+  const validTargetIds = donGiveRecipients(
     state,
-    action.target,
-    controller,
+    computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs),
     cardDb,
-    sourceCardInstanceId,
-    resultRefs,
+    controller,
   );
 
   // Valid sources: controller's leader + characters that currently have DON attached.
@@ -954,16 +990,85 @@ export function executeRedistributeDon(
 
 // ─── GIVE_OPPONENT_DON_TO_OPPONENT ───────────────────────────────────────────
 
+type GiveOpponentDonParams = NonNullable<ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT">["params"]>;
+
+/**
+ * The opponent cost-area DON!! a GIVE_OPPONENT_DON_TO_OPPONENT action may give:
+ * unattached, honoring `params.source_filter.is_rested` / `.is_active` so cards
+ * like OP15-023 Arlong and OP15-028 Meowban Brothers — which the FAQ says may
+ * pull ACTIVE or RESTED DON alike — can encode the permissive variant. With no
+ * source filter the default is RESTED (the common OP-15 text "give up to 1
+ * rested DON!!").
+ */
+export function giveOpponentDonPool(
+  state: GameState,
+  owner: 0 | 1,
+  params: GiveOpponentDonParams | undefined,
+): DonInstance[] {
+  const sourceFilter = params?.source_filter;
+  return state.players[owner].donCostArea.filter((d) => {
+    if (d.attachedTo) return false;
+    if (!sourceFilter) return d.state === "RESTED"; // historical default
+    if (sourceFilter.is_rested === true && d.state !== "RESTED") return false;
+    if (sourceFilter.is_rested === false && d.state === "RESTED") return false;
+    if (sourceFilter.is_active === true && d.state !== "ACTIVE") return false;
+    if (sourceFilter.is_active === false && d.state === "ACTIVE") return false;
+    return true;
+  });
+}
+
+/**
+ * OPT-932: which `count` DON!! of `pool` are given is a real choice only when
+ * some are left behind and the pool's DON!! differ — in their state (a
+ * permissive source filter may mix ACTIVE and RESTED) or in the effects
+ * applied to them (rule 3-1-6-1, `donIdentityChoiceMatters`).
+ */
+export function giveOpponentDonChoiceMatters(
+  state: GameState,
+  pool: readonly DonInstance[],
+  count: number,
+): boolean {
+  if (count <= 0 || count >= pool.length) return false;
+  if (new Set(pool.map((d) => d.state)).size > 1) return true;
+  return donIdentityChoiceMatters(state, pool);
+}
+
+/**
+ * Attach the given opponent DON!! (by identity, in order) to `recipient` on
+ * `owner`'s field, keeping each DON!!'s state. Stops at the first DON!! that
+ * is no longer an unattached cost-area DON!! of `owner`.
+ */
+export function attachOpponentDonById(
+  state: GameState,
+  owner: 0 | 1,
+  recipient: string,
+  donIds: readonly string[],
+): { state: GameState; given: number } {
+  let nextState = state;
+  let given = 0;
+  for (const donId of donIds) {
+    const don = nextState.players[owner].donCostArea.find((d) => d.instanceId === donId && !d.attachedTo);
+    if (!don) break;
+    const result = attachDonToCard(nextState, owner, recipient, don.state, donId);
+    if (!result) break;
+    nextState = result;
+    given++;
+  }
+  return { state: nextState, given };
+}
+
 /**
  * OPT-226: pull DON from opponent's cost area and attach it to an
  * opponent's Leader/Character — OP-15 Enel/God archetype "give 1 of
  * your opponent's DON!! to their Character" flow.
  *
- * Honors `params.source_filter.is_rested` / `.is_active` so cards like
- * OP15-023 Arlong and OP15-028 Meowban Brothers — which the FAQ says
- * may pull ACTIVE or RESTED DON alike — can encode the permissive variant.
- * When no source filter is present the default is RESTED (matching the
- * most common OP-15 text "give up to 1 rested DON!!").
+ * OPT-932: the activating player chooses which of the opponent's DON!! are
+ * given (faq_op15-eb04.md), up to the printed amount, whenever that choice
+ * matters (`giveOpponentDonChoiceMatters`); interchangeable DON!! stay
+ * prompt-free and give in cost-area order.
+ *
+ * OPT-931: a recipient under CANNOT_ATTACH_DON is never offered or given to
+ * (rule 1-3-3), read relative to the activating player as for GIVE_DON.
  */
 export function executeGiveOpponentDonToOpponent(
   state: GameState,
@@ -979,56 +1084,37 @@ export function executeGiveOpponentDonToOpponent(
   const amount = params.amount ?? 1;
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
 
-  const sourceFilter = params.source_filter;
-  const matchesSource = (d: {
-    state: "ACTIVE" | "RESTED";
-    attachedTo: string | null;
-  }): boolean => {
-    if (d.attachedTo) return false;
-    if (!sourceFilter) return d.state === "RESTED"; // historical default
-    if (sourceFilter.is_rested === true && d.state !== "RESTED") return false;
-    if (sourceFilter.is_rested === false && d.state === "RESTED") return false;
-    if (sourceFilter.is_active === true && d.state !== "ACTIVE") return false;
-    if (sourceFilter.is_active === false && d.state === "ACTIVE") return false;
-    return true;
-  };
-
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  const allValidIds = donGiveRecipients(
+    state,
+    preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs),
+    cardDb,
+    controller,
+  );
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  if (targetIds.length === 1 && fieldSideOf(state, targetIds[0]) === opp) {
+    const pool = giveOpponentDonPool(state, opp, params);
+    const count = Math.min(amount, pool.length);
+    if (giveOpponentDonChoiceMatters(state, pool, count)) {
+      return buildGiveDonIdentityPrompt(
+        state, action, opp, targetIds[0], pool.map((d) => d.instanceId), count,
+        sourceCardInstanceId, controller, cardDb, resultRefs,
+      );
+    }
+  }
+
   let nextState = state;
   let given = 0;
   for (const targetId of targetIds) {
-    for (let i = 0; i < amount; i++) {
-      const oppPlayer = nextState.players[opp];
-      const donIdx = oppPlayer.donCostArea.findIndex(matchesSource);
-      if (donIdx === -1) break;
-
-      const donCard = oppPlayer.donCostArea[donIdx];
-      const newDonCostArea = oppPlayer.donCostArea.filter((_, idx) => idx !== donIdx);
-      const attachedDon = { ...donCard, attachedTo: targetId };
-
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      const targetPlayer = newPlayers[opp];
-      const charIdx = targetPlayer.characters.findIndex((c) => c?.instanceId === targetId);
-      if (charIdx !== -1) {
-        const char = targetPlayer.characters[charIdx]!;
-        const newChars = [...targetPlayer.characters] as (typeof targetPlayer.characters);
-        newChars[charIdx] = { ...char, attachedDon: [...char.attachedDon, attachedDon] };
-        newPlayers[opp] = { ...targetPlayer, characters: newChars, donCostArea: newDonCostArea };
-      } else if (targetPlayer.leader?.instanceId === targetId) {
-        const newLeader = { ...targetPlayer.leader, attachedDon: [...targetPlayer.leader.attachedDon, attachedDon] };
-        newPlayers[opp] = { ...targetPlayer, leader: newLeader, donCostArea: newDonCostArea };
-      } else {
-        break;
-      }
-      nextState = { ...nextState, players: newPlayers };
-      given++;
-    }
+    if (fieldSideOf(nextState, targetId) !== opp) continue;
+    const pool = giveOpponentDonPool(nextState, opp, params).slice(0, amount);
+    const applied = attachOpponentDonById(nextState, opp, targetId, pool.map((d) => d.instanceId));
+    nextState = applied.state;
+    given += applied.given;
   }
 
   if (given > 0) {

@@ -318,6 +318,7 @@ function resumeEffectChainCore(
     action,
     resumeCtx,
     resultRefs,
+    cardDb,
     events
   );
   if (redistribute?.kind === "handled") return redistribute.result;
@@ -329,6 +330,8 @@ function resumeEffectChainCore(
     nextState,
     action,
     resumeCtx,
+    resultRefs,
+    cardDb,
     events
   );
   if (giveDonIdentity?.kind === "handled") return giveDonIdentity.result;
