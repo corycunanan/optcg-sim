@@ -900,7 +900,8 @@ Card text: `[Once Per Turn] If this Character would be K.O.'d, you may trash 1 {
   id: "CARD_ko_protection",
   category: "replacement",
   // Replacement events: WOULD_BE_KO, WOULD_BE_REMOVED_FROM_FIELD,
-  // WOULD_LEAVE_FIELD, WOULD_BE_RESTED, WOULD_LOSE_GAME, LIFE_ADDED_TO_HAND
+  // WOULD_LEAVE_FIELD, WOULD_BE_RESTED, WOULD_LOSE_GAME,
+  // WOULD_TAKE_DAMAGE, LIFE_ADDED_TO_HAND
   replaces: { event: "WOULD_BE_KO" },
   replacement_actions: [
     {

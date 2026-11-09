@@ -470,6 +470,7 @@ type ReplacementEvent =
   | "WOULD_LEAVE_FIELD"
   | "WOULD_BE_RESTED"
   | "WOULD_LOSE_GAME"
+  | "WOULD_TAKE_DAMAGE"
   | "LIFE_ADDED_TO_HAND";
 
 interface CauseFilter {
@@ -542,6 +543,22 @@ Fires when the controller would lose the game due to deck-out (reducing deck to 
 | Card Text | Example |
 |-----------|---------|
 | "When your deck is reduced to 0, you win the game instead of losing." | OP03-040 Nami |
+
+#### WOULD_TAKE_DAMAGE
+
+Fires when the controller's Leader would take damage, from battle (the Damage Step, rules 7-1-4-1-1) or from an effect (`DEAL_DAMAGE`, `SELF_TAKE_DAMAGE`). The subject is the damaged player's Leader, so author `target_filter: { controller: "SELF", card_type: "LEADER" }` ("If you would take damage"). Narrow the cause with `cause_filter` as for K.O. replacements.
+
+The event is the whole damage instance, checked once before its first point and before any Life card moves (OPT-1032):
+
+* One replacement prevents every point of a [Double Attack] or a "deal N damage" instruction.
+* At 0 Life it prevents the defeat that the damage would cause (9-2-1-1).
+* Life-destination rules such as ST13-003's face-up Life to deck (`DAMAGE_RULE_MOD`) apply only to damage that is actually taken. A used damage replacement leaves no Life card for them to move; a declined one lets them apply to each point.
+
+A battle offer pauses the Damage Step on the same `CHARACTER_KO_REPLACEMENT` BATTLE_DAMAGE owner as a battle K.O. replacement, with the Leader as target and the damage count already locked on the battle. An effect offer pauses the issuing chain with the damage instruction as its `pausedAction`; a decline deals that instruction (`dealDamageAfterDeclinedReplacement`).
+
+| Card Text | Example |
+|-----------|---------|
+| "If you would take damage, you may trash this Character instead." | EB05-052 Gloriosa |
 
 #### LIFE_ADDED_TO_HAND
 

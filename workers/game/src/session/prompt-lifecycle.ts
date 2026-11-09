@@ -6,6 +6,7 @@ import {
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
+import { dealDamageAfterDeclinedReplacement } from "../engine/effect-damage.js";
 import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
 import type {
   CardData,
@@ -488,6 +489,15 @@ function answerReplacementOffer(
       ? abortReplacedCost(state, topAfter, replacement.events, cardDb, resolverExecutionServices)
       : resumeFromStack(state, { ...topAfter.costReplacementAction! }, cardDb);
     state = withPendingPrompt(resumed.state, resumed.pendingPrompt);
+  } else if (
+    event === "WOULD_TAKE_DAMAGE" && caller && callerKind === "TRIGGER_DRAIN" &&
+    !replacement.replaced && !replacement.pendingPrompt
+  ) {
+    // OPT-1032: every "If you would take damage" offer was declined; the
+    // parked DEAL_DAMAGE / SELF_TAKE_DAMAGE is dealt now (8-1-3-4-1).
+    const dealt = dealDamageAfterDeclinedReplacement(state, caller.id, cardDb);
+    if (dealt) return applyDamageResult(state, { ...dealt, events: [...replacement.events, ...dealt.events] }, cardDb, actingPlayer);
+    state = recordReplacementContinuationResult(state, caller.id, true, []);
   } else if (caller && callerKind === "TRIGGER_DRAIN") {
     state = recordReplacementContinuationResult(state, caller.id, !replacement.replaced, []);
   }

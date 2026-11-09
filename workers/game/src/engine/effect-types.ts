@@ -1761,6 +1761,7 @@ export type ReplacementEvent =
   | "WOULD_LEAVE_FIELD"
   | "WOULD_BE_RESTED"
   | "WOULD_LOSE_GAME"
+  | "WOULD_TAKE_DAMAGE"
   | "LIFE_ADDED_TO_HAND";
 
 /**
