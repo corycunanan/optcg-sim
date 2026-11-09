@@ -30,6 +30,7 @@ import { playCharacterRestedScenario } from "@/lib/sandbox/scenarios/playground/
 import {
   applySandboxAction,
   buildEngineSessionGame,
+  dispatchSandboxAction,
   hydrateToGameState,
   withSandboxPromptIdentity,
 } from "../sandbox-engine-session-provider";
@@ -422,7 +423,10 @@ describe("play-character-rested scenario (OPT-1009)", () => {
 
   const cardDb = new Map(Object.entries(SANDBOX_CARD_DB));
 
-  /** Dispatches as `useSandboxEngineSession` does, prompt identity included. */
+  /**
+   * Dispatches as `useSandboxEngineSession` does. Replies carry no promptId,
+   * exactly as the board sends them (OPT-1043).
+   */
   function session() {
     let current = withSandboxPromptIdentity(
       hydrateToGameState(playCharacterRestedScenario.initialState),
@@ -433,11 +437,7 @@ describe("play-character-rested scenario (OPT-1009)", () => {
         return current.gameState;
       },
       dispatch(action: GameAction) {
-        const next = applySandboxAction(current.gameState, action, cardDb, 0);
-        current = withSandboxPromptIdentity(next, current.promptSequence);
-      },
-      promptId() {
-        return current.gameState.pendingPrompt!.promptId;
+        current = dispatchSandboxAction(current, action, cardDb, 0);
       },
     };
   }
@@ -449,9 +449,9 @@ describe("play-character-rested scenario (OPT-1009)", () => {
       effectId: "activate_add_don_and_play",
     });
     expect(s.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "activate", promptId: s.promptId() });
+    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "activate" });
     expect(s.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "choose-value:1", promptId: s.promptId() });
+    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
     expect(s.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   }
 
@@ -462,7 +462,6 @@ describe("play-character-rested scenario (OPT-1009)", () => {
     s.dispatch({
       type: "SELECT_TARGET",
       selectedInstanceIds: ["p0-hand-crocodile"],
-      promptId: s.promptId(),
     });
 
     const me = s.state.players[0];
@@ -488,7 +487,6 @@ describe("play-character-rested scenario (OPT-1009)", () => {
     s.dispatch({
       type: "SELECT_TARGET",
       selectedInstanceIds: ["not-a-candidate"],
-      promptId: s.promptId(),
     });
 
     expect(s.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");

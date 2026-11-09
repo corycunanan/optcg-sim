@@ -39,6 +39,7 @@ import { surfaceDamageFramePrompt } from "@engine/engine/damage-frames";
 import { resumePromptLifecycle } from "@engine/session/prompt-lifecycle";
 import { reconcileExecutionContextIdCounter } from "@engine/engine/execution-context";
 import { createSandboxExecutionContext } from "@/lib/sandbox/execution-context";
+import { withPromptId } from "@/lib/game/prompt-response";
 import type {
   SandboxGameSession,
   SandboxGameSessionGame,
@@ -188,6 +189,26 @@ export function withSandboxPromptIdentity(
   };
 }
 
+/**
+ * One board dispatch: the reducer behind `useSandboxEngineSession`. The board
+ * sends prompt replies without a promptId, so stamp the pending prompt's id as
+ * the live socket does (OPT-1043); otherwise every reply reads as stale.
+ */
+export function dispatchSandboxAction(
+  previous: SandboxEngineState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  myIndex: 0 | 1
+): SandboxEngineState {
+  const next = applySandboxAction(
+    previous.gameState,
+    withPromptId(action, previous.gameState.pendingPrompt?.promptId),
+    cardDb,
+    myIndex
+  );
+  return withSandboxPromptIdentity(next, previous.promptSequence);
+}
+
 export function buildEngineSessionGame(
   state: GameState,
   cardDb: CardDb,
@@ -253,15 +274,9 @@ export function useSandboxEngineSession(
 
   const dispatch = useCallback(
     (action: GameAction) => {
-      setEngineState((previous) => {
-        const next = applySandboxAction(
-          previous.gameState,
-          action,
-          cardDb,
-          myIndex
-        );
-        return withSandboxPromptIdentity(next, previous.promptSequence);
-      });
+      setEngineState((previous) =>
+        dispatchSandboxAction(previous, action, cardDb, myIndex)
+      );
     },
     [cardDb, myIndex]
   );
