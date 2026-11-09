@@ -214,6 +214,13 @@ function BoardLayoutInner({
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
+  // Block/Skip and blocker selection yield to a pending in-place SELECT_TARGET
+  // (OPT-897): the server only accepts the target response until it resolves.
+  const blockStepInputEnabled =
+    boardInputEnabled &&
+    bs.inBlockStep &&
+    !modalRouting.targetSelectionActive &&
+    !spotlight.isBlockingPrompt;
 
   const { orderedHand: playerOrderedHand, reorder: reorderPlayerHand } = useHandOrder(
     me?.hand ?? [],
@@ -489,7 +496,7 @@ function BoardLayoutInner({
             activePrompt={boardPrompt}
             rejectionReason={actionRejection?.reason ?? null}
             battleInfo={bs.battleInfo}
-            blockerMode={boardInputEnabled && bs.inBlockStep && !spotlight.isBlockingPrompt ? {
+            blockerMode={blockStepInputEnabled ? {
               selectedBlockerId: bs.selectedBlockerId,
               onBlock: () => {
                 if (bs.selectedBlockerId) {
@@ -549,11 +556,7 @@ function BoardLayoutInner({
               !modalRouting.targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
-            inBlockStep={
-              boardInputEnabled &&
-              bs.inBlockStep &&
-              !spotlight.isBlockingPrompt
-            }
+            inBlockStep={blockStepInputEnabled}
             selectedBlockerId={bs.selectedBlockerId}
             setSelectedBlockerId={bs.setSelectedBlockerId}
             onAction={dispatchBoardAction}
