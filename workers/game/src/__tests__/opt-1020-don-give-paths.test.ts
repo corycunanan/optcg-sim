@@ -8,10 +8,9 @@
  * precedence." So DISTRIBUTE_DON, REDISTRIBUTE_DON and
  * GIVE_OPPONENT_DON_TO_OPPONENT (action and cost) are gated, on the offer and
  * on a resumed reply. The DON!! Phase GIVEN_TO_LEADER rule modification
- * (OP13-003 Roger) is subject to the same rule but stays an `it.fails`
- * ratchet below (see its comment). A staged cost reply reads prohibitions in a
- * three-way reconciliation of the committed root, the staged payment and the
- * live root (`stagedProhibitionView`).
+ * (OP13-003 Roger) is subject to the same rule (OPT-1036). A staged cost
+ * reply reads prohibitions in a three-way reconciliation of the committed
+ * root, the staged payment and the live root (`stagedProhibitionView`).
  *
  * OPT-932: GIVE_OPPONENT_DON_TO_OPPONENT lets the activating player choose
  * which of the opponent's DON!! are given, up to the printed amount
@@ -343,12 +342,9 @@ describe("OPT-931 DON!! Phase GIVEN_TO_LEADER honors CANNOT_ATTACH_DON (rule 1-3
     expect(result.state.players[P0].leader.attachedDon).toHaveLength(1);
   });
 
-  // Ratchet. Rule 1-3-3 applies here too (Roger's rule modification is a
-  // card effect), but the gate belongs in phases.ts, whose bytes the frozen
-  // OPT-981 writer corpus pins (opt-981-writer-corpus.test.ts). Changing it
-  // means recapturing that audited corpus, so it is deferred to OPT-1036.
-  // Latent: no authored schema grants CANNOT_ATTACH_DON.
-  it.fails("places both DON!! in the cost area when the Leader cannot be given DON!!", () => {
+  // Rule 1-3-3 applies here too: Roger's rule modification is a card effect
+  // (OPT-1036). Latent: no authored schema grants CANNOT_ATTACH_DON.
+  it("places both DON!! in the cost area when the Leader cannot be given DON!!", () => {
     const f = rogerAtDonPhase();
     forbidDon(f, f.state.players[P0].leader);
     const result = runPipeline(f.state, { type: "ADVANCE_PHASE" }, f.db, P0);

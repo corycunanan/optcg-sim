@@ -11,6 +11,7 @@ import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { queuedSourceSnapshot } from "./trigger-ordering.js";
 import { isGameTerminated } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
+import { isDonAttachProhibited } from "./prohibitions.js";
 import type {
   CardData,
   EffectStackFrame,
@@ -141,6 +142,9 @@ export function executeAdvancePhaseWork(state: GameState, cardDb: Map<string, Ca
         })) continue;
         givenCount = Math.min(placedCount, givenCount + rule.count);
       }
+      // Rule 1-3-3: a "cannot be given DON!!" effect beats the rule
+      // modification, so the DON!! stay in the cost area (OPT-1036).
+      if (givenCount > 0 && isDonAttachProhibited(state, player.leader.instanceId, cardDb, pi)) givenCount = 0;
       nextState = placeDonFromDeck(nextState, pi, donCount);
       if (givenCount > 0) {
         const placedPlayer = nextState.players[pi];

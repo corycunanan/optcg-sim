@@ -8,6 +8,9 @@ import { command } from "./fixtures/opt-981-writer.js";
 import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
 const bytes = readFileSync(new URL("./fixtures/opt-981-writer-produced.json.gz", import.meta.url));
 const corpus = JSON.parse(gunzipSync(bytes).toString());
+/** Recorded in docs/game-engine/audits/opt-981/writer/rollout.md. */
+const ARCHIVE_SHA256 = "bfaa3aeddfb353c44f52b1f6a4caf2e8082f66eab4274c9b24eb92bc27aa01c8";
+const PRODUCER_PHASES_SHA256 = "48a18eb6084eac1f3c0370ccbb7a0be7cbf9029228e990b7704bc9745fca2abd";
 
 interface SavedState {
   pendingPrompt: { promptId: string; resumeContext: unknown; options: { choices?: { id: string }[] } };
@@ -48,7 +51,12 @@ function withoutSkippedPrompt(expected: Envelope, skippedAfter: Envelope): Envel
 describe("OPT-981 immutable actual writer corpus", () => {
   it("pins the producing runtime and distinguishes public producer receipts from reader replays", () => {
     expect(corpus.producerSourceSha).toMatch(/^[0-9a-f]{40}$/);
-    expect(corpus.producerRuntimeSha256).toBe(createHash("sha256").update(readFileSync(new URL("../engine/phases.ts", import.meta.url))).digest("hex"));
+    // The archive is immutable evidence of what the OPT-981 producer wrote.
+    // Pin the archive bytes and the producer's recorded phases.ts hash (audit
+    // doc rollout.md), not today's phases.ts: the live engine may change, and
+    // the replay below is what proves it still reads these saves (OPT-1036).
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(ARCHIVE_SHA256);
+    expect(corpus.producerRuntimeSha256).toBe(PRODUCER_PHASES_SHA256);
     expect(corpus.deployedReaderSha).toBe("8c8a80bdf93c0d095d10f100feb3e31c60aa3e61");
     const promoted = corpus.records.filter((record: { before: Record<string, { state?: { schemaVersion?: number } }>; after: Record<string, { state?: { schemaVersion?: number } }> }) =>
       record.before["session"].state?.schemaVersion === 10 && record.after["session"].state?.schemaVersion === 11);
