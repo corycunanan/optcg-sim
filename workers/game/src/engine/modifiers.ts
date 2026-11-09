@@ -295,51 +295,97 @@ const negationEvaluationRoots = new WeakMap<GameState, GameState>();
 interface NegationQueryContext {
   state: GameState;
   cardDb: Map<string, CardDataType> | undefined;
+  /** Cards whose permanent-aura negation is being decided (OPT-1008). */
   visiting: Set<string>;
+  /** Resolved negation flags whose own duration is being decided (OPT-1012). */
+  excludedFlags: Set<string>;
 }
 const negationQueryContexts: NegationQueryContext[] = [];
+
+/** Run `query` inside the negation query scope for this state root and db,
+ * opening one when none is active. Nested queries share the scope's guards. */
+function withNegationQueryContext<T>(
+  state: GameState,
+  cardDb: Map<string, CardDataType> | undefined,
+  query: (context: NegationQueryContext) => T,
+): T {
+  const queryState = negationEvaluationRoots.get(state) ?? state;
+  const active = negationQueryContexts.find(context =>
+    context.state === queryState && context.cardDb === cardDb);
+  if (active) return query(active);
+  const context: NegationQueryContext = {
+    state: queryState, cardDb, visiting: new Set(), excludedFlags: new Set(),
+  };
+  negationQueryContexts.push(context);
+  try {
+    return query(context);
+  } finally {
+    negationQueryContexts.pop();
+  }
+}
 
 export function isCardNegated(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
-  const queryState = negationEvaluationRoots.get(state) ?? state;
-  const active = negationQueryContexts.find(context =>
-    context.state === queryState && context.cardDb === cardDb);
-  if (active) return isCardNegatedWithGuard(card, state, cardDb, active.visiting);
-  const context: NegationQueryContext = {
-    state: queryState, cardDb, visiting: new Set(),
-  };
-  negationQueryContexts.push(context);
-  try {
-    return isCardNegatedWithGuard(card, state, cardDb, context.visiting);
-  } finally {
-    negationQueryContexts.pop();
-  }
+  return withNegationQueryContext(state, cardDb, context =>
+    isCardNegatedWithGuard(card, state, cardDb, context));
+}
+
+export function isNegationFlagEffect(effect: Pick<RuntimeActiveEffect, "modifiers">): boolean {
+  return effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG") ?? false;
+}
+
+/**
+ * OPT-1012: decide a gate of an already-resolved negation flag. The flag's
+ * WHILE_CONDITION decides whether that flag still applies, so it is read
+ * against the game with that one flag set aside: a duration cannot depend on
+ * its own result. Other flags, auras, and grants stay in view. Every reader of
+ * a flag's duration (negation queries, modifier gates, step-6 expiry, and the
+ * visibility view) uses this helper so they agree on one answer.
+ */
+export function evaluateNegationFlagGate(
+  effect: RuntimeActiveEffect,
+  state: GameState,
+  cardDb: Map<string, CardDataType> | undefined,
+  gate: () => boolean,
+): boolean {
+  return withNegationQueryContext(state, cardDb, context => {
+    if (context.excludedFlags.has(effect.id)) return false;
+    context.excludedFlags.add(effect.id);
+    try {
+      return gate();
+    } finally {
+      context.excludedFlags.delete(effect.id);
+    }
+  });
 }
 
 function isCardNegatedWithGuard(
   card: CardInstance,
   state: GameState,
   cardDb: Map<string, CardDataType> | undefined,
-  visiting: Set<string>,
+  context: NegationQueryContext,
 ): boolean {
+  const { visiting, excludedFlags } = context;
   const effects = state.activeEffects;
   for (const effect of effects) {
-    if (!effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG"))
-      continue;
+    if (!isNegationFlagEffect(effect)) continue;
     if (!effect.appliesTo?.includes(card.instanceId)) continue;
+    if (excludedFlags.has(effect.id)) continue;
 
     const duration = effect.duration;
     if (duration?.type === "WHILE_CONDITION" && duration.condition) {
       if (!cardDb) return true;
+      const condition = duration.condition;
       const condCtx: ConditionContext = {
         sourceCardInstanceId: effect.sourceCardInstanceId,
         controller: effect.controller,
         cardDb,
       };
-      if (!evaluateCondition(state, duration.condition, condCtx)) continue;
+      if (!evaluateNegationFlagGate(effect, state, cardDb, () =>
+        evaluateCondition(state, condition, condCtx))) continue;
     }
     return true;
   }
@@ -364,7 +410,7 @@ function isCardNegatedWithGuard(
         })) continue;
         // Unlike a resolved flag, a permanent aura stops when its source is
         // negated. Share the traversal guard so cyclic auras terminate.
-        if (isCardNegatedWithGuard(source, state, cardDb, visiting)) continue;
+        if (isCardNegatedWithGuard(source, state, cardDb, context)) continue;
         return true;
       }
     }
@@ -462,9 +508,7 @@ export function isEffectConditionMet(
   // Suppress ongoing/unproven effects whose source is negated. The
   // NEGATE_EFFECTS_FLAG modifier itself is exempt to keep the negation
   // itself resolvable even if the negator is later negated.
-  const isNegationFlag = effect.modifiers?.some(
-    (m) => m.type === "NEGATE_EFFECTS_FLAG"
-  );
+  const isNegationFlag = isNegationFlagEffect(effect);
   if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb))
     return false;
 
@@ -474,6 +518,10 @@ export function isEffectConditionMet(
     cardDb,
   };
 
+  if (isNegationFlag) {
+    return evaluateNegationFlagGate(effect, state, cardDb, () =>
+      isModifierGateMet(effect, undefined, state, condCtx));
+  }
   return isModifierGateMet(effect, undefined, state, condCtx);
 }
 
@@ -489,17 +537,16 @@ export function isModifierConditionMet(
 ): boolean {
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
-  const isNegationFlag = effect.modifiers?.some(
-    (candidate) => candidate.type === "NEGATE_EFFECTS_FLAG"
-  );
+  const isNegationFlag = isNegationFlagEffect(effect);
   if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb))
     return false;
 
-  return isModifierGateMet(effect, modifier, state, {
+  const gate = () => isModifierGateMet(effect, modifier, state, {
     sourceCardInstanceId: effect.sourceCardInstanceId,
     controller: effect.controller,
     cardDb,
   });
+  return isNegationFlag ? evaluateNegationFlagGate(effect, state, cardDb, gate) : gate();
 }
 
 /**

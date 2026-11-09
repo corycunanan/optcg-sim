@@ -43,6 +43,7 @@
 | [GAME-ENGINE-AUDIT-2026-07.md](./GAME-ENGINE-AUDIT-2026-07.md) | Consolidated Luna Max + Terra Max audit, independent verification, and sequenced Linear hardening plan | — |
 | [SAVED-STATE-COMPATIBILITY.md](./SAVED-STATE-COMPATIBILITY.md) | Game-state schema version, frame-kind contract, old-save support window, legacy shape dispositions, and the rollback/repair/rejection runbook (OPT-940) | — |
 | [SESSION-CAPTURE-EXPORT.md](./SESSION-CAPTURE-EXPORT.md) | Signed read-only capture protocol, sanitization, and the incomplete real-session fixture inventory (OPT-971) | — |
+| [NEGATION-SCOPE.md](./NEGATION-SCOPE.md) | What negation removes (printed effects) and keeps (granted effects, resolved results), [On K.O.] after negation, duration, and bounds on conditional resolved negation (OPT-954, OPT-1012) | — |
 | [ZONE-TRANSITION-CONTRACT.md](./ZONE-TRANSITION-CONTRACT.md) | Authoritative cross-zone identity, cleanup, event, atomicity, and ordering contract | — |
 | [VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md) | Binding layer order for power and cost (base settings, modifiers, DON!!, Counter power), the one evaluator, and the FAQ ruling behind each layer (OPT-953, OPT-1035) | — |
 | [GAME-ENGINE-REQUIREMENTS.md](./GAME-ENGINE-REQUIREMENTS.md) | Complete rules-to-engine mapping from Comprehensive Rules v1.2.0 | 1,079 |
