@@ -342,7 +342,7 @@ function replacementMatchesTarget(
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
     // OPT-909: a battle K.O. reads the defender's power including the Counter
-    // Step power added in this battle (value layer 4, rules §7-1-3-2-1; qa_op05
+    // Step power added in this battle (value layer 4, rules §7-1-3-1-1; qa_op05
     // OP05-001: a base-4000 Character raised to 5000+ by a Counter qualifies).
     if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;
   }

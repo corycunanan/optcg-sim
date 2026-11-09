@@ -116,7 +116,7 @@ function reload(state: GameState, db: Map<string, CardData>, location: string) {
   return location === "live" ? loaded.state : loaded.undoHistory[0];
 }
 
-// Independent expectations: rules 7-1-1-4, 7-1-2-3, 7-1-3-3 skip directly
+// Independent expectations: rules 7-1-1-4, 7-1-2-3, 7-1-3-1-3 skip directly
 // to End of Battle after the step's suspended effects finish. No damage or
 // battle-result event is permitted. Synthetic effects isolate each boundary.
 describe.each(["memory", "live", "undo"])(

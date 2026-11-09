@@ -159,7 +159,7 @@ describe.each(["memory", "live", "undo"])(
       );
     });
 
-    // Rules 7-1-3-2-2 and 8-6; docs/cards/OP-05.md:124 (OP05-018) and
+    // Rules 7-1-3-1-2 and 8-6; docs/cards/OP-05.md:124 (OP05-018) and
     // :76 (OP05-011). Kuma is Revolutionary Army, <=5000 power, and its real
     // On Play can K.O. a <=2000 attacker before Counter Step closes.
     it("OP05-018 plays Kuma, whose On Play resolves inside Counter and removes the attacker", () => {

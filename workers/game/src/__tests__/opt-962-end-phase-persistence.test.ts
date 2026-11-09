@@ -4,8 +4,8 @@
  * writer, OPT-980 reader), or is reached again after an undo through the
  * persisted undo snapshot. Fixed choices on every path.
  *
- * Rules: 6-6-1-1 (line 607), 6-6-1-1-2 (line 611), 6-6-1-2 (line 617),
- * 6-6-1-3 (line 622), 6-6-1-4 (line 624). Cards: OP04-034 (docs/cards/OP-04.md:234),
+ * Rules: 6-6-1-1 (line 613), 6-6-1-1-2 (line 617), 6-6-1-2 (line 623),
+ * 6-6-1-3 (line 628), 6-6-1-4 (line 630). Cards: OP04-034 (docs/cards/OP-04.md:234),
  * OP03-015 Lim (docs/cards/OP-03.md:95); the rest are synthetic stand-ins.
  *
  * | Stage reached | Prompt | Chooser | Fixed answer |

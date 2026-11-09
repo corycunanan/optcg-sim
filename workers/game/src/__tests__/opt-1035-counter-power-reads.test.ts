@@ -1,7 +1,7 @@
 /**
  * OPT-1035 — Counter Step power is part of the one power read.
  *
- * Rules §7-1-3-2-1: a [Symbol Counter] raises the attacked card's power
+ * Rules §7-1-3-1-1: a [Symbol Counter] raises the attacked card's power
  * "during that battle". The engine keeps it on `BattleContext.counterPowerAdded`
  * and `getEffectivePower` adds it to the battle target as value layer 4
  * (docs/game-engine/VALUE-LAYER-CONTRACT.md). Every read during the battle

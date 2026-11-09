@@ -1,8 +1,8 @@
 /**
  * Timing baseline F16 (README §2). Oracle = README, never the engine.
  *
- * Rule 9-2-1 (line 880): players who fulfil a defeat condition at the same checkpoint all lose (draw).
- * Rule 9-2-1-2 (line 884): 0 cards in deck. Rule 9-1-2 (line 876): rule processing is immediate.
+ * Rule 9-2-1 (line 884): players who fulfil a defeat condition at the same checkpoint all lose (draw).
+ * Rule 9-2-1-2 (line 888): 0 cards in deck. Rule 9-1-2 (line 880): rule processing is immediate.
  * Rule 1-2-1 (line 35): when the opponent loses, the player who has not lost wins.
  * Decision 3 (rev4 §10): evaluate both players at the same checkpoint; never run later instructions
  * to manufacture simultaneous defeat.
@@ -44,7 +44,7 @@ function run(b: Built, action: GameAction, player: 0 | 1 = 0): void {
   b.state = r.state;
 }
 
-describe("F16a synthetic checkpoint: both decks empty when rule processing runs is a draw (rules 9-2-1 line 880, 9-2-1-2 line 884, 9-1-2 line 876; Decision 3)", () => {
+describe("F16a synthetic checkpoint: both decks empty when rule processing runs is a draw (rules 9-2-1 line 884, 9-2-1-2 line 888, 9-1-2 line 880; Decision 3)", () => {
   it("F16a FINISHED with winner null", () => {
     const b = base([]);
     expect(b.state.players[0].deck).toHaveLength(0);
@@ -57,11 +57,11 @@ describe("F16a synthetic checkpoint: both decks empty when rule processing runs 
   });
 });
 
-describe("F16b sequential defeat stops at the first terminal checkpoint (rules 9-2-1 line 880, 1-2-1 line 35; Decision 3)", () => {
+describe("F16b sequential defeat stops at the first terminal checkpoint (rules 9-2-1 line 884, 1-2-1 line 35; Decision 3)", () => {
   const MILLER = "SYN-OPP-MILLER"; // [Activate: Main] opponent trashes 1 from deck, THEN you trash 1 from deck
 
   // Base engine (03071b69/1b3f6a50): CARD_TRASHED:p1 -> CARD_TRASHED:p0 -> GAME_OVER; the second MILL ran and manufactured a draw.
-  // Decision 3 / rule 9-2-1 (line 880): p1 is already defeated after instruction 1; instruction 2 must not run.
+  // Decision 3 / rule 9-2-1 (line 884): p1 is already defeated after instruction 1; instruction 2 must not run.
   // Flipped by OPT-960: the checkpoint after the OPPONENT_ACTION MILL ends play.
   it("F16b p1 deck-out ends the game before the second MILL: winner 0, p0 deck still holds its card (OPT-960)", () => {
     const schema: EffectSchema = {

@@ -1,11 +1,11 @@
 /**
  * Timing baseline F5-F8 (README §2). Oracle = README, never the engine.
  *
- * F5  Rule 7-1-4-1-1-2 (line 670), 8-6-2-1 (line 864), 8-6-2 (line 862);
+ * F5  Rule 7-1-4-1-1-2 (line 674), 8-6-2-1 (line 868), 8-6-2 (line 866);
  *     FAQ qa_op03.md:92-96, qa_op13.md:13-15.
  * F6  Rules 8-6-2, 8-6-2-1; FAQ qa_op13.md:13-15.
- * F7  OP05-098 text, rule 8-6-2 (line 862), 7-1-4-1-1-3 (line 672); FAQ qa_op05.md:237-239.
- * F8  Rule 7-1-4-1-1-3 (line 672), 8-6-2-1 (line 864), 7-1-4-1-1-1 (line 668);
+ * F7  OP05-098 text, rule 8-6-2 (line 866), 7-1-4-1-1-3 (line 676); FAQ qa_op05.md:237-239.
+ * F8  Rule 7-1-4-1-1-3 (line 676), 8-6-2-1 (line 868), 7-1-4-1-1-1 (line 672);
  *     FAQ qa_op03.md OP03-118, qa_rules.md:156-158.
  */
 import { describe, it, expect } from "vitest";
@@ -181,7 +181,7 @@ function vanillaDeck(state: GameState): GameState {
   return { ...state, players };
 }
 
-describe("F5 [Rule 7-1-4-1-1-2 line 670, 8-6-2-1 line 864, 8-6-2 line 862; FAQ qa_op03.md:92-96, qa_op13.md:13-15] four-step order in one damage point", () => {
+describe("F5 [Rule 7-1-4-1-1-2 line 674, 8-6-2-1 line 868, 8-6-2 line 866; FAQ qa_op03.md:92-96, qa_op13.md:13-15] four-step order in one damage point", () => {
   function setup() {
     const { rig, db } = baseRig();
     let s = withLeader(rig.state, db, 0, SYN_NAMI);
@@ -231,7 +231,7 @@ describe("F5 [Rule 7-1-4-1-1-2 line 670, 8-6-2-1 line 864, 8-6-2 line 862; FAQ q
   });
 });
 
-describe("F6 [Rule 8-6-2 line 862, 8-6-2-1 line 864; FAQ qa_op13.md:13-15] Ace alone: Trigger before the defender's own taking-damage effect", () => {
+describe("F6 [Rule 8-6-2 line 866, 8-6-2-1 line 868; FAQ qa_op13.md:13-15] Ace alone: Trigger before the defender's own taking-damage effect", () => {
   it("F6 Trigger activates before Ace's draw (flipped by OPT-963)", () => {
     const { rig, db } = baseRig();
     let s = withLeader(rig.state, db, 1, SYN_ACE);
@@ -272,7 +272,7 @@ function withDoubleAttacker(state: GameState): { state: GameState; attackerId: s
   return { state: { ...state, players }, attackerId: datk.instanceId };
 }
 
-describe("F7 [OP05-098 text, Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; FAQ qa_op05.md:237-239] Enel resolves once, after both Double Attack points and the Damage Step", () => {
+describe("F7 [OP05-098 text, Rule 8-6-2 line 866, 7-1-4-1-1-3 line 676; FAQ qa_op05.md:237-239] Enel resolves once, after both Double Attack points and the Damage Step", () => {
   it("F7 DAMAGE_DEALT x2 -> END_OF_BATTLE -> Enel effect once; Life ends at 1", () => {
     const { rig, db } = baseRig();
     // Marker DRAW 1 after the add: ADD_TO_LIFE_FROM_DECK emits no event, so the draw dates the effect.
@@ -309,7 +309,7 @@ describe("F7 [OP05-098 text, Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; FAQ qa_o
   });
 });
 
-describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668; FAQ qa_op03.md OP03-118, qa_rules.md:156-158] Double Attack: Trigger on point 1 changes Life before point 2", () => {
+describe("F8 [Rule 7-1-4-1-1-3 line 676, 8-6-2-1 line 868, 7-1-4-1-1-1 line 672; FAQ qa_op03.md OP03-118, qa_rules.md:156-158] Double Attack: Trigger on point 1 changes Life before point 2", () => {
   function setup(lifeCards: LifeCard[]) {
     const { rig } = baseRig();
     const da = withDoubleAttacker(vanillaDeck(withLife(rig.state, 1, lifeCards)));
@@ -341,7 +341,7 @@ describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668;
   });
 });
 
-describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op05.md:237-239, qa_op03.md:111-113] Double Attack: the defender's taking-damage effect resolves once, after the last damage point", () => {
+describe("F17 [Rule 8-6-2 line 866, 7-1-4-1-1-3 line 676; Decision 2; FAQ qa_op05.md:237-239, qa_op03.md:111-113] Double Attack: the defender's taking-damage effect resolves once, after the last damage point", () => {
   // Stands in for a "when you take damage" watcher with the real SELF filter (OPT-887).
   const SYN_TAKE_DAMAGE = synCard(
     "SYN-TAKE-DAMAGE",
@@ -355,7 +355,7 @@ describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op0
   );
 
   // OPT-973: duplicate matches previously parked the draw behind an ordering prompt.
-  // Rule 8-6-2 (line 862) / Decision 2: the effect resolves once, after the last damage point.
+  // Rule 8-6-2 (line 866) / Decision 2: the effect resolves once, after the last damage point.
   it("F17 exactly one p1 CARD_DRAWN, after the second DAMAGE_DEALT; p1 Life 0, IN_PROGRESS (fixed OPT-973)", () => {
     const { rig, db } = baseRig();
     let s = withLeader(rig.state, db, 1, SYN_TAKE_DAMAGE);

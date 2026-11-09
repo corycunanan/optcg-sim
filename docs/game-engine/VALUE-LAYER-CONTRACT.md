@@ -24,7 +24,7 @@ Off the field, power and cost are the printed values (OPT-455). Power layers P1 
 | P1 | Base-power settings (`SET_POWER`): "base power becomes N", base swap, base copy | §4-9-2-1: when several settings apply, the highest value wins, whatever the order or controller. Printed power does not compete. |
 | P2 | Additive modifiers (`MODIFY_POWER`), turn player's first | Commutative. Negative totals are kept (§1-3-6-1). |
 | P3 | DON!!: +1000 for each attached DON!!, on its owner's turn | §6-5-5-2 |
-| P4 | [Symbol Counter] power on the current battle's target | §7-1-3-2-1: "during that battle". Kept on `BattleContext.counterPowerAdded`. |
+| P4 | [Symbol Counter] power on the current battle's target | §7-1-3-1-1: "during that battle". Kept on `BattleContext.counterPowerAdded`. |
 
 `getEffectivePower` returns P0 to P4. There is no separate "battle power". The battle result, the Counter Step display, and every effect read during the battle see the same number (OPT-1035).
 

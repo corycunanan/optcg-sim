@@ -2,11 +2,11 @@
  * OPT-925 (OPT-960) — effect damage to a Leader at 0 Life defeats that player.
  *
  * Rules v1.2.0, `docs/rules/rule_comprehensive.md`:
- * - 4-6-2 (line 439): "If any action deals damage to a Leader, the player whose
+ * - 4-6-2 (line 445): "If any action deals damage to a Leader, the player whose
  *   Leader has taken damage will perform the following procedure"; 4-6-2-1/-2
  *   (lines 441-443): move one Life card to hand per point, repeated X times.
- * - 9-2-1-1 (line 882): a Leader that takes damage while its player has 0 Life
- *   fulfils the defeat condition. 9-1-2 (line 876): immediately.
+ * - 9-2-1-1 (line 886): a Leader that takes damage while its player has 0 Life
+ *   fulfils the defeat condition. 9-1-2 (line 880): immediately.
  * FAQ: qa_eb03.md:131-133 (EB03-055 Nico Robin [On K.O.] damage at 0 Life wins);
  * qa_op14_eb04.md:339-341 (OP14-115 Rindo: you take 1 damage even if you add no
  * Life card).
@@ -57,7 +57,7 @@ function dealDamage(amount: number, then: Action[] = []): Action[] {
   ];
 }
 
-describe("OPT-925 EB03-055 Nico Robin [On K.O.] effect damage (qa_eb03.md:131-133; rule 9-2-1-1 line 882)", () => {
+describe("OPT-925 EB03-055 Nico Robin [On K.O.] effect damage (qa_eb03.md:131-133; rule 9-2-1-1 line 886)", () => {
   it("EB03-055: the damage at 0 Life defeats the opponent", () => {
     const r = rig();
     r.life(0, 0);
@@ -100,7 +100,7 @@ function addNoLifeCard(r: Rig) {
   r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
 }
 
-describe("OPT-925 OP14-115 Rindo [On K.O.] self-damage (qa_op14_eb04.md:339-341; rule 9-2-1-1 line 882)", () => {
+describe("OPT-925 OP14-115 Rindo [On K.O.] self-damage (qa_op14_eb04.md:339-341; rule 9-2-1-1 line 886)", () => {
   it("OP14-115: adding no Life card, then taking 1 damage at 0 Life, defeats Rindo's owner", () => {
     const r = rig();
     r.life(1, 0);
@@ -123,7 +123,7 @@ describe("OPT-925 OP14-115 Rindo [On K.O.] self-damage (qa_op14_eb04.md:339-341;
   });
 });
 
-describe("OPT-925 DEAL_DAMAGE pipeline regressions (rules 9-2-1-1 line 882, 9-1-2 line 876, 4-6-2 line 439)", () => {
+describe("OPT-925 DEAL_DAMAGE pipeline regressions (rules 9-2-1-1 line 886, 9-1-2 line 880, 4-6-2 line 445)", () => {
   it("1 damage at 0 Life: defeat", () => {
     const r = rig();
     r.life(1, 0);

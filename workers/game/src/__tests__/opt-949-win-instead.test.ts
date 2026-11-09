@@ -6,7 +6,7 @@
  * reduced to 0, you win the game instead of losing, according to the rules."
  * P-117 Nami (`docs/cards/UNKNOWN.md:684`) carries the same clause.
  * Rules v1.2.0: 1-3-1 (line 57) card text over rules; 1-2-5 (line 53) card
- * effects may cause a player to win; 9-2-1 (line 880) every player meeting a
+ * effects may cause a player to win; 9-2-1 (line 884) every player meeting a
  * defeat condition at one checkpoint loses; 1-2-1 (line 35).
  * FAQ: qa_op09.md:204-206 and qa_op10.md:207 — with the Nami Leader's effect
  * negated for the turn, a deck reduced to 0 loses the game.

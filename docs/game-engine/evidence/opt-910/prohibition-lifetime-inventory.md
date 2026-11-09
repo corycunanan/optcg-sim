@@ -62,7 +62,7 @@ location; this does not repair unrelated matcher or trigger-reader debt.
 ## Rules and acceptance
 
 Canonical rule8-2-3 protects auto/activate effects already activated and resolved
-(`docs/rules/rule_comprehensive.md:774`). Kalgara's canonical OP12-099 text and
+(`docs/rules/rule_comprehensive.md:778`). Kalgara's canonical OP12-099 text and
 schema resolve draw then THIS_TURN CANNOT_DRAW. Its FAQ (`docs/FAQs/qa_op12.md`)
 confirms the first resolved copy prevents a second effect draw for the rest of
 the turn. Roger's permanent suppression (`docs/cards/OP-13.md:424`) suppresses

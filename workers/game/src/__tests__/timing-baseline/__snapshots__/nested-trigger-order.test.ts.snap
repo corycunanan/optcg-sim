@@ -3738,7 +3738,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
 }
 `;
 
-exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210) > F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966) 1`] = `
+exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 862; FAQ qa_op07.md:206-210) > F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {
@@ -3809,7 +3809,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
 ]
 `;
 
-exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210) > F1b prompt inside A answered immediately (ratchet OPT-966) 1`] = `
+exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 862; FAQ qa_op07.md:206-210) > F1b prompt inside A answered immediately (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {
@@ -3880,7 +3880,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
 ]
 `;
 
-exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210) > F1c prompt inside A answered after a reload (ratchet OPT-966) 1`] = `
+exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 862; FAQ qa_op07.md:206-210) > F1c prompt inside A answered after a reload (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {
@@ -7614,7 +7614,7 @@ exports[`F2 full traces and final gameplay agree across continuous, prompted and
 }
 `;
 
-exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281) > F2a continuous (ratchet OPT-966) 1`] = `
+exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 864; FAQ qa_op10.md:279-281) > F2a continuous (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {
@@ -7674,7 +7674,7 @@ exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FA
 ]
 `;
 
-exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281) > F2b prompt inside A answered immediately (ratchet OPT-966) 1`] = `
+exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 864; FAQ qa_op10.md:279-281) > F2b prompt inside A answered immediately (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {
@@ -7734,7 +7734,7 @@ exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FA
 ]
 `;
 
-exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281) > F2c prompt inside A answered after a reload (ratchet OPT-966) 1`] = `
+exports[`F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 864; FAQ qa_op10.md:279-281) > F2c prompt inside A answered after a reload (ratchet OPT-966) 1`] = `
 [
   {
     "payload": {

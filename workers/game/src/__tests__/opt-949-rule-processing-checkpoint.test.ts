@@ -3,15 +3,15 @@
  * rule-processing checkpoint and one terminal writer.
  *
  * Rules v1.2.0, `docs/rules/rule_comprehensive.md`:
- * - 9-1-2 (line 876): rule processing is resolved immediately, even while
+ * - 9-1-2 (line 880): rule processing is resolved immediately, even while
  *   other actions are being carried out.
- * - 9-2-1 (line 880): every player who meets a defeat condition when rule
+ * - 9-2-1 (line 884): every player who meets a defeat condition when rule
  *   processing begins loses (both → draw).
- * - 9-2-1-1 (line 882): Leader takes damage while at 0 Life. 9-2-1-2 (line
+ * - 9-2-1-1 (line 886): Leader takes damage while at 0 Life. 9-2-1-2 (line
  *   884): 0 cards in deck.
  * - 1-2-1 (line 35): when the opponent loses, the other player wins.
  * - 1-3-1 (line 57): card text over rules (WIN_GAME).
- * - 11-1-1-1 (line 1022): a draw only when neither player can stop a loop.
+ * - 11-1-1-1 (line 1026): a draw only when neither player can stop a loop.
  * Decision 3 (rev4 §10): evaluate both players at one checkpoint; never run
  * later instructions to manufacture simultaneous defeat. Decision 5: budget
  * exhaustion is an engine-limit outcome, distinct from a rules draw.
@@ -67,7 +67,7 @@ function activate(r: ReturnType<typeof rig>, id: string, actions: Action[], cost
   return () => r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: card.instanceId, effectId: `${id}-main` });
 }
 
-describe("joint checkpoint: both players evaluated once (rule 9-2-1 line 880; Decision 3)", () => {
+describe("joint checkpoint: both players evaluated once (rule 9-2-1 line 884; Decision 3)", () => {
   it("joint (synthetic checkpoint): both decks empty at one checkpoint is a draw", () => {
     const r = rig();
     r.state.players[0].deck = [];
@@ -97,7 +97,7 @@ describe("joint checkpoint: both players evaluated once (rule 9-2-1 line 880; De
   });
 });
 
-describe("sequential instructions: the earlier terminal checkpoint ends play (rules 9-2-1 line 880, 1-2-1 line 35; Decision 3)", () => {
+describe("sequential instructions: the earlier terminal checkpoint ends play (rules 9-2-1 line 884, 1-2-1 line 35; Decision 3)", () => {
   it("DRAW empties p0's deck, so the THEN opponent MILL never runs and the result is not a draw", () => {
     const r = rig();
     r.deck(0, 1);
@@ -120,7 +120,7 @@ describe("sequential instructions: the earlier terminal checkpoint ends play (ru
   });
 });
 
-describe("zero Life without qualifying lethal damage stays playable (rule 9-2-1-1 line 882)", () => {
+describe("zero Life without qualifying lethal damage stays playable (rule 9-2-1-1 line 886)", () => {
   it("trashing the last Life card through a move is not defeat", () => {
     const r = rig();
     r.life(0, 1);
@@ -153,7 +153,7 @@ describe("zero Life without qualifying lethal damage stays playable (rule 9-2-1-
   });
 });
 
-describe("lethal battle damage ends play at the determination (rules 7-1-4-1-1-1 line 668, 9-1-2 line 876)", () => {
+describe("lethal battle damage ends play at the determination (rules 7-1-4-1-1-1 line 672, 9-1-2 line 880)", () => {
   /** p0 attacks p1's Leader with a 6000 Character; p1 holds a "when you take damage, draw 1" watcher. */
   function attackIntoWatcher(lifeCount: number) {
     const r = rig();

@@ -1,11 +1,11 @@
 /**
  * Timing baseline F3 / F4 (OPT-939 fixtures, README §2).
  *
- * F3: Rule 6-6-1-1 (line 607), 6-6-1-1-2 (line 611), 6-6-1-2 (line 617), 6-6-1-3 (line 622);
+ * F3: Rule 6-6-1-1 (line 613), 6-6-1-1-2 (line 617), 6-6-1-2 (line 623), 6-6-1-3 (line 628);
  *     FAQ qa_op10.md OP10-003 Sugar (End of Your Turn checks power before "during this turn" expires).
- * F13: ST13-002 text, rules 6-6-1-1 line 607, 6-6-1-1-2 line 611, 8-6-1 line 858; FAQ qa_st-13.md:13-15 (ST13-002 / OP12-099).
- * F14: rules 6-6-1-2 line 617, 6-6-1-3 line 622; FAQ qa_op10.md OP10-003 (scheduled-before-expiry, both players).
- * F4: OP15-022 text, rule 1-3-1 (line 57), 6-6-1-4 (line 624); FAQ faq_op15-eb04.md Brook.
+ * F13: ST13-002 text, rules 6-6-1-1 line 613, 6-6-1-1-2 line 617, 8-6-1 line 862; FAQ qa_st-13.md:13-15 (ST13-002 / OP12-099).
+ * F14: rules 6-6-1-2 line 623, 6-6-1-3 line 628; FAQ qa_op10.md OP10-003 (scheduled-before-expiry, both players).
+ * F4: OP15-022 text, rule 1-3-1 (line 57), 6-6-1-4 (line 630); FAQ faq_op15-eb04.md Brook.
  */
 
 import { describe, expect, it } from "vitest";
@@ -87,7 +87,7 @@ const POWER_5000 = { type: "SELF_POWER", operator: ">=", value: 5000 } as const;
 
 // ─── F3 ──────────────────────────────────────────────────────────────────────
 
-describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 607, 6-6-1-1-2 line 611, 6-6-1-2 line 617, 6-6-1-3 line 622; FAQ qa_op10.md OP10-003)", () => {
+describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 613, 6-6-1-1-2 line 617, 6-6-1-2 line 623, 6-6-1-3 line 628; FAQ qa_op10.md OP10-003)", () => {
   const EOYT = "SYN-EOYT"; // stands in for OP10-003 Sugar-style [End of Your Turn] power check
   const EOOT = "SYN-EOOT"; // an [End of Your Opponent's Turn] draw
 
@@ -155,7 +155,7 @@ describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 607, 6-6-1-1-
 
 // ─── F4 ──────────────────────────────────────────────────────────────────────
 
-describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 text; rules 1-3-1 line 57, 6-6-1-4 line 624; FAQ faq_op15-eb04.md Brook)", () => {
+describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 text; rules 1-3-1 line 57, 6-6-1-4 line 630; FAQ faq_op15-eb04.md Brook)", () => {
   const BROOK_SCHEMA: EffectSchema = schema("OP15-022", "Leader", [], {
     rule_modifications: [
       { rule_type: "LOSS_CONDITION_MOD", trigger_event: "DECK_OUT", modification: "DELAYED_LOSS" },
@@ -164,7 +164,7 @@ describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 
   const MILLER = "SYN-MILLER"; // [Activate: Main] trash 2 from the top of your deck, then +1000 power
 
   // Engine: TURN_ENDED:p0 -> TURN_STARTED:p1 -> PHASE_CHANGED:p1 -> GAME_OVER:p0, so the loss is written after hand-off.
-  // OP15-022 text (docs/cards/OP-15.md:158) and rule 6-6-1-4 (line 624): the loss lands inside End Phase, before the turn ends.
+  // OP15-022 text (docs/cards/OP-15.md:158) and rule 6-6-1-4 (line 630): the loss lands inside End Phase, before the turn ends.
   it("F4 the effect that empties the deck finishes, then the loss is written at End Phase before p1's turn starts (ratchet OPT-962)", () => {
     const b = base([
       synCard("BROOK-LEADER", BROOK_SCHEMA, { ...CARDS.LEADER, id: "BROOK-LEADER", effectSchema: BROOK_SCHEMA }),
@@ -210,7 +210,7 @@ describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 
 
 // ─── F13 ─────────────────────────────────────────────────────────────────────
 
-describe("F13 ST13-002 with Kalgara: an effect newly fulfilled in the End of Your Turn wave resolves in that wave (ST13-002 text; rules 6-6-1-1 line 607, 6-6-1-1-2 line 611, 8-6-1 line 858; Decision 9; FAQ qa_st-13.md:13-15)", () => {
+describe("F13 ST13-002 with Kalgara: an effect newly fulfilled in the End of Your Turn wave resolves in that wave (ST13-002 text; rules 6-6-1-1 line 613, 6-6-1-1-2 line 617, 8-6-1 line 862; Decision 9; FAQ qa_st-13.md:13-15)", () => {
   const ACE_LEADER = "ST13-002";
   const KALGARA = "OP12-099";
 
@@ -233,7 +233,7 @@ describe("F13 ST13-002 with Kalgara: an effect newly fulfilled in the End of You
   }
 
   // Engine: PHASE_CHANGED -> TURN_ENDED:p0 -> TURN_STARTED:p1 -> PHASE_CHANGED:p1 -> CARD_TRASHED:p0 -> CARD_REMOVED_FROM_LIFE:p0; no wave, no p0 draw.
-  // Rule 6-6-1-1 (line 607) / 8-6-1 (line 858): Ace's trash and Kalgara's draw resolve in p0's wave, before TURN_ENDED.
+  // Rule 6-6-1-1 (line 613) / 8-6-1 (line 862): Ace's trash and Kalgara's draw resolve in p0's wave, before TURN_ENDED.
   it("F13 face-up Life card is trashed, then Kalgara draws once, both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
     const { b, faceUp } = setupF13();
 
@@ -276,7 +276,7 @@ function untilEndOfOpponentsTurnPlus1000(b: Built, target: CardInstance): Runtim
 /** p1's "during this turn" carrier, distinctly named so observation 2 can see it and only it. */
 const DURING_THIS_TURN_CARD: CardData = { ...CARDS.VANILLA, id: "SYN-DURING-THIS-TURN", name: "SYN-DURING-THIS-TURN" };
 
-describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 line 622; Decision 9; FAQ qa_op10.md:14-16)", () => {
+describe("F14 Three expiry stages per player (rules 6-6-1-2 line 623, 6-6-1-3 line 628; Decision 9; FAQ qa_op10.md:14-16)", () => {
   // Observation 1 (stage 1 before stage 2): p0's scheduled action reads p1's c1a, whose
   // "until end of your opponent's turn" +1000 must still be live (p1's expiry is stage 2).
   // Observation 2 (stage 1 expiry before stage 2, and stage 2 before stage 3): p1's scheduled
@@ -293,8 +293,8 @@ describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 li
     fillDecks(b);
     // p0's "until end of turn" (stage 1 expiry). OPT-962: the engine now tells the
     // two rule phrases apart (duration-tracker.ts endPhaseExpiryClause): THIS_TURN is
-    // "during this turn" (6-6-1-3, line 622), so the stand-in for "until the end of
-    // the turn" (6-6-1-2, line 617) is UNTIL_END_OF_YOUR_NEXT_TURN due this turn.
+    // "during this turn" (6-6-1-3, line 628), so the stand-in for "until the end of
+    // the turn" (6-6-1-2, line 623) is UNTIL_END_OF_YOUR_NEXT_TURN due this turn.
     // Same expiresAt as before; assertions unchanged.
     const m0: RuntimeActiveEffect = { ...thisTurnPlus1000(b, c0), duration: { type: "UNTIL_END_OF_YOUR_NEXT_TURN" } };
     const m1a = untilEndOfOpponentsTurnPlus1000(b, c1a); // p1's "until end of your opponent's turn" (stage 2 expiry)

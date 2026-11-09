@@ -240,7 +240,7 @@ Key documents:
 
 - **[PRD](./docs/project/PRD.md)** — product requirements
 - **[Architecture](./docs/architecture/ARCHITECTURE.md)** — system design and deployment
-- **[Comprehensive Rules](./docs/rules/rule_comprehensive.md)** — official OPTCG rules v1.2.0
+- **[Comprehensive Rules](./docs/rules/rule_comprehensive.md)** — official OPTCG rules v1.2.1
 - **[Rule Index](./docs/rules/RULE-INDEX.md)** — concept-to-rule lookup
 - **[Effect Schema Spec](./docs/game-engine/01-SCHEMA-OVERVIEW.md)** — 11-part spec (~12,000 lines)
 - **[Rules → Engine Map](./docs/game-engine/RULES-TO-ENGINE-MAP.md)** — every rule mapped to engine functions

@@ -1,6 +1,6 @@
 # Comprehensive Rules — Concept Index
 
-> Quick lookup from game concepts to rule numbers in `rule_comprehensive.md` (v1.2.0). Read this first to find relevant sections, then read the specific rules.
+> Quick lookup from game concepts to rule numbers in `rule_comprehensive.md` (v1.2.1). Read this first to find relevant sections, then read the specific rules.
 
 ---
 
@@ -62,7 +62,7 @@
 | Character KO'd in battle | §7-1-4-1-2 | §10-2-1 (K.O. definition) |
 | Attacker loses (nothing happens) | §7-1-4-2 | |
 | End of Battle | §7-1-5 | |
-| Mid-battle zone check (card leaves field → skip to end) | §7-1-1-4, §7-1-2-3, §7-1-3-3 | |
+| Mid-battle zone check (card leaves field → skip to end) | §7-1-1-4, §7-1-2-3, §7-1-3-1-3 | |
 | No battle on first turn | §6-5-6-1 | |
 
 ## Damage & Defeat

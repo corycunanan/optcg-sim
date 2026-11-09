@@ -2,10 +2,10 @@
  * OPT-955 — batch and distribution semantics (docs/game-engine/BATCH-CONTRACT.md).
  *
  * Rules v1.2.0, `docs/rules/rule_comprehensive.md`:
- * - 3-1-7 (line 291): cards placed in an area at once are ordered by their owner.
- * - 3-2-3 (line 301): multiple cards moved from a deck move one by one.
- * - 8-6-1-1 (line 860): effects whose timing is met at once resolve one after another.
- * - 9-1-2 (line 876) / 9-2-1-2 (line 884): rule processing runs as soon as a
+ * - 3-1-7 (line 297): cards placed in an area at once are ordered by their owner.
+ * - 3-2-3 (line 307): multiple cards moved from a deck move one by one.
+ * - 8-6-1-1 (line 864): effects whose timing is met at once resolve one after another.
+ * - 9-1-2 (line 880) / 9-2-1-2 (line 888): rule processing runs as soon as a
  *   deck reaches 0, even mid-resolution.
  *
  * | Clause | Condition / evaluation time | Cost/payer | Target/chooser | Timing/continuation | Observable result | Test |

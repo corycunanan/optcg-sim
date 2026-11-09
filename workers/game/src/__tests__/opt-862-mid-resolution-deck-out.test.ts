@@ -2,11 +2,11 @@
  * OPT-862 (OPT-960) — deck-out is checked mid-resolution (rule 9-1-2).
  *
  * Rules v1.2.0, `docs/rules/rule_comprehensive.md`:
- * - 9-1-2 (line 876): rule processing is resolved immediately when the event
+ * - 9-1-2 (line 880): rule processing is resolved immediately when the event
  *   occurs, even while other actions are being carried out.
- * - 9-2-1-2 (line 884): a player with 0 cards in deck has fulfilled the defeat
+ * - 9-2-1-2 (line 888): a player with 0 cards in deck has fulfilled the defeat
  *   conditions.
- * - 3-2-3 (line 301): multiple cards moved from a deck move one by one.
+ * - 3-2-3 (line 307): multiple cards moved from a deck move one by one.
  * - 8-3-1 / 8-3-1-1: costs are paid in printed order before the effect resolves.
  * - 1-3-1 (line 57): card text over rules. OP15-022 Brook (`docs/cards/OP-15.md:158`):
  *   "You lose at the end of the turn in which your deck becomes 0 cards."
@@ -91,7 +91,7 @@ const KO_UP_TO_1: Action = {
   target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
 };
 
-describe("OPT-862 mid-cost deck-out (rules 9-1-2 line 876, 9-2-1-2 line 884)", () => {
+describe("OPT-862 mid-cost deck-out (rules 9-1-2 line 880, 9-2-1-2 line 888)", () => {
   it("EB01-051: paying MILL 2 from a 2-card deck ends the game before the K.O. prompt; the paid cost stands; nothing survives reload or a stale reply", async () => {
     const r = rig();
     r.deck(0, 2);
@@ -165,7 +165,7 @@ describe("OPT-862 mid-cost deck-out (rules 9-1-2 line 876, 9-2-1-2 line 884)", (
   });
 });
 
-describe("OPT-862 mid-action deck-out (rules 9-1-2 line 876, 9-2-1-2 line 884, 3-2-3 line 301)", () => {
+describe("OPT-862 mid-action deck-out (rules 9-1-2 line 880, 9-2-1-2 line 888, 3-2-3 line 307)", () => {
   it("mid-action MILL: MILL 2 empties the deck, so the THEN K.O. prompt never opens", () => {
     const r = rig();
     r.deck(0, 2);

@@ -637,7 +637,7 @@ describe("OPT-792 pipeline", () => {
 
 // ─── Rule 3-1-6-1: DON!! area moves shed id-keyed effects ────────────────────
 // "When a DON!! card moves from one area to another, all effects that were
-// previously applied to that DON!! card are removed." (rule_comprehensive.md:289)
+// previously applied to that DON!! card are removed." (rule_comprehensive.md:295)
 
 describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
   function holdRestedOpponentDon(f: Fixture) {
