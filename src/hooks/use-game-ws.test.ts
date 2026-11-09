@@ -199,6 +199,78 @@ describe("useGameWs prompt identity", () => {
     });
   });
 
+  it("clears a held prompt when a game:state arrives without a pending prompt", () => {
+    const game = useGameWs(
+      "game-1",
+      "https://worker.test",
+      async () => "token"
+    );
+    const activePromptSetter = mocks.stateSetters[1];
+    const activePromptIdSetter = mocks.stateSetters[7];
+    mocks.onMessage?.({
+      type: "game:prompt",
+      promptId: "prompt-2",
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Choose",
+        choices: [{ id: "yes", label: "Yes" }],
+      },
+    });
+    activePromptSetter.mockClear();
+    activePromptIdSetter.mockClear();
+
+    mocks.onMessage?.({
+      type: "game:state",
+      state: {
+        status: "IN_PROGRESS",
+        pendingPrompt: null,
+        players: [],
+        turn: { battleSubPhase: null },
+      } as unknown as GameState,
+    });
+
+    expect(activePromptSetter).toHaveBeenCalledWith(null);
+    expect(activePromptIdSetter).toHaveBeenCalledWith(null);
+    game.sendAction({ type: "PLAYER_CHOICE", choiceId: "yes" });
+    expect(mocks.send).toHaveBeenCalledWith({
+      type: "game:action",
+      action: { type: "PLAYER_CHOICE", choiceId: "yes" },
+    });
+  });
+
+  it("keeps the Blocker prompt across a prompt-less game:state in the same Block Step", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+    const activePromptSetter = mocks.stateSetters[1];
+    const blockStepState = {
+      status: "IN_PROGRESS",
+      pendingPrompt: null,
+      players: [],
+      turn: { battleSubPhase: "BLOCK_STEP" },
+    } as unknown as GameState;
+    mocks.onMessage?.({
+      type: "game:prompt",
+      options: {
+        promptType: "SELECT_BLOCKER",
+        validTargets: ["char-1"],
+        optional: true,
+        timeoutMs: 30_000,
+      },
+    });
+    activePromptSetter.mockClear();
+
+    mocks.onMessage?.({ type: "game:state", state: blockStepState });
+    expect(activePromptSetter).not.toHaveBeenCalled();
+
+    mocks.onMessage?.({
+      type: "game:state",
+      state: {
+        ...blockStepState,
+        turn: { battleSubPhase: "COUNTER_STEP" },
+      } as unknown as GameState,
+    });
+    expect(activePromptSetter).toHaveBeenCalledWith(null);
+  });
+
   it("does not attach prompt IDs to ordinary game actions", () => {
     const game = useGameWs(
       "game-1",
