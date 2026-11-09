@@ -832,12 +832,23 @@ type ActionReference =
   | "ACTIVATED_EVENT"
   | "PLAYED_CHARACTER"
   | "USED_BLOCKER"
-  | "ATTACKED";
+  | "ATTACKED"
+  | "CHARACTER_KO"
+  | "CARD_TRASHED_FROM_HAND_BY_EFFECT";
 ```
+
+`CARD_TRASHED_FROM_HAND_BY_EFFECT` (OPT-1034) is true when a card left the
+`controller`'s hand for the trash by an effect this turn, whoever's effect it
+was. It uses the `CARD_TRASHED_FROM_HAND` trigger's predicate (see
+[02-TRIGGERS.md](02-TRIGGERS.md#hand-trash-effect-watchers-opt-795)), so
+activation-cost discards count and symbol Counters, rule disposal, and Event
+disposal do not. It reads the event log back to this turn's `TURN_STARTED`
+instead of `actionsPerformedThisTurn`, so saved state is unchanged.
 
 | Text Pattern | Action | Filter | Example Cards |
 |-------------|--------|--------|---------------|
 | "If you have activated an Event with a base cost of 3 or more during this turn..." | `ACTIVATED_EVENT` | `{ base_cost: { operator: ">=", value: 3 } }` | OP15-002 |
+| "During the turn in which a card in your hand is trashed by an effect..." | `CARD_TRASHED_FROM_HAND_BY_EFFECT` | — | ST33-004 |
 
 Example — OP15-002 Lucy:
 

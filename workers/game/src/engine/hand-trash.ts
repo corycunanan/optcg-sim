@@ -5,6 +5,24 @@ import { effectSourceCard } from "./effect-source.js";
 
 export const TRIGGERING_HAND_TRASH_REF = "__triggering_hand_trash";
 
+/** Whether a card left `playerIndex`'s hand for the trash by an effect during
+ * the current turn (OPT-1034, ST33-004). Reads the event log back to this
+ * turn's TURN_STARTED, so it needs no extra saved state: the turn boundary
+ * resets it, and both players are covered. A CARD_TRASHED event's player is
+ * whose hand lost the cards; who caused the trash does not matter. */
+export function handTrashedByEffectThisTurn(
+  state: GameState,
+  playerIndex: 0 | 1
+): boolean {
+  for (let i = state.eventLog.length - 1; i >= 0; i--) {
+    const event = state.eventLog[i];
+    if (event.type === "TURN_STARTED") return false;
+    if (event.playerIndex === playerIndex && isHandTrashByEffect(event))
+      return true;
+  }
+  return false;
+}
+
 /** One event per simultaneous hand discard, with its actual moved count.
  * OP12 Garp FAQ supports activation-cost discards. Applying this to OP14 is
  * an explicitly user-authorized inference, not a direct OP14 cost ruling.

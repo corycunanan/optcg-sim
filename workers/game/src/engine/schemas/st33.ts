@@ -3,11 +3,6 @@
  *
  * New IDs ST33-001..005. Reprints are authored in their origin sets.
  * Rulings: docs/FAQs/qa_st-33.md.
- *
- * ST33-004 Borsalino is partial: its hand-zone "during the turn in which a
- * card in your hand is trashed by an effect, give this card in your hand −3
- * cost" needs a per-turn hand-trash record that the engine does not keep yet
- * (docs/game-engine/DEFERRED-CARD-EFFECTS.md). Only [Blocker] is encoded.
  */
 import type { EffectSchema } from "../effect-types.js";
 
@@ -118,7 +113,7 @@ export const ST33_003_SMOKER: EffectSchema = {
   ],
 };
 
-// ─── ST33-004 Borsalino (Character) — partial, see header ──────────────────
+// ─── ST33-004 Borsalino (Character) ────────────────────────────────────────
 
 export const ST33_004_BORSALINO: EffectSchema = {
   card_id: "ST33-004",
@@ -129,6 +124,25 @@ export const ST33_004_BORSALINO: EffectSchema = {
       id: "blocker",
       category: "permanent",
       flags: { keywords: ["BLOCKER"] },
+    },
+    {
+      // "During the turn in which a card in your hand is trashed by an effect,
+      // give this card in your hand −3 cost." FAQ: an opponent's effect counts.
+      id: "hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "ACTION_PERFORMED_THIS_TURN",
+        controller: "SELF",
+        action: "CARD_TRASHED_FROM_HAND_BY_EFFECT",
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { type: "SELF", self_ref: true },
+          params: { amount: -3 },
+        },
+      ],
     },
   ],
 };
