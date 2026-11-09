@@ -1,5 +1,10 @@
 import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/ui", () => {
@@ -57,10 +62,14 @@ const choices = [
   { id: "don-rest:2", label: "Rest 2 → +4000" },
 ];
 
+function textOf(node: ReactTestInstance | string): string {
+  return typeof node === "string" ? node : node.children.map(textOf).join("");
+}
+
 function findButton(renderer: ReactTestRenderer, label: string) {
   return renderer.root
     .findAllByType("button")
-    .find((button) => button.children.join("") === label)!;
+    .find((button) => textOf(button) === label)!;
 }
 
 describe("PlayerChoiceModal confirmed selection mode", () => {
@@ -122,7 +131,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     expect(
       renderer.root
         .findAllByType("button")
-        .map((button) => button.children.join(""))
+        .map((button) => textOf(button))
     ).toContain("Elder 2");
     await act(async () => {
       findButton(renderer, "Elder 1 — Resolved").props.onClick?.();
@@ -302,5 +311,31 @@ describe("v7 DON identity picker with generic-choice fallback", () => {
     await act(async () => { findButton(renderer, "Return 1 held and 1 free DON!!").props.onClick(); });
     await act(async () => { findButton(renderer, "Confirm").props.onClick(); });
     expect(onAction).toHaveBeenCalledWith({ type: "PLAYER_CHOICE", choiceId: id(["held", "free-a"]) });
+  });
+
+  it("wraps long choice labels inside the dialog instead of overflowing", async () => {
+    const label =
+      "Monkey.D.Luffy: [On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card and add it to your hand.";
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose which effect to activate first"
+          choices={[
+            { id: "t-1", label },
+            { id: "t-2", label: "Nami: [On Play] Draw 1 card." },
+          ]}
+          cardDb={{}}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    const classes = findButton(renderer, label).props.className.split(" ");
+    expect(classes).toEqual(
+      expect.arrayContaining(["whitespace-normal", "text-left", "h-auto"])
+    );
   });
 });

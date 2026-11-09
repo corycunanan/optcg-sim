@@ -163,7 +163,9 @@ export function PlayerChoiceModal({
                 key={source.id}
                 className="border-gb-border flex min-h-12 items-center justify-between gap-4 border-b py-2 last:border-b-0"
               >
-                <span className="text-gb-text text-sm">{source.label}</span>
+                <span className="text-gb-text min-w-0 flex-1 break-words text-sm">
+                  {source.label}
+                </span>
                 <div className="grid shrink-0 grid-cols-[2rem_2rem_2rem] items-center">
                   <GameButton
                     variant="secondary"
@@ -233,10 +235,12 @@ export function PlayerChoiceModal({
             }}
             disabled={choice.disabled}
             aria-pressed={selectedChoiceId === choice.id}
-            className="h-auto w-full justify-start px-4 py-3 text-sm"
+            className="h-auto w-full justify-start px-4 py-3 text-left text-sm whitespace-normal"
           >
-            {choice.label}
-            {choice.disabled ? " — Resolved" : ""}
+            <span className="min-w-0 break-words">
+              {choice.label}
+              {choice.disabled ? " — Resolved" : ""}
+            </span>
           </GameButton>
         ))}
       </div>
