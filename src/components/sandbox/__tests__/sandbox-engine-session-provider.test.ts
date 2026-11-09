@@ -9,7 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPipeline } from "@engine/engine/pipeline";
 import type {
   GameAction,
@@ -25,6 +25,8 @@ import {
   playerSlot,
 } from "@/lib/sandbox/scenarios/helpers";
 import type { PartialGameState } from "@/lib/sandbox/scenarios/types";
+import { SANDBOX_CARD_DB } from "@/lib/sandbox/sandbox-card-data";
+import { playCharacterRestedScenario } from "@/lib/sandbox/scenarios/playground/play-character-rested";
 import {
   applySandboxAction,
   buildEngineSessionGame,
@@ -361,6 +363,10 @@ function triggerWindowState() {
 }
 
 describe("applySandboxAction routes prompt replies through the prompt lifecycle", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("answers a Trigger window's REVEAL_TRIGGER (the pipeline rejects it as an action)", () => {
     const { state, cardDb } = triggerWindowState();
     const prompt = state.pendingPrompt!;
@@ -385,8 +391,16 @@ describe("applySandboxAction routes prompt replies through the prompt lifecycle"
     const { state: raw, cardDb } = triggerWindowState();
     const state = withSandboxPromptIdentity(raw, 0).gameState;
     expect(state.pendingPrompt?.promptId).toBe("sandbox-engine-prompt-1");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const stale = applySandboxAction(state, { type: "REVEAL_TRIGGER", reveal: false, promptId: "not-this-prompt" }, cardDb, 0);
     expect(stale).toBe(state);
+    // OPT-1009: the no-op is reported, not silent.
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/^\[sandbox\] REVEAL_TRIGGER reply names a prompt that is no longer pending/);
+    expect(warn.mock.calls[0][1]).toMatchObject({
+      expectedPromptId: "sandbox-engine-prompt-1",
+      givenPromptId: "not-this-prompt",
+    });
   });
 
   it("still sends ordinary actions through the pipeline", () => {
@@ -396,5 +410,90 @@ describe("applySandboxAction routes prompt replies through the prompt lifecycle"
     const ended = applySandboxAction(finished, { type: "ADVANCE_PHASE" }, cardDb, finished.turn.activePlayerIndex);
     expect(ended).not.toBe(finished);
     expect(ended.eventLog.length).toBeGreaterThan(finished.eventLog.length);
+  });
+});
+
+// ─── OPT-1009: Lim → Crocodile playground flow ─────────────────────────
+
+describe("play-character-rested scenario (OPT-1009)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const cardDb = new Map(Object.entries(SANDBOX_CARD_DB));
+
+  /** Dispatches as `useSandboxEngineSession` does, prompt identity included. */
+  function session() {
+    let current = withSandboxPromptIdentity(
+      hydrateToGameState(playCharacterRestedScenario.initialState),
+      0
+    );
+    return {
+      get state() {
+        return current.gameState;
+      },
+      dispatch(action: GameAction) {
+        const next = applySandboxAction(current.gameState, action, cardDb, 0);
+        current = withSandboxPromptIdentity(next, current.promptSequence);
+      },
+      promptId() {
+        return current.gameState.pendingPrompt!.promptId;
+      },
+    };
+  }
+
+  function activateLim(s: ReturnType<typeof session>) {
+    s.dispatch({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: "p0-leader",
+      effectId: "activate_add_don_and_play",
+    });
+    expect(s.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "activate", promptId: s.promptId() });
+    expect(s.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    s.dispatch({ type: "PLAYER_CHOICE", choiceId: "choose-value:1", promptId: s.promptId() });
+    expect(s.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  }
+
+  it("activates Lim, adds 1 DON!!, and plays Crocodile from hand rested", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const s = session();
+    activateLim(s);
+    s.dispatch({
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["p0-hand-crocodile"],
+      promptId: s.promptId(),
+    });
+
+    const me = s.state.players[0];
+    expect(s.state.pendingPrompt).toBeNull();
+    expect(me.hand).toEqual([]);
+    const crocodile = me.characters.find((card) => card?.cardId === "OP09-025");
+    expect(crocodile?.state).toBe("RESTED");
+    // The 3 DON!! paid as the cost, plus the 1 added rested by the effect.
+    expect(me.donCostArea.map((don) => don.state)).toEqual([
+      "RESTED",
+      "RESTED",
+      "RESTED",
+      "RESTED",
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns and keeps the prompt when the engine rejects a selection", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const s = session();
+    activateLim(s);
+    const before = s.state;
+    s.dispatch({
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["not-a-candidate"],
+      promptId: s.promptId(),
+    });
+
+    expect(s.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(s.state.players).toBe(before.players);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/^\[sandbox\] SELECT_TARGET reply was rejected by the engine/);
   });
 });

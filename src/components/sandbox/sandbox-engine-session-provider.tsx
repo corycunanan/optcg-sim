@@ -102,8 +102,8 @@ const SANDBOX_LIFECYCLE_SERVICES = {
  * One sandbox action, routed as GameSession does (OPT-963): a reply to the
  * pending prompt (a Trigger window's Reveal/Skip, a target selection, a
  * choice) goes through the prompt lifecycle; everything else through the
- * pipeline, which rejects prompt replies. A rejected reply leaves the state
- * as it was. The next Trigger window's prompt is surfaced afterwards, as the
+ * pipeline, which rejects prompt replies. A stale or rejected reply leaves the
+ * state as it was and logs a `[sandbox]` warning (OPT-1009). The next Trigger window's prompt is surfaced afterwards, as the
  * coordinator does after every action.
  */
 export function applySandboxAction(
@@ -116,19 +116,55 @@ export function applySandboxAction(
     // A stale reply names another prompt (the coordinator's own check).
     const expected = gameState.pendingPrompt.promptId;
     const given = "promptId" in action ? action.promptId : undefined;
-    if (expected && given !== expected) return gameState;
+    if (expected && given !== expected) {
+      warnSandboxReply("stale", action, expected, given);
+      return gameState;
+    }
     const resumed = resumePromptLifecycle(
       gameState,
       action,
       cardDb,
       SANDBOX_LIFECYCLE_SERVICES
     );
-    return resumed.responseRejected
-      ? gameState
-      : surfaceDamageFramePrompt(resumed.state, cardDb);
+    if (resumed.responseRejected) {
+      warnSandboxReply(
+        resumed.reprompted ? "reprompted" : "rejected",
+        action,
+        expected,
+        given
+      );
+      // A reprompt carries a refreshed prompt for the same choice, which the
+      // coordinator persists and sends; keep it rather than the old one.
+      return resumed.reprompted ? resumed.state : gameState;
+    }
+    return surfaceDamageFramePrompt(resumed.state, cardDb);
   }
   const next = runPipeline(gameState, action, cardDb, myIndex);
   return next.valid ? surfaceDamageFramePrompt(next.state, cardDb) : next.state;
+}
+
+/**
+ * OPT-1009: a prompt reply the engine did not accept leaves the board as it
+ * was, which looks exactly like a no-op. Warn so a scenario author can tell
+ * the two apart.
+ */
+function warnSandboxReply(
+  outcome: "stale" | "rejected" | "reprompted",
+  action: GameAction,
+  expectedPromptId: string | undefined,
+  givenPromptId: string | undefined
+): void {
+  const detail =
+    outcome === "stale"
+      ? "names a prompt that is no longer pending"
+      : outcome === "reprompted"
+        ? "was declined and the prompt was asked again with refreshed choices"
+        : "was rejected by the engine; the state is unchanged";
+  console.warn(`[sandbox] ${action.type} reply ${detail}.`, {
+    action,
+    expectedPromptId,
+    givenPromptId,
+  });
 }
 
 export function withSandboxPromptIdentity(
