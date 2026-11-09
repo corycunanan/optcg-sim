@@ -849,6 +849,13 @@ export function executeDistributeDon(
   // OPT-931: rule 1-3-3 — a CANNOT_ATTACH_DON prohibition takes precedence
   // over "give DON!! to each", exactly as for GIVE_DON: a prohibited card is
   // neither offered nor accepted from a resumed (preselected) reply.
+  // OPT-955: a split with nothing to give asks nothing, not even recipients.
+  if (
+    params.max_per_target !== undefined &&
+    donSplitRemaining(state, action, controller, { round: 1, allocation: [] }) === 0
+  ) {
+    return { state, events, succeeded: false };
+  }
   const allValidIds = donGiveRecipients(
     state,
     preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs),
@@ -871,20 +878,25 @@ export function executeDistributeDon(
 
   let nextState = state;
   let totalGiven = 0;
+  const recipients: string[] = [];
   for (const targetId of targetIds) {
+    let given = 0;
     for (let i = 0; i < amountPerTarget; i++) {
       const result = attachDonToCard(nextState, controller, targetId, donState);
       if (!result) break;
       nextState = result;
-      totalGiven++;
+      given++;
     }
+    // OPT-955: the result names only recipients that received DON!!.
+    if (given > 0) recipients.push(targetId);
+    totalGiven += given;
   }
 
   if (totalGiven > 0) {
     events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: totalGiven } });
   }
 
-  return { state: nextState, events, succeeded: totalGiven > 0, result: { targetInstanceIds: targetIds, count: totalGiven } };
+  return { state: nextState, events, succeeded: totalGiven > 0, result: { targetInstanceIds: recipients, count: totalGiven } };
 }
 
 // ─── DISTRIBUTE_DON split (OPT-955) ──────────────────────────────────────────

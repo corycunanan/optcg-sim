@@ -20,7 +20,8 @@
  * | batch K.O. of 3 [On K.O.] draw 1, owner deck 1 | after the batch | none | none | first trigger empties the deck → defeat, remaining triggers never run | all 3 in trash, owner drew 1, FINISHED | "batch K.O. of 3 …" |
  */
 import { describe, expect, it } from "vitest";
-import type { Action, EffectSchema } from "../engine/effect-types.js";
+import type { Action, ActionOf, EffectSchema } from "../engine/effect-types.js";
+import { executeDistributeDon } from "../engine/effect-resolver/actions/don.js";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import { findDonSplitParamViolations } from "../engine/schema-don-split-lint.js";
 import type { CardInstance, DonInstance, GameState } from "../types.js";
@@ -209,6 +210,40 @@ describe("OPT-955 DISTRIBUTE_DON max_per_target (one pool, per-target cap, playe
     expect(r.state.pendingPrompt ?? null).toBeNull();
     expect(attached(r.state, c1.instanceId)).toHaveLength(2);
     expect(attached(r.state, leaderId)).toHaveLength(0);
+  });
+
+  it("an \"up to\" split with an empty pool asks nothing, not even recipients", () => {
+    const r = rig();
+    r.deck(0, 10);
+    setDon(r, 0, 2);
+    r.put(CARDS.VANILLA.id, 0, "CHARACTER");
+    playSplitter(r, {
+      ...split(2),
+      target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 2 } },
+    } as Action);
+    expect(r.state.pendingPrompt ?? null).toBeNull();
+  });
+
+  it("fixed form: the result names only recipients that received DON!!", () => {
+    const r = rig();
+    r.deck(0, 10);
+    setDon(r, 1, 0);
+    const c1 = r.put(CARDS.VANILLA.id, 0, "CHARACTER");
+    const c2 = r.put(CARDS.VANILLA.id, 0, "CHARACTER");
+    const result = executeDistributeDon(
+      r.state,
+      {
+        type: "DISTRIBUTE_DON",
+        target: { type: "CHARACTER", controller: "SELF", count: { all: true } },
+        params: { amount_per_target: 1, don_state: "RESTED" },
+      } as ActionOf<"DISTRIBUTE_DON">,
+      c1.instanceId,
+      0,
+      r.db,
+      new Map(),
+      [c1.instanceId, c2.instanceId],
+    );
+    expect(result.result).toEqual({ targetInstanceIds: [c1.instanceId], count: 1 });
   });
 
   it("no rested DON!! means no prompt and nothing given", () => {
