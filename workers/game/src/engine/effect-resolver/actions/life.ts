@@ -282,6 +282,46 @@ export function lifeToHandChoiceId(end: "TOP" | "BOTTOM"): string {
   return `life-to-hand:${end}`;
 }
 
+/**
+ * The Life owner of LIFE_TO_HAND. The OPPONENT_LIFE target type implies the
+ * opponent even without an explicit controller (same convention as
+ * executeReorderAllLife).
+ */
+export function lifeToHandOwner(
+  action: ActionOf<"LIFE_TO_HAND">,
+  controller: 0 | 1,
+): 0 | 1 {
+  return action.target?.type === "OPPONENT_LIFE" ||
+    action.target?.controller === "OPPONENT"
+    ? controller === 0
+      ? 1
+      : 0
+    : controller;
+}
+
+/**
+ * OPT-1037: true when executeLifeToHand would move no card: the Life owner
+ * has no Life cards, or a prohibition stops the add. The resolver uses the
+ * same check to skip an action-level "you may" that could do nothing.
+ */
+export function lifeToHandAddsNothing(
+  state: GameState,
+  action: ActionOf<"LIFE_TO_HAND">,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): boolean {
+  const owner = lifeToHandOwner(action, controller);
+  if (Math.min(action.params?.amount ?? 1, state.players[owner].life.length) === 0) return true;
+  return isLifeToHandProhibited(
+    state,
+    owner,
+    effectSourceController(state, sourceCardInstanceId, controller, resultRefs),
+    cardDb,
+  );
+}
+
 // OPT-259 (F6): non-damage Life→hand adds (e.g. OP05-107) do NOT fire [Trigger].
 // Damage-driven Life→hand goes through executeDealDamage / battle damage.
 export function executeLifeToHand(
@@ -296,15 +336,7 @@ export function executeLifeToHand(
   const params = action.params ?? {};
   const amount = params.amount ?? 1;
   const position = params.position ?? "TOP";
-  // The OPPONENT_LIFE target type implies the opponent even without an
-  // explicit controller (same convention as executeReorderAllLife).
-  const targetController: 0 | 1 =
-    action.target?.type === "OPPONENT_LIFE" ||
-    action.target?.controller === "OPPONENT"
-      ? controller === 0
-        ? 1
-        : 0
-      : controller;
+  const targetController = lifeToHandOwner(action, controller);
   const causingController = effectSourceController(state, _sourceCardInstanceId, controller, _resultRefs);
   if (isLifeToHandProhibited(state, targetController, causingController, _cardDb)) {
     return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };

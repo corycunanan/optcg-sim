@@ -54,7 +54,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | `state.ts` | Immutable state helpers: zone transitions, DON!! mutations, card lookup |
 | `conditions.ts` | Effect condition evaluation (40+ condition types) |
 | `duration-tracker.ts` | Effect lifecycle: expiry, while-conditions, scheduled actions |
-| `effect-stack.ts` | LIFO stack for paused effect chains and player prompts |
+| `effect-stack.ts` | Frame storage for paused effect chains and player prompts. Push/pop is a storage mechanism, not the timing rule: resolution order belongs to `pending-work-drain.ts` (FIFO trigger generations, children before their parent resumes; see 8-6-1) |
 | `effect-types.ts` | TypeScript types for EffectSchema, actions, triggers, conditions |
 | `events.ts` | Event bus — appends typed events to state log |
 | `keywords.ts` | Keyword queries (Rush, Blocker, etc.) |
@@ -85,10 +85,10 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **1-2-1.** Game ends when a player loses | **IMPL** | `defeat.ts → runRuleProcessing()` → `terminal.ts → terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | Every checkpoint writes the result once through the common terminal writer (OPT-949) |
 | **1-2-1-1-1.** Defeat: 0 life + leader takes damage | **IMPL** | `defeat.ts → checkDefeat()` | Life-out requires a qualifying lethal determination in `RuleProcessingContext.lethalDamage`; the Life count alone never defeats |
-| **1-2-1-1-2.** Defeat: 0 cards in deck | **IMPL** | `defeat.ts:26–27` | `p0DeckOut` / `p1DeckOut` |
+| **1-2-1-1-2.** Defeat: 0 cards in deck | **IMPL** | `defeat.ts → checkDefeat()`, `runRuleProcessingAfterMove()`; [`opt-862-mid-resolution-deck-out.test.ts`](../../workers/game/src/__tests__/opt-862-mid-resolution-deck-out.test.ts) | Deck count is checked after every deck-changing move, including mid-cost and mid-resolution (OPT-862); delayed deck-out (OP15-022 Brook) is honored while its Leader is unnegated |
 | **1-2-2.** Defeat processed at next rule processing | **IMPL** | `defeat.ts → runRuleProcessing()` | Checkpoints run mid-resolution and at action end (see 9-1-2) |
-| **1-2-2-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34`, `battle.ts:306–309` | Battle checks life-out before moving life cards |
-| **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts:26–27` | Checked at defined move, pre-prompt and action-end rule-processing checkpoints |
+| **1-2-2-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts → checkDefeat()` (`RuleProcessingContext.lethalDamage`), `battle.ts → dealOneLeaderDamage()`, `effect-damage.ts`; [`opt-925-effect-damage-defeat.test.ts`](../../workers/game/src/__tests__/opt-925-effect-damage-defeat.test.ts), [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | Battle and effect damage both report a lethal determination when the Leader is hit at 0 Life (OPT-925); the check runs before any Life card moves |
+| **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts → runRuleProcessing()`; [`opt-862-mid-resolution-deck-out.test.ts`](../../workers/game/src/__tests__/opt-862-mid-resolution-deck-out.test.ts) | Checked at defined move, pre-prompt and action-end rule-processing checkpoints |
 | **1-2-3.** Concession at any time | **IMPL** | `execute.ts → executeConcede()`, `validation.ts:52` | Always legal, immediate game end |
 | **1-2-4.** Concession unaffected by cards | **IMPL** | `executeConcede()` bypasses all effect logic | No card effect can block concession |
 | **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `effect-resolver/actions/effects.ts → executeWinGame()` → `terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | WIN_GAME ends play mid-chain (OPT-949). LOSS_CONDITION_MOD `DELAYED_LOSS` (OP15-022) and `WIN_INSTEAD` (OP03-040, P-117; [`opt-949-win-instead.test.ts`](../../workers/game/src/__tests__/opt-949-win-instead.test.ts)) are evaluated at the checkpoint; a negated Nami Leader loses on deck-out (qa_op09.md:204-206). Joint Nami checkpoints follow an assumed literal reading |

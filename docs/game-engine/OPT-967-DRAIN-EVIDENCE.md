@@ -106,7 +106,7 @@ This closes the full leg-5 checklist rather than its earlier four-example subset
 | Exact End Phase steps | Rewritten from stage implementation and order/expiry/reload regressions, assumptions retained in rules map |
 | Defeat after every action/deck-count mutation | Narrowed to actual defined checkpoints and context |
 | Life-out on every damage path | Qualified lethal determination; battle/effect damage evidence mapped separately |
-| State-hash/player-declared loops | Removed false guarantee; engine limits distinct; OPT-952 remains |
+| State-hash/player-declared loops | Removed false guarantee; engine limits distinct; OPT-952 remained open at OPT-967 and has since shipped (see OPT-956 reconciliation below) |
 | Nested opponent/turn-player order | Rewritten to FIFO generations/cohorts and independent A/X/C, A/B/C expectations |
 | Events sole scheduling interface | Corrected: explicit queue, phase-wave and durable domain work also report |
 | Costs enter player pipeline | Corrected: cost orchestrator/resume contract |
@@ -122,6 +122,47 @@ This closes the full leg-5 checklist rather than its earlier four-example subset
 | Single undo checkpoint | Preserved session ownership |
 | Thin cost facade | Preserved acyclic cost modules; production resolver work-only boundary guarded |
 | GE-11/12 | Deliberate added checks; immutable services, cast/type parsing and session boundaries retained |
+
+### OPT-956 reconciliation (2026-11-09)
+
+OPT-956 checked each historical leg-5 item against the docs and code on main after OPT-967, and against tickets that merged later. This table is the canonical checklist; [leg 5](./audits/consolidation-2026-10/leg-5-engine-docs-and-baseline.md), [audit §4K](./CONSOLIDATION-PROPOSAL-AUDIT-2026-10.md#k-documentation-to-correct-in-baseline-work-low) and OPT-939 point here. Status reflects delivered behavior, not the baseline downgrade the audit proposed.
+
+| Historical item | Current claim (Doc08 section) | Rule / ticket | Evidence |
+|---|---|---|---|
+| "No backdoor", every mutation through seven steps | Player pipeline and rule processing: player commands, work-only resolver and reply boundaries, one drain | OPT-967 | GE-11 `opt-478-resolver-architecture.test.ts`, `opt-479-session-boundaries.test.ts`; route inventory above |
+| Step-3 replacement interception operative | Generic step 3 is a stub; consequence sites check | OPT-968/OPT-883/OPT-923 (Phase 3) | `replacements.ts → checkReplacements()` returns no match; `opt-872-battle-ko-replacement-continuation.test.ts` |
+| Zero-power K.O. | Removed; power may be negative | 1-3-6-1-1 | No zero-power K.O. path; rules map 1-3-6-1-1 |
+| `TURN_ENDED` after End Phase processing | Emitted at handoff after staged waves | 6-6-1-4, OPT-924 | `opt-962-end-phase-order.test.ts`, timing F4 |
+| End Phase exact order | Stage order in End Phase and durations | 6-6-1-1..6-6-1-4, OPT-924/OPT-962 | `opt-962-end-phase-order.test.ts`, `opt-962-expiry-owner.test.ts`, timing F3/F13/F14 |
+| Defeat after every action, deck-count actions | Defined checkpoints, deck count checked after every deck-changing move | 9-1-2, 1-2-1-1-2, OPT-862/OPT-949 | `opt-862-mid-resolution-deck-out.test.ts`, `opt-949-rule-processing-checkpoint.test.ts` |
+| Life-out on every damage path | Qualifying lethal determination on battle and effect damage | 1-2-2-1, 7-1-4-1-1-1, OPT-925/OPT-886 | `opt-925-effect-damage-defeat.test.ts`, `opt-886-double-attack-one-life.test.ts` |
+| State-hash loop detection, declared counts | Delivered after OPT-967: repeated-state draw, decline-as-count | 11-1-1..11-1-1-3, OPT-952 | `opt-952-infinite-loop-protocol.test.ts`, `opt-467-engine-limits.test.ts` |
+| Nested-trigger order | FIFO generations and later cohorts | 8-6-1, 8-6-1-1, OPT-967 | `timing-baseline/nested-trigger-order.test.ts` (A→X→C, A→B→C) |
+| Events are the sole interface | Corrected: queued triggers, phase waves and durable work also report | OPT-967 | `opt-967-event-occurrences.test.ts` |
+| Costs "enter pipeline" | Cost orchestrator and resumable cost handlers | 8-3, OPT-967 | `opt-824-give-don-cost.test.ts`, `opt-864-decision-10-replaced-cost-rollback.test.ts` |
+| AND commit contract, IF_DO result | Preserved, no broader claim | GE-06, OPT-472; 4-10-1, OPT-1027 | `opt-472-simultaneous-and.test.ts` |
+| Replacement next-eligible and action routing | Consequence-site behavior; substitutes use resolver handlers | 8-1-3-4, 8-3-1-7, OPT-883/OPT-923 | `opt-872-battle-ko-replacement-continuation.test.ts`; Phase 3 owners open |
+| Rest vs activate: resting wins | No guarantee made | 1-3-8 (PARTIAL in rules map) | Rules map 1-3-8; no conflict resolver in code |
+| Bound scheduled action discarded when source leaves | Entries keep source identity and snapshot | OPT-937/OPT-964 | `opt-964-source-snapshot.test.ts` |
+| Prohibitions always override | Classified activation/resolution timing | OPT-876 (CANNOT_DRAW) and per-prohibition tests | `opt-869-give-don-attach-prohibition.test.ts` |
+| Modifier layers, set-to-zero | Binding layer contract | 4-9-2-1, OPT-953 | [VALUE-LAYER-CONTRACT.md](./VALUE-LAYER-CONTRACT.md), `opt-953-value-layer-rulings.test.ts`, `opt-953-value-layer-guard.test.ts` |
+| Scheduled "priority queue" | Ordered list and phase cursor | OPT-924 | `duration-tracker.ts` reads `state.scheduledActions` in stored order |
+| Preserve: copy-on-write | Kept as an update convention, no deep-freeze | GE-07, OPT-468 | `opt-468-event-immutability.test.ts` |
+| Preserve: persisted deterministic context | Kept in `GameState.executionContext` | OPT-940 | `SAVED-STATE-COMPATIBILITY.md` |
+| Preserve: single undo checkpoint | Kept as session ownership | OPT-967 | `opt-967-rollback.test.ts` live/undo cases |
+| Preserve: thin cost façade | Kept; acyclic cost modules | GE-11, OPT-478 | `opt-478-resolver-architecture.test.ts` |
+
+Rules-map rows the audit proposed downgrading:
+
+| Row | Audit proposal | Status now | Evidence |
+|---|---|---|---|
+| 6-6-1-1-2 through 6-6-1-4 | PARTIAL (OPT-924) | IMPL, correct | OPT-924 shipped; End Phase evidence above |
+| 8-6-1, 8-6-1-1, 8-6-2 | PARTIAL (prompt boundary) | IMPL, correct | OPT-967 drain; nested and damage-window timing fixtures |
+| 7-1-4-1-1-1, 1-2-2-1 | PARTIAL (OPT-925) | IMPL, correct | OPT-925 Done; 1-2-2-1 now cites effect damage |
+| 1-2-1-1-2, 1-2-2-2 | PARTIAL (OPT-862) | IMPL, correct | OPT-862 Done; stale `defeat.ts` line references replaced |
+| "LIFO stack" (module table) | Replace | Replaced | `effect-stack.ts` is frame storage; order belongs to the drain |
+
+`CARD-ANALYSIS-FINDINGS.md` §1.6 and §3.5 now classify ST03-016 as a [Counter] Event whose `[Trigger]` reuses its `COUNTER_EVENT` block, matching `docs/cards/ST-03.md` and the authored `st03.ts`. The same pass moved OP01-030 to the [Main] row there and in `02-TRIGGERS.md`.
 
 Unrelated partial/gap rows in the rules map (hidden-zone ordering, generic action feasibility, loop counts, unsupported event activation restrictions) are not upgraded by scheduling consolidation.
 

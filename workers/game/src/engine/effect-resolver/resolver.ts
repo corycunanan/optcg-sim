@@ -63,7 +63,10 @@ import {
   pushBatchResumeFrame,
 } from "./resume-core.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
-import { isFixedReferenceChainVacuous } from "./feasibility.js";
+import {
+  isFixedReferenceChainVacuous,
+  isOptionalActionVacuous,
+} from "./feasibility.js";
 import {
   SIMULTANEOUS_ACTION_TYPES,
   isSimultaneousGroupStart,
@@ -1171,6 +1174,27 @@ function executeActionChainCore(
     // were checked first ("Then, if you have 2 or more Life cards, you may…"
     // asks only when the condition holds); now the controller chooses.
     if (action.optional === true) {
+      // OPT-1037: a "you may" that could do nothing (0 Life for a Life add)
+      // is not offered. It counts as declined, so an "If you do" is skipped.
+      if (
+        isOptionalActionVacuous(
+          state,
+          action,
+          sourceCardInstanceId,
+          controller,
+          cardDb,
+          resultRefs
+        )
+      ) {
+        log("effect.optional_action", {
+          sourceInstanceId: sourceCardInstanceId,
+          controller,
+          actionType: action.type,
+          decision: "skipped_vacuous",
+        });
+        lastActionSucceeded = false;
+        continue;
+      }
       return pauseForOptionalAction(
         state,
         action,
