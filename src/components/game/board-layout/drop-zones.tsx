@@ -355,8 +355,6 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
             <CardActionMenuContent
               card={card}
               cardDb={cardDb}
-              activation={activation}
-              canActivateNow={effectAction === "available"}
               onAction={onAction}
               onClose={() => setMenuOpen(false)}
             />

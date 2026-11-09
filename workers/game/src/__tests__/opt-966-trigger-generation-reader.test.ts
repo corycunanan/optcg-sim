@@ -50,7 +50,7 @@ function fixture(prompted = false) {
           count: prompted ? { up_to: 1 } : { exact: 1 },
           filter: { name: "C" },
         },
-        params: { source_zone: "HAND", cost_override: "FREE" },
+        params: { source_zone: "HAND" },
       },
     ],
   };

@@ -78,7 +78,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays Life reveal and prompted Tri
   }]), 1, "HAND");
   rig.putSyn("LIFE", synSchema("LIFE", "Character", [{
     id: "life", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [
-      { type: "PLAY_CARD", target: { type: "CHARACTER_CARD", source_zone: "HAND", controller: "SELF", count: { up_to: 1 }, filter: { name: "CHILD" } }, params: { source_zone: "HAND", cost_override: "FREE" } },
+      { type: "PLAY_CARD", target: { type: "CHARACTER_CARD", source_zone: "HAND", controller: "SELF", count: { up_to: 1 }, filter: { name: "CHILD" } }, params: { source_zone: "HAND" } },
       { type: "DRAW", params: { amount: 1 } },
     ],
   }]), 1, "HAND", { triggerText: "Play a CHILD, then draw 1.", keywords: { ...rig.db.get("CHAR-VANILLA")!.keywords, trigger: true } });
@@ -180,7 +180,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("reparks legacy s
   else delete phase.stage;
   phase.remainingScheduledActions = [
     { sourceEffectId: "legacy-play", controller: 0,
-      action: { type: "PLAY_CARD", target: { type: "CHARACTER_CARD", controller: "SELF", source_zone: "HAND", filter: { name: "LEGACY-CHILD" }, count: { up_to: 1 } }, params: { source_zone: "HAND", cost_override: "FREE" } } },
+      action: { type: "PLAY_CARD", target: { type: "CHARACTER_CARD", controller: "SELF", source_zone: "HAND", filter: { name: "LEGACY-CHILD" }, count: { up_to: 1 } }, params: { source_zone: "HAND" } } },
     { sourceEffectId: "later-marker", controller: 0, action: { type: "DRAW", params: { amount: 1 } } },
   ];
   const pauses = await replayPauses(rig, state => {

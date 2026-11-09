@@ -495,7 +495,6 @@ Actions go in the `actions` array. They represent text **after the colon**.
 
 | Type | Card Text | Params |
 |------|-----------|--------|
-| `HAND_WHEEL` | "Trash N from hand, draw M" | `{ trash_count: N, draw_count: M }` |
 | `PLACE_HAND_TO_DECK` | "Place N from hand to deck" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
 | `RETURN_HAND_TO_DECK` | "Return hand to deck" | `{ position: "TOP"\|"BOTTOM" }` |
 | `REVEAL` | "Reveal N cards" | `{ amount: N, source: "DECK_TOP"\|"HAND" }` |

@@ -353,23 +353,17 @@ interface LossConditionMod {
   rule_type: "LOSS_CONDITION_MOD";
   trigger_event: "DECK_OUT";
   modification: LossModificationType;
-  delay?: DelaySpec;
 }
 
 type LossModificationType =
   | "WIN_INSTEAD"
   | "DELAYED_LOSS";
-
-interface DelaySpec {
-  timing: "END_OF_TURN";
-}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `trigger_event` | `"DECK_OUT"` | Which loss condition is modified |
 | `modification` | `LossModificationType` | How the loss is changed |
-| `delay` | `DelaySpec` (optional) | When `DELAYED_LOSS`, specifies when the loss actually occurs |
 
 ### Win Instead of Losing
 
@@ -398,10 +392,7 @@ OP15-022 Brook — "you do not lose when your deck has 0 cards. You lose at the 
   "rule": {
     "rule_type": "LOSS_CONDITION_MOD",
     "trigger_event": "DECK_OUT",
-    "modification": "DELAYED_LOSS",
-    "delay": {
-      "timing": "END_OF_TURN"
-    }
+    "modification": "DELAYED_LOSS"
   }
 }
 ```
@@ -410,7 +401,7 @@ The engine hooks into the deck-out check. When a player would lose from deck-out
 
 1. Check for `LOSS_CONDITION_MOD` with `trigger_event: "DECK_OUT"`.
 2. If `WIN_INSTEAD`: reverse the outcome — the player wins.
-3. If `DELAYED_LOSS`: suppress the immediate loss and register a scheduled check at the specified `delay.timing`. The player loses at that point if the deck is still at 0.
+3. If `DELAYED_LOSS`: suppress the immediate loss and the player loses at the end of the turn in which their deck became 0 (`defeat.ts`). End of turn is the only printed timing, so there is no `delay` param (OPT-802 removed the unread one).
 
 ---
 

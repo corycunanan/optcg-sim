@@ -1,6 +1,5 @@
-import { handTrashEvent } from "../../hand-trash.js";
 /**
- * Action handlers: PLACE_HAND_TO_DECK, RETURN_HAND_TO_DECK, HAND_WHEEL,
+ * Action handlers: PLACE_HAND_TO_DECK, RETURN_HAND_TO_DECK,
  * SHUFFLE_DECK, REVEAL, REVEAL_HAND, SEARCH_AND_PLAY
  */
 
@@ -9,12 +8,9 @@ import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import {
-  effectSourceController,
   getSearchAndPlayPickLimit,
   promptEffectDescription,
-  resolveAmount,
 } from "../action-utils.js";
-import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
@@ -116,87 +112,6 @@ export function executeReturnHandToDeck(
   };
 }
 
-export function executeHandWheel(
-  state: GameState,
-  action: ActionOf<"HAND_WHEEL">,
-  _sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>,
-): ActionResult {
-  const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const trashCount = resolveAmount(
-    params.trash_count ?? params.amount ?? 0,
-    resultRefs,
-    state,
-    controller,
-    cardDb,
-  );
-  const drawCount = resolveAmount(
-    params.draw_count ?? params.amount ?? 0,
-    resultRefs,
-    state,
-    controller,
-    cardDb,
-  );
-
-  const p = state.players[controller];
-
-  // Trash cards from hand
-  const toTrashCount = Math.min(trashCount, p.hand.length);
-  if (toTrashCount === 0 && trashCount > 0) return { state, events, succeeded: false };
-
-  const trashed = p.hand.slice(0, toTrashCount);
-  let nextState = transitionCards(
-    state,
-    trashed.map((card) => card.instanceId),
-    "TRASH",
-    { position: "TOP" },
-  ).state;
-
-  if (toTrashCount > 0) {
-    const event = handTrashEvent(state, controller, toTrashCount, "EFFECT", _sourceCardInstanceId, controller, resultRefs);
-    event.payload = { ...event.payload, reason: "hand_wheel" };
-    events.push(event);
-  }
-
-  // Draw cards
-  // OPT-876: CANNOT_DRAW blocks only the draw half; the trash half still happens.
-  // The drawer is `controller`; the causing controller is derived from the
-  // effect's source card (pre-trash state), so an OPPONENT_ACTION wrapper's
-  // flipped `controller` never changes whose effect caused the draw.
-  const drawBlocked = isDrawProhibitedByEffect(
-    nextState,
-    controller,
-    effectSourceController(state, _sourceCardInstanceId, controller, resultRefs),
-    cardDb,
-  );
-  const actualDraw = drawBlocked
-    ? 0
-    : Math.min(drawCount, nextState.players[controller].deck.length);
-  if (actualDraw > 0) {
-    const drawn = nextState.players[controller].deck.slice(0, actualDraw);
-    nextState = transitionCards(
-      nextState,
-      drawn.map((card) => card.instanceId),
-      "HAND",
-    ).state;
-
-    for (const card of drawn) {
-      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
-    }
-
-    events.push({ type: "DRAW_OUTSIDE_DRAW_PHASE", playerIndex: controller, payload: { count: actualDraw } });
-  }
-
-  return {
-    state: nextState,
-    events,
-    succeeded: true,
-    result: { targetInstanceIds: [], count: toTrashCount + actualDraw },
-  };
-}
 
 export function executeShuffleDeck(
   state: GameState,

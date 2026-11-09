@@ -169,7 +169,7 @@ export const OP08_005_CHESS: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Kuromarimo" },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           conditions: {
             not: {
               type: "CARD_ON_FIELD",
@@ -1644,7 +1644,6 @@ export const OP08_046_SHAKUYAKU: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "PLACE_HAND_TO_DECK",
               params: { amount: 1, position: "BOTTOM" },
@@ -2155,7 +2154,7 @@ export const OP08_059_ALBER: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "King", cost_max: 7 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2264,7 +2263,7 @@ export const OP08_062_CHARLOTTE_KATAKURI: EffectSchema = {
               },
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2321,7 +2320,7 @@ export const OP08_064_CHARLOTTE_CRACKER: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Biscuit Warrior" },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2489,7 +2488,7 @@ export const OP08_070_BARON_TAMAGO: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Viscount Hiyoko", cost_max: 5 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -2520,7 +2519,7 @@ export const OP08_071_COUNT_NIWATORI: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Baron Tamago", cost_max: 4 },
           },
-          params: { source_zone: "DECK", cost_override: "FREE" },
+          params: { source_zone: "DECK" },
         },
         {
           type: "SHUFFLE_DECK",
@@ -2578,7 +2577,7 @@ export const OP08_073_VISCOUNT_HIYOKO: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Count Niwatori", cost_max: 6 },
           },
-          params: { source_zone: "DECK", cost_override: "FREE" },
+          params: { source_zone: "DECK" },
         },
         {
           type: "SHUFFLE_DECK",
@@ -2818,7 +2817,6 @@ export const OP08_079_KAIDO: EffectSchema = {
         {
           type: "OPPONENT_ACTION",
           params: {
-            mandatory: true,
             action: {
               type: "TRASH_FROM_HAND",
               params: { amount: 1 },
@@ -3172,7 +3170,7 @@ export const OP08_090_HAMLET: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["SMILE"], cost_max: 2 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -3248,7 +3246,7 @@ export const OP08_092_PAGE_ONE: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Ulti", cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -3448,7 +3446,7 @@ export const OP08_096_PEOPLES_DREAMS: EffectSchema = {
             count: { up_to: 1 },
             filter: { color: "BLACK", cost_max: 3 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -3551,7 +3549,7 @@ export const OP08_098_KALGARA: EffectSchema = {
               },
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
         {
           type: "LIFE_TO_HAND",
@@ -3909,7 +3907,7 @@ export const OP08_110_WYPER: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Upper Yard" },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -4111,7 +4109,7 @@ export const OP08_115_THE_EARTH_WILL_NOT_LOSE: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Upper Yard" },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],

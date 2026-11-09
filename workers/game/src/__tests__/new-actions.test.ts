@@ -2,7 +2,7 @@
  * Tests for new action types added to effect-resolver.ts
  *
  * Covers: RETURN_TO_DECK, PLAY_CARD, SET_DON_ACTIVE, TRASH_CARD,
- * NEGATE_EFFECTS, MODIFY_COST, MILL, HAND_WHEEL, SHUFFLE_DECK,
+ * NEGATE_EFFECTS, MODIFY_COST, MILL, SHUFFLE_DECK,
  * REST_OPPONENT_DON, RETURN_DON_TO_DECK, REVEAL,
  * Life card actions: TURN_LIFE_FACE_UP, TURN_LIFE_FACE_DOWN,
  * LIFE_TO_HAND, ADD_TO_LIFE_FROM_HAND, LIFE_CARD_TO_DECK,
@@ -176,7 +176,7 @@ describe("PLAY_CARD action", () => {
           count: { exact: 1 },
           filter: { card_type: "CHARACTER" },
         },
-        params: { source_zone: "HAND", cost_override: "FREE" },
+        params: { source_zone: "HAND" },
       }],
     });
 
@@ -272,7 +272,7 @@ describe("MODIFY_COST action", () => {
   });
 });
 
-// ─── MILL / HAND_WHEEL Tests ───────────────────────────────────────────────────
+// ─── MILL Tests ────────────────────────────────────────────────────────────────
 
 describe("MILL action", () => {
   it("publishes deck provenance for the trash batch", () => {
@@ -290,39 +290,6 @@ describe("MILL action", () => {
       count: 2,
       reason: "mill",
       from: "DECK",
-    });
-  });
-});
-
-describe("HAND_WHEEL action", () => {
-  it("trashes cards then draws cards", () => {
-    const cardDb = createTestCardDb();
-    const state = createBattleReadyState(cardDb);
-    const origHandSize = state.players[0].hand.length;
-    const origDeckSize = state.players[0].deck.length;
-    const origTrashSize = state.players[0].trash.length;
-
-    const block = makeEffectBlock({
-      actions: [{
-        type: "HAND_WHEEL",
-        params: { trash_count: 2, draw_count: 2 },
-      }],
-    });
-
-    const result = resolveEffect(state, block, "char-0-v1", 0, cardDb);
-    expect(result.resolved).toBe(true);
-
-    // Hand size should stay the same (trash 2, draw 2)
-    expect(result.state.players[0].hand.length).toBe(origHandSize);
-    // Deck shrunk by 2
-    expect(result.state.players[0].deck.length).toBe(origDeckSize - 2);
-    // Trash grew by 2
-    expect(result.state.players[0].trash.length).toBe(origTrashSize + 2);
-    const trashed = result.events.find((event) => event.type === "CARD_TRASHED");
-    expect(trashed?.payload).toMatchObject({
-      count: 2,
-      reason: "hand_wheel",
-      from: "HAND",
     });
   });
 });

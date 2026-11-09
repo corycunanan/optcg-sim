@@ -219,7 +219,6 @@ describe("OPT-837 OP17-049 schema shape", () => {
       {
         type: "OPPONENT_ACTION",
         params: {
-          mandatory: true,
           action: {
             type: "TRASH_CARD",
             target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 2 } },

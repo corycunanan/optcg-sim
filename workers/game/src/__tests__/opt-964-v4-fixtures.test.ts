@@ -90,7 +90,7 @@ function overflow(): Json {
           source_zone: "HAND",
           count: { exact: 1 },
         },
-        params: { source_zone: "HAND", cost_override: "FREE" },
+        params: { source_zone: "HAND" },
       },
       playOverflow: {
         playTargetId: "v4-target",
@@ -552,7 +552,7 @@ it("reloads real mid-batch overflow live/undo and resumes the rule-trash pipelin
           source_zone: "TRASH",
           count: { exact: 2 },
         },
-        params: { source_zone: "TRASH", cost_override: "FREE" },
+        params: { source_zone: "TRASH" },
       },
     ],
     state.players[0].leader.instanceId,

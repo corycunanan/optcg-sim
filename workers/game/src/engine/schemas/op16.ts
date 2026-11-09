@@ -290,7 +290,7 @@ export const OP16_012_BENN_BECKMAN: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Shanks" } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },
@@ -342,7 +342,7 @@ export const OP16_014_MARCO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "SELF" },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
       flags: { optional: true },
@@ -455,7 +455,7 @@ export const OP16_019_LETS_SHOW_EM: EffectSchema = {
             count: { up_to: 2 },
             filter: { traits_contains: ["Whitebeard Pirates"], power_exact: 8000 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -576,7 +576,7 @@ export const OP16_025_BUNKOV: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { cost_max: 2 } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -597,7 +597,7 @@ export const OP16_026_EMPORIO_IVANKOV: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { cost_max: 2 } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -633,7 +633,7 @@ export const OP16_029_ANTLERKOV: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { cost_max: 2 } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -685,7 +685,7 @@ export const OP16_031_BUGGY: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
@@ -957,7 +957,7 @@ export const OP16_041_BUGGY: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true, once_per_turn: true },
@@ -1013,7 +1013,7 @@ export const OP16_045_CROCODILE: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { traits: ["Impel Down"], cost_max: 2 } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },
@@ -1036,7 +1036,7 @@ export const OP16_047_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       actions: [
         {
           type: "OPPONENT_ACTION",
-          params: { mandatory: true, action: { type: "PLACE_HAND_TO_DECK", params: { amount: 2, position: "BOTTOM" } } },
+          params: { action: { type: "PLACE_HAND_TO_DECK", params: { amount: 2, position: "BOTTOM" } } },
         },
       ],
       flags: { optional: true },
@@ -1059,7 +1059,7 @@ export const OP16_048_BUGGY: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -1317,7 +1317,6 @@ export const OP16_059_SNEAKY_TO_FLASHY: EffectSchema = {
             pick: { up_to: 2 },
             filter: { traits: ["Impel Down"], card_type: "CHARACTER", power_max: 6000 },
             rest_destination: "BOTTOM",
-            cost_override: "FREE",
           },
         },
       ],
@@ -1351,7 +1350,7 @@ export const OP16_060_SENGOKU: EffectSchema = {
             count: { up_to: 3 },
             filter: { traits: ["Admiral"], unique_names: true },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
       flags: { optional: true },
@@ -1820,7 +1819,7 @@ export const OP16_084_KOUZUKI_MOMONOSUKE: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { name: "Kouzuki Momonosuke", cost_exact: 9 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
       flags: { optional: true },
@@ -1842,7 +1841,7 @@ export const OP16_085_KOUZUKI_MOMONOSUKE: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { traits: ["Land of Wano"], cost_max: 6, exclude_name: "Kouzuki Momonosuke" } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -1988,7 +1987,7 @@ export const OP16_094_PORTGAS_D_ACE: EffectSchema = {
   card_name: "Portgas.D.Ace",
   card_type: "Character",
   effects: [
-    { id: "on_ko_opponent_discards", category: "auto", trigger: { keyword: "ON_KO" }, actions: [{ type: "OPPONENT_ACTION", params: { mandatory: true, action: { type: "TRASH_FROM_HAND", params: { amount: 2 } } } }] },
+    { id: "on_ko_opponent_discards", category: "auto", trigger: { keyword: "ON_KO" }, actions: [{ type: "OPPONENT_ACTION", params: { action: { type: "TRASH_FROM_HAND", params: { amount: 2 } } } }] },
     {
       id: "activate_give_don",
       category: "activate",
@@ -2040,7 +2039,7 @@ export const OP16_096_YAMATO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { name: "Yamato", cost_max: 6 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
     },
@@ -2064,7 +2063,7 @@ export const OP16_097_YAMATO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { cost_max: 2 } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
           chain: "THEN",
         },
       ],
@@ -2087,7 +2086,7 @@ export const OP16_098_YAMATO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { name: "Yamato", color: "BLACK", cost_exact: 8 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
       ],
       flags: { optional: true },
@@ -2110,7 +2109,7 @@ export const OP16_099_CUT_THOSE_CHAINS: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { traits: ["Land of Wano"], cost_max: 6 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           chain: "THEN",
         },
       ],
@@ -2197,7 +2196,7 @@ export const OP16_102_AVALO_PIZARRO: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "STAGE_CARD", source_zone: ["HAND", "TRASH"], count: { up_to: 1 }, filter: { name: "Fullalead" } },
-          params: { source_zone: "HAND_OR_TRASH", cost_override: "FREE" },
+          params: { source_zone: "HAND_OR_TRASH" },
           chain: "THEN",
         },
       ],
@@ -2260,7 +2259,7 @@ export const OP16_104_CATARINA_DEVON: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { traits: ["Blackbeard Pirates"], cost_exact: 1 } },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           chain: "THEN",
         },
       ],
@@ -2463,7 +2462,7 @@ export const OP16_116_ZEHAHAHAHAHA: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Marshall.D.Teach" } },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
         { type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE", controller: "OPPONENT" }, params: { amount: 1, position: "TOP" }, chain: "THEN" },
       ],
@@ -2590,7 +2589,7 @@ export const OP16_105_GECKO_MORIA: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Absalom", cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
         },
         {
           type: "PLAY_CARD",
@@ -2600,7 +2599,7 @@ export const OP16_105_GECKO_MORIA: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Dr. Hogback", cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           chain: "THEN",
         },
         {
@@ -2611,7 +2610,7 @@ export const OP16_105_GECKO_MORIA: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Perona", cost_max: 4 },
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: { source_zone: "TRASH" },
           chain: "THEN",
         },
       ],

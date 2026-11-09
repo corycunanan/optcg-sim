@@ -45,7 +45,6 @@ const MORIA_ACTION: Action = {
   target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
   params: {
     source_zone: "TRASH",
-    cost_override: "FREE",
     entry_state: "PLAYER_CHOICE",
     state_distribution: { ACTIVE: 1, RESTED: 1 },
   },
@@ -114,7 +113,6 @@ describe("OPT-114: PLAY_CARD state distribution (PLAYER_CHOICE entry_state)", ()
       ...MORIA_ACTION,
       params: {
         source_zone: "TRASH",
-        cost_override: "FREE",
         entry_state: "PLAYER_CHOICE",
         // Only RESTED capacity → every frame auto-plays RESTED, no prompt.
         state_distribution: { ACTIVE: 0, RESTED: 2 },
@@ -168,7 +166,7 @@ describe("OPT-114: PLAY_CARD state distribution (PLAYER_CHOICE entry_state)", ()
     const action: Action = {
       type: "PLAY_CARD",
       target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 2 } },
-      params: { source_zone: "TRASH", cost_override: "FREE", entry_state: "RESTED" },
+      params: { source_zone: "TRASH", entry_state: "RESTED" },
     };
 
     const result = executePlayCard(

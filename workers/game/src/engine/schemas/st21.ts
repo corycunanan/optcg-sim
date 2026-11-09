@@ -336,7 +336,7 @@ export const ST21_015_RORONOA_ZORO: EffectSchema = {
               exclude_name: "Roronoa Zoro",
             },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { source_zone: "HAND" },
         },
       ],
     },
