@@ -47,7 +47,7 @@ it("actual f19 Counter publication survives repository, Coordinator and two repl
 
 async function completeCounter(
   stored: Record<string, unknown>,
-  mode: 6 | 7 | 8 = 7,
+  mode: 6 | 7 | 8 | 9 = 7,
   context = "live"
 ) {
   const reader = await runtime(process.env.OPT969_HISTORY_READER_ROOT);
@@ -188,13 +188,13 @@ it("Counter staged-entry history repair never blesses stale live history or reso
   }
 });
 
-it("ordinary setup and direct Repository writes own mode8", async () => {
+it("ordinary setup and direct Repository writes own mode9 (OPT-958)", async () => {
   const rt = await runtime();
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
-  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
   const loaded = (await memory(rt, await save(rt, state, db)).repo.load())!;
-  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
 });
 
 for (const context of [
@@ -222,9 +222,9 @@ for (const [version, mode] of [
 }
 
 for (const context of ["live", "undo-first", "undo-later", "embedded-first", "embedded-later"]) {
-  it(`ordinary mode8 writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
+  it(`ordinary writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
     const state = createBattleReadyState(createTestCardDb());
-    expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
-    await completeCounter(await generateCounter(), 8, context);
+    expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
+    await completeCounter(await generateCounter(), 9, context);
   });
 }

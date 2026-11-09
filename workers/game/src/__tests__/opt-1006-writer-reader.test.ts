@@ -21,7 +21,10 @@ it(`OPT-1006 ${stage} corpus matches its immutable manifest hash, families and p
   if (stage === "final-writer") {
     expect(manifest.producer).toBe("a529eebceb5b6a933734403d695829335ebb7653");
     expect(manifest.rollbackFloor).toBe("d8309e70fef64a133ce19d8a2bd327bb625e56fb");
-    expect(createHash("sha256").update(readFileSync(new URL("./opt-1001-field-trash.test.ts", import.meta.url))).digest("hex")).toBe(manifest.generatorSha256);
+    // The generator is the frozen copy of opt-1001-field-trash.test.ts that
+    // produced this corpus. OPT-958 later changed that live file's new-game
+    // mode assertions (8 → 9); the corpus is not re-captured.
+    expect(createHash("sha256").update(readFileSync(new URL("./fixtures/opt-1006-final-writer-generator.test.ts.txt", import.meta.url))).digest("hex")).toBe(manifest.generatorSha256);
   }
   for (const [name, capture] of Object.entries(corpus)) {
     expect(capture.producer).toBe(manifest.families[name].producer);

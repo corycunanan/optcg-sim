@@ -219,7 +219,7 @@ it.each([8, 9] as const)("writer source%s scheduling captures source and preserv
   expect(r.state.schemaVersion).toBe(10);
   expect(r.state.scheduledActions[0].sourceCardSnapshot).toMatchObject({ instanceId: source.instanceId, cardId: source.cardId, controller: source.controller });
   expect(r.state.fieldTrashSemanticsVersion).toBe(version === 9 ? 9 : 8);
-  expect(r.state.costSemanticsVersion).toBe(8);
+  expect(r.state.costSemanticsVersion).toBe(9);
 });
 
 it.each([8, 9, 10] as const)("source%s COST roots reject independent capability overrides", version => {
@@ -267,6 +267,6 @@ it.each(["hand only", "zero selection"])("native10/field8 %s does not activate t
   const source = r.put("SYN-no-upgrade", 0, "CHARACTER", { schema: synSchema("SYN-no-upgrade", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: path === "hand only" ? { type: "CARD_IN_HAND", controller: "SELF", count: { all: true } } : { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }] }]) });
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
   if (path === "zero selection") r.select([]);
-  expect(r.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: 8 });
+  expect(r.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: 9 });
   expect(r.state.pendingPrompt).toBeNull();
 });

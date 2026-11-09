@@ -32,6 +32,7 @@ import { computeEffectAvailability } from "../engine/availability.js";
 import { validate } from "../engine/validation.js";
 import { retainsReplacedCostPrefix } from "../engine/native-cost-semantics.js";
 import { rig, synSchema, type Rig } from "./opt-960-rig.js";
+import { setupGame } from "./helpers.js";
 import { command, capture } from "./opt-997-corpus-support.js";
 
 const P0 = 0 as const;
@@ -45,6 +46,11 @@ function mode9(r: Rig): Rig {
 }
 
 describe("OPT-958 mode9 gate", () => {
+  it("new games start on cost mode 9", () => {
+    expect(setupGame().state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
+    expect(retainsReplacedCostPrefix(setupGame().state)).toBe(true);
+  });
+
   it("applies to explicit cost mode 9 only", () => {
     for (const schemaVersion of [8, 9, 10, 11] as const) {
       expect(retainsReplacedCostPrefix({ schemaVersion, costSemanticsVersion: 9 })).toBe(true);

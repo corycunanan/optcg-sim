@@ -17,8 +17,8 @@ function fixture(mode: 6 | 7 | 8) {
   r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = "UP";
   return r;
 }
-it("writer ordinary setup uses mode8 and historical schema7 promotion stays7", () => {
-  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+it("writer ordinary setup uses mode9 (OPT-958) and historical schema7 promotion stays7", () => {
+  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
   r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
   expect(promoteGameStateForWriter(r.state, "state")).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
 });

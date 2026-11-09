@@ -31,9 +31,10 @@ export async function generateCounter(
     if (version === 8) state.costSemanticsVersion = mode;
     else delete state.costSemanticsVersion;
   } else {
-    // Combined writer proof begins from real setup, before any first action.
+    // Combined writer proof begins from real setup, before any first action
+    // (cost mode 9 since OPT-958).
     expect(state.schemaVersion).toBe(8);
-    expect(state.costSemanticsVersion).toBe(8);
+    expect(state.costSemanticsVersion).toBe(9);
   }
   state.players[1].hand = [
     {

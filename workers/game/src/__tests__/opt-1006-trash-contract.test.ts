@@ -20,7 +20,7 @@ it("mixed-zone resumed trash finalization keeps one immutable aggregate hand eve
 });
 
 for (const zone of ["HAND", "CHARACTER"] as const) it(`native8 ${zone} trash with ${zone === "HAND" ? "a selected hand card" : "zero selected targets"} stays8`, () => {
-  const r = rig(); const source = r.put("OPT1006-SOURCE", 1, "CHARACTER"); const target = r.put("OPT1006-TARGET", 0, zone);
+  const r = rig(); r.state.costSemanticsVersion = 8; const source = r.put("OPT1006-SOURCE", 1, "CHARACTER"); const target = r.put("OPT1006-TARGET", 0, zone);
   const before = structuredClone(r.state);
   const result = executeTrashCard(r.state, { type: "TRASH_CARD", target: { type: zone === "HAND" ? "CARD_IN_HAND" : "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }, source.instanceId, 1, r.db, new Map(), zone === "HAND" ? [target.instanceId] : [], resolverExecutionServices);
   expect(result.state.schemaVersion).toBe(8); expect(result.state.costSemanticsVersion).toBe(8); expect(r.state).toEqual(before);

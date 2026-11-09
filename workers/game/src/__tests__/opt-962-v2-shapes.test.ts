@@ -54,11 +54,11 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
   it.each(built.map((s) => s.name))("%s: current writer matches its separate exact fixture and historical input still loads", (name) => {
     const state = built.find((s) => s.name === name)!.state;
       expect(currentWriter.cases).toHaveProperty(name);
-    // This is current new-game output, now mode8. The frozen candidate and
+    // This is current new-game output, now mode9 (OPT-958). The frozen candidate and
     // shared historical promotion helper remain mode7 for their other users.
     const historicalExpected = writerEnvelope(candidateExpected<GameState>(`endphase/${name}`));
     expect(historicalExpected.costSemanticsVersion).toBe(7);
-    expect(persisted(state)).toEqual(orderedEnvelope({ ...historicalExpected, costSemanticsVersion: 8 }, state));
+    expect(persisted(state)).toEqual(orderedEnvelope({ ...historicalExpected, costSemanticsVersion: 9 }, state));
     // The v2 reader input is frozen, not rewritten to hide current scheduling.
     const historical = structuredClone(fixture.cases[name].state);
     expect(() => convertPersistedGameState(historical, "historical v2 state")).not.toThrow();

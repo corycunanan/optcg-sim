@@ -7,9 +7,10 @@ import { setupGame } from "./helpers.js";
 import { runtime, memory, save, command } from "./native7-producer-support.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 
-it("new setup chooses mode8 before first action/save and actual default8 cost prompt crosses a saved boundary (verified floor when env supplied)", async () => {
-  expect(setupGame().state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
-  const r = rig(); expect(r.state.costSemanticsVersion).toBe(8);
+it("mode8 cost prompt crosses a saved boundary (verified floor when env supplied)", async () => {
+  // New setup chose mode8 until OPT-958 moved it to mode9; mode8 games keep this path.
+  expect(setupGame().state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
+  const r = rig(); r.state.costSemanticsVersion = 8;
   r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = "UP";
   const source = r.put("writer-live-life", 0, "CHARACTER", { schema: synSchema("writer-live-life", [{
     id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { optional: true },

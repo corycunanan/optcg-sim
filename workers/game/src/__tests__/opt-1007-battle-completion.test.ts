@@ -152,7 +152,8 @@ it.each([6, 7] as const)(
 it("activates default writer8 after the reader deployment", () => {
   expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
   expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(11);
-  expect(toPersistedGameState(endPhaseRig().state)).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+  // OPT-958: new games start on cost mode 9.
+  expect(toPersistedGameState(endPhaseRig().state)).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 9 });
 });
 
 function nativeRig(mode: 6 | 7 = 6) {
