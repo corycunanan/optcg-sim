@@ -3,6 +3,7 @@
 import type { Action, EffectResult } from "../effect-types.js";
 import type { CardData, GameState } from "../../types.js";
 import { computeAllValidTargets } from "./target-resolver.js";
+import { lifeToHandAddsNothing } from "./actions/life.js";
 
 function hasFullTargetCount(
   state: GameState,
@@ -122,4 +123,35 @@ export function isFixedReferenceChainVacuous(
     sourceCardInstanceId,
     resultRefs,
   ).length === 0;
+}
+
+/**
+ * OPT-1037: true when accepting an action-level `optional` ("Then, you may
+ * add 1 card from the top or bottom of your Life cards to your hand") would
+ * reach the action handler's own no-op path, so the "you may" offers no real
+ * choice (rule 1-3-2). The resolver then treats the clause as declined
+ * without a prompt: a following IF_DO does not run. Each entry mirrors the
+ * handler's early return exactly, so skipping and declining agree.
+ */
+export function isOptionalActionVacuous(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): boolean {
+  switch (action.type) {
+    case "LIFE_TO_HAND":
+      return lifeToHandAddsNothing(
+        state,
+        action,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      );
+    default:
+      return false;
+  }
 }

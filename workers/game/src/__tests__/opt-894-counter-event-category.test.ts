@@ -886,13 +886,46 @@ describe("OPT-919 — OP08-116 Burn Bazooka: optional Life add gates the Life pl
     expect(handIds(f)).toEqual([warrior.instanceId]);
   });
 
-  it("0 Life: accepting adds nothing, so the If-you-do placement is skipped", () => {
+  // OPT-1037: with 0 Life the "you may" can do nothing (rule 1-3-2), so it is
+  // not offered; it counts as declined and the If-you-do placement is skipped.
+  it("0 Life: no optional prompt, and the If-you-do placement is skipped", () => {
     const { f, warrior, leaderBase } = setup();
     f.state.players[1].life = [];
-    f.counter("OP08-116", [ids(f.p1Leader()), "accept"]);
+    const logStart = f.state.eventLog.length;
+    f.counter("OP08-116", [ids(f.p1Leader())]);
+    expect(f.state.pendingPrompt).toBeNull();
     expect(f.power(f.p1Leader())).toBe(leaderBase + 4000);
     expect(f.state.players[1].life).toEqual([]);
     expect(handIds(f)).toEqual([warrior.instanceId]);
+    expect(f.state.eventLog.slice(logStart).some((e) => e.type === "CARD_ADDED_TO_LIFE")).toBe(false);
+  });
+
+  it("OPT-1037: 1 Life still offers the optional add", () => {
+    const { f, warrior } = setup();
+    f.state.players[1].life = f.state.players[1].life.slice(0, 1);
+    const lifeCardId = f.state.players[1].life[0].cardId;
+    // One Life card is the same card at both ends, so no top/bottom prompt.
+    f.counter("OP08-116", [ids(f.p1Leader()), "accept", ids(warrior)]);
+    expect(f.state.players[1].life).toHaveLength(1);
+    expect(f.state.players[1].life[0]).toMatchObject({ cardId: "SW-A", face: "UP" });
+    expect(f.state.players[1].hand.map((c) => c.cardId)).toEqual([lifeCardId]);
+  });
+
+  // OPT-1037: ST22-015 at 0 Life plays no optional prompt and gives no +2000.
+  it("ST22-015 [Main] at 0 Life: no optional prompt, Leader keeps its power", () => {
+    const f = fixture();
+    f.state.players.forEach((p) => (p.characters = padChars([])));
+    f.state.players[1].hand = [];
+    f.state.players[1].life = [];
+    f.leaderData({ types: ["Whitebeard Pirates"] });
+    const leaderBase = f.power(f.p1Leader());
+    f.state.turn.activePlayerIndex = 1;
+    const ev = f.put("ST22-015", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: canonicalText("ST22-015") });
+    f.act({ type: "PLAY_CARD", cardInstanceId: ev.instanceId }, 1);
+    f.drive([]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].hand).toHaveLength(0);
+    expect(f.power(f.p1Leader())).toBe(leaderBase);
   });
 
   // Same "Then, you may add ... If you do" shape found by the OPT-919 scan.
