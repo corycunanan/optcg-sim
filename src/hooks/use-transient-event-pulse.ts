@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { GameEvent } from "@shared/game-types";
+import { buildEventTimeline, eventOffsetMs } from "@/lib/game/event-timeline";
 
 type TransientEventKey = string | number;
 
@@ -17,6 +18,8 @@ export type TransientEventPulses<Key extends TransientEventKey> = ReadonlyMap<
 /**
  * Shared event-log cursor and timeout lifecycle for one-shot board feedback.
  * Existing history is seeded on mount so reconnects do not replay effects.
+ * Each pulse waits for its event's beat in the update's playback timeline
+ * (OPT-1040), so glows follow the flights and spotlights before them.
  */
 export function useTransientEventPulse<Key extends TransientEventKey>(
   eventLog: GameEvent[],
@@ -32,6 +35,7 @@ export function useTransientEventPulse<Key extends TransientEventKey>(
   const nonceByKeyRef = useRef<Map<Key, number>>(new Map());
   const timersRef = useRef<Map<Key, ReturnType<typeof setTimeout>>>(new Map());
   const scheduledKeysRef = useRef<Set<Key>>(new Set());
+  const beatTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -80,16 +84,31 @@ export function useTransientEventPulse<Key extends TransientEventKey>(
       timersRef.current.set(key, timer);
     };
 
+    const enqueue = (key: Key, count: number) => {
+      if (!mountedRef.current) return;
+      pendingCountsRef.current.set(
+        key,
+        (pendingCountsRef.current.get(key) ?? 0) + count
+      );
+
+      if (timersRef.current.has(key) || scheduledKeysRef.current.has(key)) {
+        return;
+      }
+
+      scheduledKeysRef.current.add(key);
+      queueMicrotask(() => {
+        scheduledKeysRef.current.delete(key);
+        startNextPulse(key);
+      });
+    };
+
     let maxTimestamp = lastTimestampRef.current;
-    const nextCounts = new Map<Key, number>();
+    const newEvents: GameEvent[] = [];
 
     for (const event of eventLog) {
       if (event.timestamp <= lastTimestampRef.current) continue;
       maxTimestamp = Math.max(maxTimestamp, event.timestamp);
-      const key = selectKey(event);
-      if (key !== null) {
-        nextCounts.set(key, (nextCounts.get(key) ?? 0) + 1);
-      }
+      newEvents.push(event);
     }
 
     lastTimestampRef.current = maxTimestamp;
@@ -97,6 +116,8 @@ export function useTransientEventPulse<Key extends TransientEventKey>(
     if (reducedMotion) {
       for (const timer of timersRef.current.values()) clearTimeout(timer);
       timersRef.current.clear();
+      for (const timer of beatTimersRef.current) clearTimeout(timer);
+      beatTimersRef.current.clear();
       pendingCountsRef.current.clear();
       scheduledKeysRef.current.clear();
       queueMicrotask(() => {
@@ -105,23 +126,28 @@ export function useTransientEventPulse<Key extends TransientEventKey>(
       return;
     }
 
-    if (nextCounts.size === 0) return;
+    // Group this update's pulses by beat offset, preserving event order.
+    const timeline = buildEventTimeline(newEvents);
+    const countsByOffset = new Map<number, Map<Key, number>>();
+    for (const event of newEvents) {
+      const key = selectKey(event);
+      if (key === null) continue;
+      const offset = eventOffsetMs(timeline, event);
+      const counts = countsByOffset.get(offset) ?? new Map<Key, number>();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      countsByOffset.set(offset, counts);
+    }
 
-    for (const [key, count] of nextCounts) {
-      pendingCountsRef.current.set(
-        key,
-        (pendingCountsRef.current.get(key) ?? 0) + count
-      );
-
-      if (timersRef.current.has(key) || scheduledKeysRef.current.has(key)) {
+    for (const [offset, counts] of countsByOffset) {
+      if (offset <= 0) {
+        for (const [key, count] of counts) enqueue(key, count);
         continue;
       }
-
-      scheduledKeysRef.current.add(key);
-      queueMicrotask(() => {
-        scheduledKeysRef.current.delete(key);
-        startNextPulse(key);
-      });
+      const timer = setTimeout(() => {
+        beatTimersRef.current.delete(timer);
+        for (const [key, count] of counts) enqueue(key, count);
+      }, offset);
+      beatTimersRef.current.add(timer);
     }
   }, [durationMs, eventLog, reducedMotion, selectKey]);
 
@@ -130,11 +156,14 @@ export function useTransientEventPulse<Key extends TransientEventKey>(
     const timers = timersRef.current;
     const pendingCounts = pendingCountsRef.current;
     const scheduledKeys = scheduledKeysRef.current;
+    const beatTimers = beatTimersRef.current;
 
     return () => {
       mountedRef.current = false;
       for (const timer of timers.values()) clearTimeout(timer);
       timers.clear();
+      for (const timer of beatTimers) clearTimeout(timer);
+      beatTimers.clear();
       pendingCounts.clear();
       scheduledKeys.clear();
     };
