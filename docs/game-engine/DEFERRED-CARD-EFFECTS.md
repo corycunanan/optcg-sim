@@ -10,10 +10,10 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 1** (ST33-004 — partially encoded 2026-11-08, see
-below). EB05-010 Nico Robin is fully encoded since OPT-1033 (`keywords_not`)
-and EB05-052 Gloriosa since OPT-1032 (`WOULD_TAKE_DAMAGE` replacement). No
-playable-format exclusion is active.
+**Remaining deferred cards: 0.** EB05-010 Nico Robin is fully encoded since
+OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
+(`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
+(`CARD_TRASHED_FROM_HAND_BY_EFFECT`). No playable-format exclusion is active.
 
 ---
 
@@ -396,7 +396,7 @@ to process player card selections.
 
 `ADD_TO_LIFE` (EB02-057) was a false positive — the schema correctly uses `ADD_TO_LIFE_FROM_FIELD`.
 
-## EB-05 and ST-33 Deferred Effects (1 card, partially encoded) — 2026-11-08
+## EB-05 and ST-33 Deferred Effects (all encoded) — 2026-11-08
 
 These cards ship with every expressible block authored. The clause below is
 **not encoded and not approximated**: in play the card behaves as if that
@@ -405,14 +405,12 @@ clause were absent. Each needs engine vocabulary first.
 EB05-010 Nico Robin (Leader), authored partially on 2026-11-08, is complete: OPT-1033 added the `keywords_not` target filter, read from the
 K.O.'d card's last-known keywords (`CARD_KO.preKO_keywords`).
 
-### ST33-004 Borsalino — PARTIAL
+### ~~ST33-004 Borsalino~~ — ENCODED
 **Tags:** `HAND_ZONE_MODIFIER`, `TURN_HISTORY`
 
 > During the turn in which a card in your hand is trashed by an effect, give this card in your hand −3 cost.
 
-**Blocker:** `ActionReference` has no per-turn record of a hand card trashed by an effect. `CARD_TRASHED_FROM_HAND` exists as an event (OPT-795) but is not recorded for the turn. The FAQ (`docs/FAQs/qa_st-33.md`) counts trashes caused by the opponent's effects too. Needs a turn-history flag readable by a hand-zone `MODIFY_COST` condition.
-
-**Encoded:** [Blocker].
+OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTION_PERFORMED_THIS_TURN`. It reads this turn's event log (back to `TURN_STARTED`) for a hand trash that the `CARD_TRASHED_FROM_HAND` trigger also admits, scoped to whose hand it was. The FAQ (`docs/FAQs/qa_st-33.md`) counts the opponent's effects. Activation-cost discards count, as they do for the OPT-795 watchers; a symbol Counter does not. The hand-zone `MODIFY_COST` −3 and [Blocker] are encoded.
 
 ---
 
@@ -442,18 +440,17 @@ output rather than the stale `~80` estimate:
 
 All 51 findings have a checked-in disposition. The 2026-11-08 EB-05 and
 ST-31 to ST-36 authoring added three partial cards (EB05-010, EB05-052,
-ST33-004); EB05-010 (OPT-1033) and EB05-052 (OPT-1032) are now fully encoded.
-ST33-004 is listed above and is playable without the deferred clause.
-Its other detector findings are in
+ST33-004); all three are now fully encoded (OPT-1033, OPT-1032, OPT-1034).
+ST33-004's other detector findings are in
 [SCHEMA-QA-DISPOSITIONS.md](SCHEMA-QA-DISPOSITIONS.md).
 
 ### Totals
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 38 cards | 0 | 0 |
+| Historical card entries in this document | 39 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
-| EB-05 / ST-33 partial encodings (2026-11-08) | 1 card | 1 | 0 |
-| **Tracked cards still needing disposition** | — | **1** | **0** |
+| EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
+| **Tracked cards still needing disposition** | — | **0** | **0** |

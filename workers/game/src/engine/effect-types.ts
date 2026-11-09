@@ -471,7 +471,13 @@ export interface ActionPerformedThisTurnCondition {
   source?: "SELF_CARD";
 }
 
-export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO";
+// CARD_TRASHED_FROM_HAND_BY_EFFECT (OPT-1034): a card left `controller`'s hand
+// for the trash because of an effect (the CARD_TRASHED_FROM_HAND event's
+// predicate, so activation-cost discards count and Counter/rule disposal does
+// not). `controller` scopes whose hand it was; the causing player is ignored
+// (ST33-004 FAQ: an opponent's effect counts). Read from this turn's event
+// log rather than actionsPerformedThisTurn, so saved state is unchanged.
+export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO" | "CARD_TRASHED_FROM_HAND_BY_EFFECT";
 
 export interface PlayMethodCondition {
   type: "PLAY_METHOD";
