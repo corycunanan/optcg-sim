@@ -76,6 +76,11 @@ node --import tsx scripts/replay-opt-981-reader.ts /absolute/path/to/deployed-re
 Do not regenerate the committed corpus to mask a regression. The source capture
 script is archived for provenance; generation must run at its recorded source.
 
+The in-repo test `opt-981-writer-corpus.test.ts` pins the archive hash and the
+producer's recorded `phases.ts` hash above, not the live `phases.ts` (OPT-1036).
+The live engine may change; its exact replay of every receipt is the check that
+current code still reads these saves.
+
 ## Validation and historical expectation changes
 
 The source baseline without promotion fails the new producer/public authored
