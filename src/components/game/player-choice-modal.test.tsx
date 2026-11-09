@@ -257,6 +257,43 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
   });
 });
 
+describe("PlayerChoiceModal DON!! return picker", () => {
+  // OPT-936: pins the actionLabel wiring of the donReturn branch, which no
+  // other test reaches.
+  it("titles the dialog with the action label", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="[On Play] Return 1 DON!! card"
+          actionLabel="Return DON!!"
+          choices={[
+            { id: "don-return:1:1", label: "1 active" },
+            { id: "don-return:0:1:don-a=1", label: "1 attached" },
+          ]}
+          donReturn={{
+            count: 1,
+            sources: [
+              { id: "cost-active", label: "Active DON!!", max: 1, kind: "COST_ACTIVE" },
+              { id: "don-a", label: "Attached to Leader", max: 1, kind: "ATTACHED" },
+            ],
+          }}
+          cardDb={{}}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    const dialog = renderer.root.findByProps({ role: "dialog" });
+    const heading = renderer.root.findByProps({
+      id: dialog.props["aria-labelledby"],
+    });
+    expect(heading.children).toEqual(["Card Effect: Return DON!!"]);
+  });
+});
+
 describe("v7 DON identity picker with generic-choice fallback", () => {
   const id = (ids: string[]) => `don-return-ids:${JSON.stringify(ids)}`;
   const identityChoices = [

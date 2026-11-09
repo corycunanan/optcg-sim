@@ -284,7 +284,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // live in one place and can compose with motion presets. Precedence (top
   // wins): combat winner > attack redirected > effects negated > counter flash
   // (all transient) > attacker (current aggressor) > defender
-  // (OPT-274 — current battle target, same amber pulse as attacker) > selected
+  // (OPT-274 — current battle target, same amber pulse as attacker; when it
+  // is also selected it shows both rings, OPT-896) > selected
   // (user-chosen blocker or effect target) > eligible candidate > ambient
   // usable-effect availability.
   const selectionSelected = !!selected || !!targetSelection?.selected;
@@ -304,7 +305,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           : isAttacker
             ? ("attacker" as const)
             : isDefender
-              ? ("defender" as const)
+              ? selectionSelected
+                ? ("defender-selected" as const)
+                : ("defender" as const)
               : selectionSelected
                 ? ("selected" as const)
                 : selectionEligible
@@ -617,7 +620,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
           : isAttacker
             ? ("attacker" as const)
             : isDefender
-              ? ("defender" as const)
+              ? targetSelection?.selected
+                ? ("defender-selected" as const)
+                : ("defender" as const)
               : targetSelection?.selected
                 ? ("selected" as const)
                 : targetSelection?.eligible

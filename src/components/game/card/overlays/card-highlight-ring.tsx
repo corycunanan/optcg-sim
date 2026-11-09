@@ -30,6 +30,10 @@ import type { HighlightRingColor } from "../types";
  *              attacker so both participants in the active battle read as
  *              linked; kept as a separate color so future divergence
  *              doesn't require retrofitting consumers)
+ *   defender-selected → green static ring on the card plus the amber
+ *              defender pulse one step outside it (OPT-896): the battle
+ *              target that is also the chosen Blocker or effect target keeps
+ *              both cues, and the green ring holds under reduced motion
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
  *   winner   → green pulse (OPT-283 combat victory, one-shot; the field-card
  *              wrapper owns the card recoil so the art and ring move together)
@@ -120,6 +124,15 @@ export function CardHighlightRing({
         }}
         transition={negatedRing.transition}
       />
+    );
+  }
+
+  if (color === "defender-selected") {
+    return (
+      <>
+        <CardHighlightRing color="defender" className={cn("-inset-1", className)} />
+        <CardHighlightRing color="selected" className={className} />
+      </>
     );
   }
 

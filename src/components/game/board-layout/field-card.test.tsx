@@ -92,6 +92,11 @@ function renderOpponent(
     counterPulse?: boolean;
     isAttacker?: boolean;
     isDefender?: boolean;
+    targetSelection?: {
+      eligible: boolean;
+      selected: boolean;
+      disabledReason: null;
+    };
     powerMod?: {
       kind: "delta" | "absolute";
       value: number;
@@ -169,6 +174,48 @@ describe("OpponentFieldCard indicator precedence", () => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
+});
+
+describe("attacked card that is also selected (OPT-896)", () => {
+  it("shows both the defender and the selected ring", () => {
+    renderOpponent({
+      isDefender: true,
+      targetSelection: { eligible: true, selected: true, disabledReason: null },
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("defender-selected");
+  });
+
+  it("shows both rings on your attacked card chosen as Blocker", () => {
+    act(() => {
+      renderer = create(
+        <PlayerFieldCard
+          card={card}
+          cardDb={{}}
+          activeDragType={null}
+          canAttack={false}
+          blockerSelectable
+          selected
+          isDefender
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />,
+      );
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("defender-selected");
+  });
+
+  it("keeps the plain defender ring while the attacked card is unselected", () => {
+    renderOpponent({
+      isDefender: true,
+      targetSelection: { eligible: true, selected: false, disabledReason: null },
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("defender");
+  });
 });
 
 describe("OpponentFieldCard winner recoil", () => {

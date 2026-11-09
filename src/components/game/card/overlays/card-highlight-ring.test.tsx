@@ -130,3 +130,24 @@ describe("CardHighlightRing indicator feedback", () => {
     expect(renderRing("redirected", false)?.toJSON()).toBeNull();
   });
 });
+
+describe("CardHighlightRing defender-selected (OPT-896)", () => {
+  it.each([true, false])(
+    "draws the green selected ring inside the amber defender ring (reduced motion: %s)",
+    (reduced) => {
+      motionState.reduced = reduced;
+      const ring = renderRing("defender-selected", false);
+      const classNames = ring!.root
+        .findAllByType("div")
+        .map((node) => String(node.props.className));
+
+      expect(classNames).toHaveLength(2);
+      const defender = classNames.find((name) => name.includes("ring-gb-signal-battle"));
+      const selected = classNames.find((name) => name.includes("ring-gb-signal-selected"));
+      expect(defender).toContain("-inset-1");
+      expect(defender).not.toMatch(/(^| )inset-0( |$)/);
+      expect(selected).toMatch(/(^| )inset-0( |$)/);
+      motionState.reduced = true;
+    }
+  );
+});

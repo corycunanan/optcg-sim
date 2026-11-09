@@ -44,6 +44,8 @@ export type HighlightRingColor =
   | "eligible"
   | "attacker"
   | "defender"
+  // OPT-896: the battle target is also the chosen Blocker or effect target.
+  | "defender-selected"
   | "counter"
   | "winner"
   | "negated"
