@@ -7,6 +7,7 @@ import {
   matchesFilter as matchesFilterQuery,
   type ConditionContext as QueryConditionContext,
   type ConditionQueryServices,
+  type LastKnownFilterInfo,
 } from "./condition-queries.js";
 import {
   getEffectiveCostForRead,
@@ -57,7 +58,7 @@ export function matchesFilter(
   resultRefs?: Map<string, EffectResult>,
   costOverride?: number,
   filterController?: 0 | 1,
-  basePowerOverride?: number
+  lki?: LastKnownFilterInfo
 ): boolean {
   return matchesFilterQuery(
     card,
@@ -68,7 +69,7 @@ export function matchesFilter(
     costOverride,
     filterController,
     conditionQueries,
-    basePowerOverride
+    lki
   );
 }
 

@@ -1271,6 +1271,13 @@ export interface TargetFilter {
 
   // Keyword / ability filters
   keywords?: Keyword[];
+  /**
+   * "without [Keyword]" (OPT-1033): fails when the card has any listed
+   * keyword at runtime — a negated printed or self-granted keyword is absent,
+   * an externally granted one is present. On a K.O. watcher the K.O.'d
+   * card's keywords are read as they were when it left the field.
+   */
+  keywords_not?: Exclude<Keyword, "CAN_ATTACK_ACTIVE">[];
   has_trigger?: boolean;
   attribute?: Attribute;
   attribute_not?: Attribute;

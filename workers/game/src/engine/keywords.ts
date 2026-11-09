@@ -87,6 +87,46 @@ export function hasEffectiveKeyword(
   );
 }
 
+/** Keywords whose presence depends on runtime state (negation, grants). */
+export const RUNTIME_FILTER_KEYWORDS = [
+  "BLOCKER",
+  "RUSH",
+  "RUSH_CHARACTER",
+  "DOUBLE_ATTACK",
+  "BANISH",
+  "UNBLOCKABLE",
+] as const;
+
+/** The keywords printed on the card (no negation, no grants). */
+export function printedFilterKeywords(cardData: CardData): string[] {
+  return RUNTIME_FILTER_KEYWORDS.filter((keyword) =>
+    isKeywordEffective(cardData, keyword, false, false)
+  );
+}
+
+/**
+ * OPT-1033: last-known runtime keywords for a card about to leave the field,
+ * or `undefined` when they equal its printed keywords. A K.O. event stamps a
+ * defined value so a "without [Blocker]" watcher reads the keywords the card
+ * had on the field (negation and source auras are gone once it is in the
+ * trash). Leaving the common case unstamped keeps persisted events
+ * byte-identical; readers fall back to `printedFilterKeywords`.
+ */
+export function lastKnownKeywordsIfChanged(
+  card: CardInstance,
+  cardData: CardData,
+  state: GameState,
+  cardDb?: Map<string, CardData>
+): string[] | undefined {
+  const runtime = RUNTIME_FILTER_KEYWORDS.filter((keyword) =>
+    hasEffectiveKeyword(card, cardData, keyword, state, cardDb)
+  );
+  const printed = printedFilterKeywords(cardData);
+  return runtime.length === printed.length && runtime.every((k, i) => k === printed[i])
+    ? undefined
+    : runtime;
+}
+
 /**
  * Returns true if the card can attack this turn.
  * Characters cannot attack the turn they are played (summoning sickness),

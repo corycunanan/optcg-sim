@@ -621,7 +621,7 @@ Filters narrow valid targets. Key fields:
 
 **Name:** `name` (exact), `name_any_of` (array), `name_includes` (substring), `exclude_name`, `exclude_self`, `name_matching_ref` (match name from a prior result_ref)
 
-**Keywords:** `keywords` (array), `has_trigger`, `attribute`, `attribute_not`, `has_effect`, `no_base_effect`, `lacks_effect_type`, `has_counter`
+**Keywords:** `keywords` (array), `keywords_not` (array; runtime "without [Keyword]", negation-aware, last-known on K.O. watchers), `has_trigger`, `attribute`, `attribute_not`, `has_effect`, `no_base_effect`, `lacks_effect_type`, `has_counter`
 
 **Card Type:** `card_type` (`"CHARACTER"` | `"EVENT"` | `"STAGE"` | `"LEADER"` — filter by card category)
 

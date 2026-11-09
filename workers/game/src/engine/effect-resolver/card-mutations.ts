@@ -7,6 +7,7 @@ import { transitionCard, type ZoneTransitionFact } from "../zone-transition.js";
 
 import { findCardInstance } from "../state.js";
 import { getEffectiveBasePower } from "../modifiers.js";
+import { lastKnownKeywordsIfChanged } from "../keywords.js";
 
 type CardMutationResult = {
   state: GameState;
@@ -27,6 +28,9 @@ export function koCharacter(
   const data = card && cardDb.get(card.cardId);
   const preKO_basePower = card && data
     ? getEffectiveBasePower(card, data, snapshotState, cardDb)
+    : undefined;
+  const preKO_keywords = card && data
+    ? lastKnownKeywordsIfChanged(card, data, snapshotState, cardDb)
     : undefined;
   const moved = transitionCard(state, instanceId, "TRASH", {
     position: "TOP",
@@ -51,6 +55,7 @@ export function koCharacter(
         movementCause: "EFFECT",
         preKO_donCount: moved.fact.detachedDonInstanceIds.length,
         ...(preKO_basePower !== undefined ? { preKO_basePower } : {}),
+        ...(preKO_keywords !== undefined ? { preKO_keywords } : {}),
         ...(moved.fact.source === "STAGE" ? { cardType: "STAGE" as const } : {}),
       },
     }],
