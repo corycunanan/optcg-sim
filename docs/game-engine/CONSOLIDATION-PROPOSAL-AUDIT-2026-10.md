@@ -184,6 +184,8 @@ The 2026-07 audit closed every finding, but four are unnamed in the proposal and
 
 ### K. Documentation to correct in baseline work (Low)
 
+**Status (2026-11-09):** the Doc 08, rules-map and §1.6 items below are reconciled in the [OPT-956 checklist](./OPT-967-DRAIN-EVIDENCE.md#opt-956-reconciliation-2026-11-09). The line numbers below refer to the 2026-10 baseline. The `DISTRIBUTE_DON` and rules-version items have their own owners (OPT-955, OPT-957).
+
 - **Doc 08** has at least 14 stale guarantees beyond the four the proposal lists. Leg 5's table enumerates them with line numbers: "no backdoor" (lines 13, 269), step-3 interception (115, 321), zero-power K.O. (367, 899), `TURN_ENDED` (462), End Phase order (785–792), defeat after every action (109, 363, 881, 895), state-hash loop detection (371, 913), nested-trigger order (502, 508–540, 859), "events are the sole interface" (377), cost path "enters pipeline" (530, 544), "priority queue" (117), bound scheduled action discarded (832), rest-vs-activate (344). Preserve: copy-on-write (11), persisted context (21), undo checkpoint (104), cost façade (111).
 - **RULES-TO-ENGINE-MAP.md** marks §6-6-1-1-2 through §6-6-1-4, §8-6-1, §8-6-1-1, §8-6-2, §7-1-4-1-1-1, §1-2-1-1-2 as IMPL. The proposal's own tickets say otherwise. Line 52 calls the effect stack "LIFO"; §4A says timing is not generic LIFO.
 - **04-ACTIONS.md:1356-1380** documents `DISTRIBUTE_DON` params that do not match code (`don_per_target`/`max_targets` vs `amount`/`amount_per_target`/`don_state`); same for `GIVE_DON`.
