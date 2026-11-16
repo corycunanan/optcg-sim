@@ -79,3 +79,29 @@ describe("formatEvent damage direction (OPT-887)", () => {
     expect(formatEvent(self, cardDb, 0)?.text).toBe("You took damage");
   });
 });
+
+describe("formatEvent auto-resolved prompts", () => {
+  it("names the source card and what the engine decided", () => {
+    const gameEvent: GameEvent = {
+      type: "PROMPT_AUTO_RESOLVED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { detail: "Trashed the other 4 cards", cardId: "OP01-029" },
+    };
+    expect(formatEvent(gameEvent, cardDb, 0)?.text).toBe(
+      "Auto-resolved (Radical Beam!!): Trashed the other 4 cards"
+    );
+  });
+
+  it("omits the source when none is known", () => {
+    const gameEvent: GameEvent = {
+      type: "PROMPT_AUTO_RESOLVED",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { detail: "Chose 2, the only legal value" },
+    };
+    expect(formatEvent(gameEvent, cardDb, 0)?.text).toBe(
+      "Auto-resolved: Chose 2, the only legal value"
+    );
+  });
+});

@@ -413,6 +413,13 @@ export interface GameEventPayloadMap {
   PREGAME_PRIORITY_ROLLED: { rolls: [number, number]; priorityDeciderIndex: 0 | 1 };
   PREGAME_FIRST_PLAYER_DECIDED: { firstPlayerIndex: 0 | 1 };
   MULLIGAN_DECISION: { redrew: boolean };
+  /**
+   * A prompt the engine resolved itself because it had one meaningful answer
+   * (an order nobody keeps, top vs bottom of a 1-card Life, a single legal
+   * value, a "you may" that can do nothing). `detail` names what happened in
+   * player-facing words and never carries hidden card identities.
+   */
+  PROMPT_AUTO_RESOLVED: { detail: string; cardId?: string };
 }
 
 /** Union of all event type strings. */
@@ -470,6 +477,7 @@ export const ALL_GAME_EVENT_TYPES = [
   "PREGAME_PRIORITY_ROLLED",
   "PREGAME_FIRST_PLAYER_DECIDED",
   "MULLIGAN_DECISION",
+  "PROMPT_AUTO_RESOLVED",
 ] as const satisfies readonly GameEventType[];
 
 type _AllGameEventTypesCovered =
@@ -881,6 +889,12 @@ export interface ArrangeTopCardsPrompt {
   restDestination?: string;
   /** How many cards may be kept/picked ("play up to N"). Defaults to 1. */
   maxKeep?: number;
+  /**
+   * false when the order of the unpicked cards cannot matter (they are
+   * shuffled back, trashed, or rejoin a searched deck), so the client skips
+   * the reorder step. Absent = the order matters.
+   */
+  restOrderMatters?: boolean;
 }
 
 export interface SelectTargetPrompt {

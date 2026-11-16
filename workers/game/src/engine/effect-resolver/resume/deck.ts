@@ -25,6 +25,7 @@ import type { ActionResult } from "../types.js";
 import { isPresent } from "../../type-guards.js";
 import { getSearchAndPlayPickLimit } from "../action-utils.js";
 import { getDeckScryDestination } from "../actions/draw-search.js";
+import { cardCount, promptAutoResolvedEvent } from "../../auto-resolved.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -77,6 +78,28 @@ function resolveRestDestination(
   const normalized = schemaDestination.toUpperCase();
   if (normalized === "TOP_OR_BOTTOM") return requestedDestination;
   return normalized === "TOP" ? "top" : "bottom";
+}
+
+/**
+ * A single leftover card bound for one fixed end of the deck has one
+ * placement, so the client places it without a reorder step. Log it.
+ */
+function pushSingleRestPlacement(
+  state: GameState,
+  events: PendingEvent[],
+  controller: 0 | 1,
+  restCount: number,
+  schemaDestination: string,
+  sourceInstanceId: string | undefined,
+): void {
+  const normalized = schemaDestination.toUpperCase();
+  if (restCount !== 1 || (normalized !== "TOP" && normalized !== "BOTTOM")) return;
+  events.push(promptAutoResolvedEvent(
+    state,
+    controller,
+    `Placed 1 card on the ${normalized === "TOP" ? "top" : "bottom"} of the deck`,
+    sourceInstanceId,
+  ));
 }
 
 /**
@@ -236,6 +259,7 @@ export function handleArrangeSearchDeck(
   controller: 0 | 1,
   validTargets: string[] | undefined,
   events: PendingEvent[],
+  sourceInstanceId?: string,
 ): GameState | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "SEARCH_DECK") {
     return null;
@@ -270,6 +294,7 @@ export function handleArrangeSearchDeck(
 
   const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
+  pushSingleRestPlacement(nextState, events, controller, arrangedCards.length, restDest, sourceInstanceId);
 
   const current = nextState.players[controller];
   const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
@@ -284,6 +309,7 @@ export function handleArrangeSearchTrashTheRest(
   controller: 0 | 1,
   validTargets: string[] | undefined,
   events: PendingEvent[],
+  sourceInstanceId?: string,
 ): GameState | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "SEARCH_TRASH_THE_REST") {
     return null;
@@ -324,6 +350,15 @@ export function handleArrangeSearchTrashTheRest(
 
   if (restDest.toUpperCase() === "TRASH") {
     newDeck = restOfDeck;
+    // Rule 3-5-2: trash order is free, so there was no order to choose.
+    if (remainingCards.length > 0) {
+      events.push(promptAutoResolvedEvent(
+        nextState,
+        controller,
+        `Trashed the other ${cardCount(remainingCards.length)}`,
+        sourceInstanceId,
+      ));
+    }
     const moved = transitionCards(nextState, remainingCards.map((card) => card.instanceId), "TRASH", { position: "TOP" });
     nextState = moved.state;
     for (const transition of moved.transitions) {
@@ -342,6 +377,7 @@ export function handleArrangeSearchTrashTheRest(
     // Place at bottom (or top) like SEARCH_DECK
     const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, remainingCards, destination);
+    pushSingleRestPlacement(nextState, events, controller, remainingCards.length, restDest, sourceInstanceId);
   }
 
   const current = nextState.players[controller];
@@ -358,6 +394,7 @@ export function handleArrangeSearchAndPlay(
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
   validTargets?: string[],
+  sourceInstanceId?: string,
 ): GameState | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "SEARCH_AND_PLAY") {
     return null;
@@ -469,6 +506,17 @@ export function handleArrangeSearchAndPlay(
   } else {
     const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, [...arrangedCards, ...unplayable], destination);
+  }
+  // The prompt carried restOrderMatters: false, so no order was asked for.
+  if ((searchFullDeck || shuffleAfter) && arrangedCards.length > 0) {
+    events.push(promptAutoResolvedEvent(
+      nextState,
+      controller,
+      `Returned the other ${cardCount(arrangedCards.length)} to the deck${shuffleAfter ? " and shuffled it" : ""}`,
+      sourceInstanceId,
+    ));
+  } else if (!searchFullDeck && !shuffleAfter) {
+    pushSingleRestPlacement(nextState, events, controller, arrangedCards.length + unplayable.length, restDest, sourceInstanceId);
   }
 
   if (shuffleAfter) {

@@ -126,6 +126,16 @@ export function formatEvent(
         accent: "text-gb-text-bright",
       };
     }
+    case "PROMPT_AUTO_RESOLVED": {
+      const source = event.payload.cardId
+        ? ` (${cardName(event.payload.cardId)})`
+        : "";
+      return {
+        icon: "⏩",
+        text: `Auto-resolved${source}: ${event.payload.detail}`,
+        accent: "text-gb-text-dim",
+      };
+    }
     case "MULLIGAN_DECISION": {
       const action = event.payload.redrew ? "redrew" : "kept their hand";
       return { icon: "🃏", text: `${who} ${action}` };

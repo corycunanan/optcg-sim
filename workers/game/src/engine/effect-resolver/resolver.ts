@@ -1,3 +1,4 @@
+import { promptAutoResolvedEvent } from "../auto-resolved.js";
 import { prepareResumeProvenance, settleResumeProvenance } from "./resume-provenance.js";
 import { drainPendingWork } from "../pending-work-drain.js";
 import {
@@ -573,6 +574,12 @@ function resolveEffectCore(
       )
     ) {
       log("effect.skipped", { ...logCtx, reason: "no_legal_target" });
+      events.push(promptAutoResolvedEvent(
+        state,
+        controller,
+        "Skipped an optional effect with no legal target",
+        sourceCardInstanceId,
+      ));
       return { state, events, resolved: false, effectNotActivated: true };
     }
 
