@@ -150,6 +150,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
     validTargets: StringArray.optional(),
     restDestination: z.string().optional(),
     maxKeep: NonNegativeInteger.optional(),
+    restOrderMatters: z.boolean().optional(),
   }),
   z.strictObject({
     promptType: z.literal("SELECT_TARGET"),
@@ -765,6 +766,10 @@ const EventPayloadSchemas = {
     firstPlayerIndex: PlayerIndex,
   }),
   MULLIGAN_DECISION: z.strictObject({ redrew: z.boolean() }),
+  PROMPT_AUTO_RESOLVED: z.strictObject({
+    detail: z.string(),
+    cardId: z.string().optional(),
+  }),
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {

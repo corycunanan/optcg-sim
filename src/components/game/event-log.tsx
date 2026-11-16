@@ -205,6 +205,15 @@ export function formatEvent(
             : "Opponent";
       return out([`${firstPlayer} will go first`], "text-gb-text-bright");
     }
+    case "PROMPT_AUTO_RESOLVED": {
+      const detail = event.payload.detail;
+      return out(
+        event.payload.cardId
+          ? ["Auto-resolved (", card(event.payload.cardId), `): ${detail}`]
+          : [`Auto-resolved: ${detail}`],
+        "text-gb-text-dim",
+      );
+    }
     case "MULLIGAN_DECISION": {
       const action = event.payload.redrew ? "redrew" : "kept their hand";
       return out([`${who} ${action}`]);

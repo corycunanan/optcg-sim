@@ -184,6 +184,9 @@ export function executeSearchTrashTheRest(
       validTargets,
       restDestination: restDest,
       maxKeep: getSearchAndPlayPickLimit(p_, validTargets.length),
+      // Rule 3-5-2: a player may reorder their trash freely, so the order of
+      // trashed cards is not a decision.
+      ...(restDest.toUpperCase() === "TRASH" ? { restOrderMatters: false } : {}),
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
@@ -297,6 +300,7 @@ export function executeFullDeckSearch(
       effectDescription,
       canSendToBottom: false,
       validTargets,
+      restOrderMatters: false,
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

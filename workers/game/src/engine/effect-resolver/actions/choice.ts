@@ -1,3 +1,4 @@
+import { promptAutoResolvedEvent } from "../../auto-resolved.js";
 import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
 import { REPLACED_CARD_REF } from "../../effect-types.js";
 /**
@@ -200,6 +201,22 @@ export function executeChooseValue(
   }
   if (values.length === 0 || values.length > 100) {
     return { state, events: [], succeeded: false };
+  }
+
+  // One legal value is no choice: record it as if chosen, the same result
+  // the resume handler stores (handleChooseValue), and continue in place.
+  if (values.length === 1 && action.result_ref) {
+    return {
+      state,
+      events: [promptAutoResolvedEvent(
+        state,
+        controller,
+        `Chose ${values[0]}, the only legal value`,
+        sourceCardInstanceId,
+      )],
+      succeeded: true,
+      result: { targetInstanceIds: [], count: 1, value: values[0] },
+    };
   }
 
   const validTargets = values.map((value) => `choose-value:${value}`);
