@@ -193,6 +193,8 @@ interface ArrangeTopCardsModalProps {
   validTargets?: string[];
   /** How many cards may be kept ("up to N"). Defaults to 1. 0 = reorder only. */
   maxKeep?: number;
+  /** false = the leftover order is discarded, so there is no reorder step. */
+  restOrderMatters?: boolean;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -214,6 +216,7 @@ export function ArrangeTopCardsModal({
   restDestination,
   validTargets,
   maxKeep = 1,
+  restOrderMatters = true,
   cardDb,
   isHidden,
   onHide,
@@ -316,8 +319,12 @@ export function ArrangeTopCardsModal({
     const remaining = orderedCards.filter((c) => !kept.includes(c.instanceId));
     setKeptIds(kept);
     setSelectedIds(new Set());
-    // Nothing left to order: the only remaining decision is already fixed.
-    if (remaining.length === 0 && destinations.length === 1) {
+    // Nothing left to decide: no order is kept, or at most one card goes to
+    // a single fixed destination.
+    if (
+      !restOrderMatters ||
+      (remaining.length <= 1 && destinations.length === 1)
+    ) {
       submit(kept, remaining, destinations[0]);
       return;
     }

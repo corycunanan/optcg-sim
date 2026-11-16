@@ -75,6 +75,7 @@ export function BoardModals({
             restDestination={activePrompt.restDestination}
             validTargets={activePrompt.validTargets}
             maxKeep={activePrompt.maxKeep}
+            restOrderMatters={activePrompt.restOrderMatters}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}

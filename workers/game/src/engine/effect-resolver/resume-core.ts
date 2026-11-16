@@ -145,7 +145,8 @@ function resumeEffectChainCore(
     pausedAction,
     controller,
     validTargets,
-    events
+    events,
+    effectSourceInstanceId
   );
   if (deckSearch) nextState = deckSearch;
 
@@ -155,7 +156,8 @@ function resumeEffectChainCore(
     pausedAction,
     controller,
     validTargets,
-    events
+    events,
+    effectSourceInstanceId
   );
   if (deckTrashRest) nextState = deckTrashRest;
 
@@ -166,7 +168,8 @@ function resumeEffectChainCore(
     controller,
     cardDb,
     events,
-    validTargets
+    validTargets,
+    effectSourceInstanceId
   );
   if (deckAndPlay) nextState = deckAndPlay;
 

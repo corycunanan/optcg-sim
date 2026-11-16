@@ -1,3 +1,4 @@
+import { cardCount, promptAutoResolvedEvent } from "../../auto-resolved.js";
 import { getPlayEntryState } from "../../play-entry-state.js";
 /**
  * Action handlers: All 14 life actions
@@ -569,7 +570,7 @@ export function executeAddToLifeFromField(
 
   const params = action.params ?? {};
   const face = params.face ?? "DOWN";
-  const position = params.position ?? "TOP";
+  let position = params.position ?? "TOP";
   const movableIds = targetIds.filter((id) => {
     const card = findCardInstance(state, id);
     return (
@@ -588,6 +589,23 @@ export function executeAddToLifeFromField(
     );
   });
   if (movableIds.length === 0) return { state, events, succeeded: false };
+
+  // Into an empty Life, top and bottom give the same stack: no choice.
+  if (
+    position === "TOP_OR_BOTTOM" &&
+    movableIds.every((id) => {
+      const card = findCardInstance(state, id);
+      return card !== null && card !== undefined && state.players[card.owner].life.length === 0;
+    })
+  ) {
+    position = "TOP";
+    events.push(promptAutoResolvedEvent(
+      state,
+      controller,
+      `Added ${cardCount(movableIds.length)} to an empty Life (top and bottom are the same)`,
+      sourceCardInstanceId,
+    ));
+  }
 
   if (position === "TOP_OR_BOTTOM") {
     // Bind responses to the already-selected identities. No card moves until

@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
-import type { CardDb, PromptOptions } from "@shared/game-types";
+import type { CardDb, GameAction, PromptOptions } from "@shared/game-types";
 import { sandboxBoardPrompt } from "@/components/sandbox/sandbox-board-prompt";
 
 vi.mock("@/components/ui", () => {
@@ -196,6 +196,75 @@ describe("ARRANGE_TOP_CARDS prompt identity", () => {
     await act(async () => {
       renderer.update(arrangeModals(null));
     });
+    expect(arrangeText(renderer)).toContain("Order the remaining");
+  });
+});
+
+describe("ARRANGE_TOP_CARDS skips a reorder with nothing to decide", () => {
+  const render = async (
+    prompt: Extract<PromptOptions, { promptType: "ARRANGE_TOP_CARDS" }>,
+    onAction: (action: GameAction) => void,
+  ) => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <BoardModals
+          activePrompt={prompt}
+          activePromptId="prompt-a"
+          isPromptHidden={false}
+          onHide={vi.fn()}
+          cardDb={{} as CardDb}
+          onAction={onAction}
+          zonePreview={null}
+          onCloseZonePreview={vi.fn()}
+          me={null}
+          opp={null}
+          redistributeTransfers={[]}
+          onRedistributeUndo={vi.fn()}
+        />,
+      );
+    });
+    return renderer;
+  };
+
+  it("submits right after the pick when the rest's order is discarded", async () => {
+    const onAction = vi.fn<(action: GameAction) => void>();
+    const renderer = await render(
+      { ...arrangePrompt, cards: [...arrangeCards], restOrderMatters: false },
+      onAction,
+    );
+    await skipToStepTwo(renderer);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction.mock.calls[0][0]).toMatchObject({
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceIds: [],
+      orderedInstanceIds: arrangeCards.map((card) => card.instanceId),
+    });
+  });
+
+  it("places a single leftover card without a reorder step", async () => {
+    const onAction = vi.fn<(action: GameAction) => void>();
+    const renderer = await render(
+      { ...arrangePrompt, cards: arrangeCards.slice(0, 1) },
+      onAction,
+    );
+    await skipToStepTwo(renderer);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction.mock.calls[0][0]).toMatchObject({
+      type: "ARRANGE_TOP_CARDS",
+      orderedInstanceIds: [arrangeCards[0].instanceId],
+      destination: "bottom",
+    });
+  });
+
+  it("still asks for the order of two or more leftover cards", async () => {
+    const onAction = vi.fn<(action: GameAction) => void>();
+    const renderer = await render(
+      { ...arrangePrompt, cards: [...arrangeCards] },
+      onAction,
+    );
+    await skipToStepTwo(renderer);
+    expect(onAction).not.toHaveBeenCalled();
     expect(arrangeText(renderer)).toContain("Order the remaining");
   });
 });
