@@ -72,31 +72,17 @@ export function useInPlaceTargetSelection({
     setSelectionState({ promptKey, selectedIds: EMPTY_SELECTION });
   }, [promptKey]);
 
+  // Escape clears the selection. A click on empty board no longer does
+  // (OPT-776): a stray click would wipe a multi-card pick.
   useEffect(() => {
     if (!inPlacePrompt) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") clear();
     };
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (
-        target.closest(
-          "[data-target-selection], [data-target-selection-control]"
-        )
-      ) {
-        return;
-      }
-      clear();
-    };
 
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [clear, inPlacePrompt]);
 
   const toggle = useCallback(

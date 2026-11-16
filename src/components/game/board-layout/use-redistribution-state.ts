@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { PromptOptions } from "@shared/game-types";
-import type { RedistributeTransfer } from "../redistribute-don-overlay";
+
+export interface RedistributeTransfer {
+  fromCardInstanceId: string;
+  donInstanceId: string;
+  toCardInstanceId: string;
+}
 
 type RedistributePrompt = Extract<
   PromptOptions,

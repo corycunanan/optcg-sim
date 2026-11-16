@@ -19,6 +19,7 @@ import {
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
+  NAVBAR_H,
 } from "./constants";
 import {
   boardZoneKey,
@@ -31,7 +32,9 @@ import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
-import { MidZone } from "./mid-zone";
+import { PromptPanel } from "./prompt-panel";
+import { TurnPill, type TurnOwner } from "./turn-pill";
+import { EventLog } from "../event-log";
 import { CardAnimationLayer } from "./card-animation-layer";
 import { BoardNavbar } from "./board-navbar";
 import { OpponentField } from "./opponent-field";
@@ -75,6 +78,9 @@ import { mergeDonCountAdjustments } from "./don-count-adjustments";
 // Transient pulse hooks intentionally produce no pulses under reduced motion,
 // but their empty collections can be recreated on a parent render. Reuse one
 // bundle so those no-op values do not pierce the field memo boundaries.
+/** Inset of the left column (prompt panel + event log) from the canvas edge. */
+const RAIL_MARGIN = 16;
+
 const EMPTY_FIELD_PULSE_PROPS = {
   winnerPulseIds: new Set<string>(),
   powerModPulses: new Map<string, PowerModPulse>(),
@@ -212,6 +218,34 @@ function BoardLayoutInner({
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
+  // The left gutter beside the scaled board hosts the prompt panel and log.
+  const gutterWidth = Math.max(0, (viewport.width - FIELD_W * boardScale) / 2);
+  const railWidth = Math.max(0, gutterWidth - 2 * RAIL_MARGIN);
+  const turnOwner: TurnOwner = !turn
+    ? null
+    : myIndex === null || spectatorMode
+      ? turn.activePlayerIndex
+      : turn.activePlayerIndex === myIndex
+        ? "me"
+        : "opp";
+  const lookupInstance = useMemo(() => {
+    const ids = new Map<string, string>();
+    for (const player of [me, opp]) {
+      if (!player) continue;
+      const cards = [
+        player.leader,
+        player.stage,
+        ...player.characters,
+        ...player.hand,
+        ...player.trash,
+        ...player.life,
+      ];
+      for (const card of cards) {
+        if (card && cardDb[card.cardId]) ids.set(card.instanceId, card.cardId);
+      }
+    }
+    return (instanceId: string) => ids.get(instanceId);
+  }, [me, opp, cardDb]);
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
   // Block/Skip and blocker selection yield to a pending in-place SELECT_TARGET
@@ -476,56 +510,7 @@ function BoardLayoutInner({
             onTargetToggle={modalRouting.targetSelection.toggle}
           />
 
-          <MidZone
-            top={midTop}
-            isMyTurn={isMyTurn}
-            phase={bs.phase}
-            canEndPhase={
-              boardInputEnabled &&
-              bs.canEndPhase &&
-              !boardPrompt &&
-              !spotlight.isBlockingPrompt
-            }
-            canPass={
-              boardInputEnabled &&
-              bs.canPass &&
-              !boardPrompt &&
-              !spotlight.isBlockingPrompt
-            }
-            inBattle={bs.inBattle}
-            activePrompt={boardPrompt}
-            rejectionReason={actionRejection?.reason ?? null}
-            battleInfo={bs.battleInfo}
-            blockerMode={blockStepInputEnabled ? {
-              selectedBlockerId: bs.selectedBlockerId,
-              onBlock: () => {
-                if (bs.selectedBlockerId) {
-                  dispatchBoardAction({ type: "DECLARE_BLOCKER", blockerInstanceId: bs.selectedBlockerId });
-                  bs.setSelectedBlockerId(null);
-                }
-              },
-            } : undefined}
-            targetSelectionMode={
-              modalRouting.targetSelection.prompt && modalRouting.targetSelection.model
-                ? {
-                    effectDescription: modalRouting.targetSelection.prompt.effectDescription,
-                    countLabel: modalRouting.targetSelection.model.countLabel,
-                    selectedCount: modalRouting.targetSelection.model.selectedCount,
-                    aggregateLabel: modalRouting.targetSelection.model.aggregateLabel,
-                    canConfirm: modalRouting.targetSelection.model.canConfirm,
-                    canSkip: modalRouting.targetSelection.prompt.countMin === 0,
-                    onConfirm: modalRouting.targetSelection.confirm,
-                    onSkip: modalRouting.targetSelection.skip,
-                  }
-                : undefined
-            }
-            isPromptHidden={modalRouting.isPromptHidden}
-            onShowPrompt={modalRouting.showPrompt}
-            canUndo={
-              boardInputEnabled && canUndo && !spotlight.isBlockingPrompt
-            }
-            onAction={dispatchBoardAction}
-          />
+          <TurnPill top={midTop} owner={turnOwner} turnNumber={turn?.number ?? null} />
 
           <PlayerField
             me={bottomPlayer}
@@ -581,6 +566,95 @@ function BoardLayoutInner({
             onTargetToggle={modalRouting.targetSelection.toggle}
           />
         </div>
+      </div>
+
+      {/* ── Left column: prompt panel + event log (OPT-776) ───────── */}
+      <div
+        className="absolute flex flex-col gap-4"
+        style={{
+          left: RAIL_MARGIN,
+          top: NAVBAR_H + RAIL_MARGIN,
+          bottom: RAIL_MARGIN,
+          width: railWidth,
+        }}
+        data-left-rail=""
+      >
+        <div className="flex min-h-0 flex-1 flex-col justify-center">
+          <PromptPanel
+            isMyTurn={isMyTurn && !spectatorMode}
+            phase={bs.phase}
+            canEndPhase={
+              boardInputEnabled &&
+              bs.canEndPhase &&
+              !boardPrompt &&
+              !spotlight.isBlockingPrompt
+            }
+            canPass={
+              boardInputEnabled &&
+              bs.canPass &&
+              !boardPrompt &&
+              !spotlight.isBlockingPrompt
+            }
+            activePrompt={boardPrompt}
+            rejectionReason={actionRejection?.reason ?? null}
+            battleInfo={bs.battleInfo}
+            blockerMode={blockStepInputEnabled ? {
+              selectedBlockerId: bs.selectedBlockerId,
+              onBlock: () => {
+                if (bs.selectedBlockerId) {
+                  dispatchBoardAction({ type: "DECLARE_BLOCKER", blockerInstanceId: bs.selectedBlockerId });
+                  bs.setSelectedBlockerId(null);
+                }
+              },
+            } : undefined}
+            targetSelectionMode={
+              modalRouting.targetSelection.prompt && modalRouting.targetSelection.model
+                ? {
+                    effectDescription: modalRouting.targetSelection.prompt.effectDescription,
+                    instruction: modalRouting.targetSelection.prompt.instruction,
+                    sourceCard: modalRouting.targetSelection.prompt.sourceCard,
+                    countLabel: modalRouting.targetSelection.model.countLabel,
+                    selectedCount: modalRouting.targetSelection.model.selectedCount,
+                    aggregateLabel: modalRouting.targetSelection.model.aggregateLabel,
+                    canConfirm: modalRouting.targetSelection.model.canConfirm,
+                    canSkip: modalRouting.targetSelection.prompt.countMin === 0,
+                    onConfirm: modalRouting.targetSelection.confirm,
+                    onSkip: modalRouting.targetSelection.skip,
+                  }
+                : undefined
+            }
+            redistributeMode={
+              interactiveBoardOverlaysEnabled &&
+              boardPrompt?.promptType === "REDISTRIBUTE_DON"
+                ? {
+                    effectDescription: boardPrompt.effectDescription,
+                    maxTransfers: boardPrompt.maxTransfers,
+                    transfers: redistribution.transfers,
+                    onUndo: redistribution.undo,
+                  }
+                : undefined
+            }
+            opponentChoosing={
+              !boardPrompt &&
+              promptRespondingPlayer !== null &&
+              promptRespondingPlayer !== myIndex
+            }
+            isPromptHidden={modalRouting.isPromptHidden}
+            onShowPrompt={modalRouting.showPrompt}
+            canUndo={
+              boardInputEnabled && canUndo && !spotlight.isBlockingPrompt
+            }
+            cardDb={cardDb}
+            onAction={dispatchBoardAction}
+          />
+        </div>
+        <EventLog
+          events={eventLog}
+          cardDb={cardDb}
+          myIndex={myIndex}
+          lookupInstance={lookupInstance}
+          className="max-h-[40%] shrink-0"
+        />
       </div>
 
       {/* ── Player Hand Layer ──────────────────────────────────────── */}
@@ -646,8 +720,6 @@ function BoardLayoutInner({
             onCloseZonePreview={modalRouting.closeZonePreview}
             me={me}
             opp={opp}
-            redistributeTransfers={redistribution.transfers}
-            onRedistributeUndo={redistribution.undo}
             selectTargetInPlace={modalRouting.targetSelectionActive}
           />
 

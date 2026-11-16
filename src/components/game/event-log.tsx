@@ -1,104 +1,188 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { damagedPlayerOf, type CardDb, type GameEvent } from "@shared/game-types";
+import {
+  damagedPlayerOf,
+  type CardDb,
+  type GameEvent,
+} from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui";
+import { EffectInline } from "@/components/cards/effect-text";
+import { CardTooltip } from "./use-card-tooltip";
 
-interface EventLogProps {
-  events: GameEvent[];
-  cardDb: CardDb;
-  myIndex: 0 | 1 | null;
+/** One run of an event-log line. Text runs may carry printed notation
+ *  (`[Trigger]`, `[Counter]`, `[Blocker]`), which renders as the same inline
+ *  chips the card inspection modal uses. Card runs name a card and open its
+ *  inspection tooltip on hover. */
+export type EventLogPart =
+  | { kind: "text"; text: string }
+  | { kind: "card"; cardId: string; name: string };
+
+export interface FormattedEvent {
+  /** Plain-text reading of the line (card names and notation inline). */
+  text: string;
+  parts: EventLogPart[];
+  accent?: string;
 }
 
-/** Human-readable label for a game event */
+/** Resolves an instance id to its card id from the current visible state. */
+export type InstanceCardLookup = (instanceId: string) => string | undefined;
+
+type CardRef = { cardId: string };
+
+function line(
+  items: Array<string | CardRef>,
+  cardDb: CardDb,
+  accent?: string,
+): FormattedEvent {
+  const parts: EventLogPart[] = items.map((item) =>
+    typeof item === "string"
+      ? { kind: "text", text: item }
+      : {
+          kind: "card",
+          cardId: item.cardId,
+          name: cardDb[item.cardId]?.name ?? item.cardId,
+        },
+  );
+  const text = parts
+    .map((part) => (part.kind === "text" ? part.text : part.name))
+    .join("");
+  return accent ? { text, parts, accent } : { text, parts };
+}
+
+/** Human-readable line for a game event, or `null` when it is not logged. */
 export function formatEvent(
   event: GameEvent,
   cardDb: CardDb,
   myIndex: 0 | 1 | null,
-): { icon: string; text: string; accent?: string } | null {
+  lookupInstance: InstanceCardLookup = () => undefined,
+): FormattedEvent | null {
   const who = event.playerIndex === myIndex ? "You" : "Opponent";
-  const cardName = (id?: unknown) => {
-    if (!id || typeof id !== "string") return "a card";
-    return cardDb[id]?.name ?? id;
+  const card = (id?: unknown): CardRef | string =>
+    typeof id === "string" && id ? { cardId: id } : "a card";
+  const instance = (instanceId?: unknown): CardRef | null => {
+    if (typeof instanceId !== "string") return null;
+    const cardId = lookupInstance(instanceId);
+    return cardId ? { cardId } : null;
   };
+  const out = (items: Array<string | CardRef>, accent?: string) =>
+    line(items, cardDb, accent);
 
   switch (event.type) {
     case "CARD_PLAYED": {
-      const name = cardName(event.payload.cardId);
-      const zone = event.payload.zone;
-      if (zone === "TRASH") return { icon: "🎴", text: `${who} played event ${name}`, accent: "text-gb-accent-purple" };
-      return { icon: "🃏", text: `${who} played ${name}` };
+      if (event.payload.zone === "TRASH") {
+        return out(
+          [`${who} played event `, card(event.payload.cardId)],
+          "text-gb-accent-purple",
+        );
+      }
+      return out([`${who} played `, card(event.payload.cardId)]);
     }
     case "CARD_DRAWN":
-      return { icon: "📥", text: `${who} drew a card` };
-    case "CARD_KO": {
-      const name = cardName(event.payload.cardId);
-      return { icon: "💀", text: `${name} was K.O.'d`, accent: "text-gb-accent-red" };
-    }
+      return out([`${who} drew a card`]);
+    case "CARD_KO":
+      return out(
+        [card(event.payload.cardId), " was K.O.'d"],
+        "text-gb-accent-red",
+      );
     case "CARD_TRASHED": {
-      const name = cardName(event.payload.cardId);
       const reason = event.payload.reason;
-      if (reason === "overflow") return { icon: "🗑️", text: `${name} trashed (overflow)` };
-      if (reason === "stage_replaced") return { icon: "🗑️", text: `${name} trashed (stage replaced)` };
-      return { icon: "🗑️", text: `${name} trashed` };
+      const suffix =
+        reason === "overflow"
+          ? " trashed (overflow)"
+          : reason === "stage_replaced"
+            ? " trashed (stage replaced)"
+            : " trashed";
+      return out([card(event.payload.cardId), suffix]);
     }
-    case "CARD_RETURNED_TO_HAND": {
-      const name = cardName(event.payload.cardId);
-      return { icon: "↩️", text: `${name} returned to hand` };
-    }
+    case "CARD_RETURNED_TO_HAND":
+      return out([card(event.payload.cardId), " returned to hand"]);
     case "ATTACK_DECLARED": {
-      return { icon: "⚔️", text: `${who} declared an attack`, accent: "text-gb-accent-amber" };
+      const attacker = instance(event.payload.attackerInstanceId);
+      const target = instance(event.payload.targetInstanceId);
+      if (attacker && target) {
+        return out(
+          [attacker, " attacked ", target],
+          "text-gb-accent-amber",
+        );
+      }
+      return out([`${who} declared an attack`], "text-gb-accent-amber");
     }
     case "BLOCK_DECLARED": {
-      return { icon: "🛡️", text: `${who} declared a blocker`, accent: "text-gb-accent-blue" };
+      const blocker = instance(event.payload.blockerInstanceId);
+      if (blocker) {
+        return out(
+          ["[Blocker] ", `${who} blocked with `, blocker],
+          "text-gb-accent-blue",
+        );
+      }
+      return out(
+        ["[Blocker] ", `${who} declared a blocker`],
+        "text-gb-accent-blue",
+      );
     }
     case "COUNTER_USED": {
-      const name = cardName(event.payload.cardId);
-      return { icon: "🔄", text: `${who} used counter ${name}` };
+      const value = event.payload.counterValue;
+      return out([
+        "[Counter] ",
+        `${who} used `,
+        card(event.payload.cardId),
+        ...(typeof value === "number" && value > 0 ? [` (+${value})`] : []),
+      ]);
     }
     case "DAMAGE_DEALT": {
       // OPT-887: playerIndex is the dealer; name the player who took it.
       const damaged = damagedPlayerOf(event) === myIndex ? "You" : "Opponent";
-      return { icon: "💥", text: `${damaged} took damage`, accent: "text-gb-accent-red" };
+      return out([`${damaged} took damage`], "text-gb-accent-red");
     }
     case "TRIGGER_ACTIVATED": {
       if (event.payload.activated !== true) return null;
-      const name = cardName(event.payload.cardId);
-      return { icon: "⚡", text: `Trigger: ${name}`, accent: "text-gb-accent-purple" };
+      return out(
+        ["[Trigger] ", `${who} activated `, card(event.payload.cardId)],
+        "text-gb-accent-purple",
+      );
     }
     case "CARDS_REVEALED": {
       const count = event.payload.cards.length;
       if (event.payload.visibility === "CONTROLLER_ONLY") {
         if (event.payload.visibleTo !== myIndex) return null;
-        return {
-          icon: "👁️",
-          text: `${who} looked at ${count} ${count === 1 ? "card" : "cards"}`,
-          accent: "text-gb-accent-blue",
-        };
+        return out(
+          [`${who} looked at ${count} ${count === 1 ? "card" : "cards"}`],
+          "text-gb-accent-blue",
+        );
       }
-      const names = event.payload.cards.map((card) => cardName(card.cardId));
-      return {
-        icon: "👁️",
-        text: `${who} revealed ${names.join(", ")}`,
-        accent: "text-gb-accent-amber",
-      };
+      const items: Array<string | CardRef> = [`${who} revealed `];
+      event.payload.cards.forEach((revealed, index) => {
+        if (index > 0) items.push(", ");
+        items.push(card(revealed.cardId));
+      });
+      return out(items, "text-gb-accent-amber");
     }
     case "DON_GIVEN_TO_CARD": {
+      const target = instance(event.payload.targetInstanceId);
       const count = event.payload.count;
-      return { icon: "🔴", text: `${who} attached ${count} DON!!` };
+      return out(
+        target
+          ? [`${who} gave ${count} DON!! to `, target]
+          : [`${who} gave ${count} DON!!`],
+      );
     }
     case "POWER_MODIFIED": {
       const amount = event.payload.amount ?? event.payload.value ?? 0;
       const sign = amount > 0 ? "+" : "";
-      return { icon: "💪", text: `Power ${sign}${amount}`, accent: amount > 0 ? "text-gb-accent-green" : "text-gb-accent-red" };
+      const target = instance(event.payload.targetInstanceId);
+      return out(
+        target
+          ? [target, ` power ${sign}${amount}`]
+          : [`Power ${sign}${amount}`],
+        amount > 0 ? "text-gb-accent-green" : "text-gb-accent-red",
+      );
     }
     case "TURN_STARTED":
-      return { icon: "🔄", text: `${who}'s turn`, accent: "text-gb-text-bright" };
-    case "GAME_OVER": {
-      const reason = event.payload.reason;
-      return { icon: "🏁", text: `Game over: ${reason}`, accent: "text-gb-accent-amber" };
-    }
+      return out([`${who === "You" ? "Your" : "Opponent's"} turn`], "text-gb-text-bright");
+    case "GAME_OVER":
+      return out([`Game over: ${event.payload.reason}`], "text-gb-accent-amber");
     case "PREGAME_PRIORITY_ROLLED": {
       const [r0, r1] = event.payload.rolls;
       const winner =
@@ -107,11 +191,10 @@ export function formatEvent(
           : event.payload.priorityDeciderIndex === myIndex
             ? "You"
             : "Opponent";
-      return {
-        icon: "🎲",
-        text: `Priority roll: P1 ${r0} vs P2 ${r1} — ${winner} won`,
-        accent: "text-gb-accent-amber",
-      };
+      return out(
+        [`Priority roll: P1 ${r0} vs P2 ${r1}, ${winner} won`],
+        "text-gb-accent-amber",
+      );
     }
     case "PREGAME_FIRST_PLAYER_DECIDED": {
       const firstPlayer =
@@ -120,15 +203,11 @@ export function formatEvent(
           : event.payload.firstPlayerIndex === myIndex
             ? "You"
             : "Opponent";
-      return {
-        icon: "▶️",
-        text: `${firstPlayer} will go first`,
-        accent: "text-gb-text-bright",
-      };
+      return out([`${firstPlayer} will go first`], "text-gb-text-bright");
     }
     case "MULLIGAN_DECISION": {
       const action = event.payload.redrew ? "redrew" : "kept their hand";
-      return { icon: "🃏", text: `${who} ${action}` };
+      return out([`${who} ${action}`]);
     }
     case "PHASE_CHANGED":
     case "TURN_ENDED":
@@ -145,7 +224,72 @@ export function formatEvent(
   }
 }
 
-export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
+/** A card named in the log: underlined, and hovering or focusing it opens the
+ *  same card inspection tooltip a board card opens. */
+function EventLogCardName({
+  cardId,
+  name,
+  cardDb,
+}: {
+  cardId: string;
+  name: string;
+  cardDb: CardDb;
+}) {
+  return (
+    <CardTooltip data={cardDb[cardId] ?? null} cardId={cardId}>
+      <span
+        tabIndex={cardDb[cardId] ? 0 : undefined}
+        data-event-log-card={cardId}
+        className="cursor-help underline decoration-gb-text-subtle underline-offset-2 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-gb-accent-blue"
+      >
+        {name}
+      </span>
+    </CardTooltip>
+  );
+}
+
+export function EventLogLine({
+  entry,
+  cardDb,
+}: {
+  entry: FormattedEvent;
+  cardDb: CardDb;
+}) {
+  return (
+    <p className={cn("text-sm leading-relaxed", entry.accent ?? "text-gb-text")}>
+      {entry.parts.map((part, index) =>
+        part.kind === "card" ? (
+          <EventLogCardName
+            key={index}
+            cardId={part.cardId}
+            name={part.name}
+            cardDb={cardDb}
+          />
+        ) : (
+          <EffectInline key={index} text={part.text} />
+        ),
+      )}
+    </p>
+  );
+}
+
+interface EventLogProps {
+  events: GameEvent[];
+  cardDb: CardDb;
+  myIndex: 0 | 1 | null;
+  lookupInstance?: InstanceCardLookup;
+  className?: string;
+}
+
+/** The game's event log, docked in the board's left column under the prompt
+ *  panel. Collapsible; follows the newest entry. */
+export function EventLog({
+  events,
+  cardDb,
+  myIndex,
+  lookupInstance,
+  className,
+}: EventLogProps) {
   const [collapsed, setCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
@@ -158,25 +302,27 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
     prevCountRef.current = events.length;
   }, [events.length]);
 
-  // Format only the displayable events
-  const displayEvents = events
-    .map((e, i) => ({ key: i, ...formatEvent(e, cardDb, myIndex) }))
-    .filter((e): e is { key: number; icon: string; text: string; accent?: string } => e.icon !== undefined);
+  const displayEvents = events.flatMap((event, index) => {
+    const formatted = formatEvent(event, cardDb, myIndex, lookupInstance);
+    return formatted ? [{ key: index, entry: formatted }] : [];
+  });
 
   // Show last 100 max
   const visibleEvents = displayEvents.slice(-100);
 
   return (
     <div
+      data-event-log=""
       className={cn(
-        "fixed bottom-3 left-3 z-[100] flex flex-col rounded-lg border border-gb-border-strong bg-gb-surface/95 backdrop-blur-sm shadow-lg transition-all duration-200",
-        collapsed ? "w-[180px]" : "w-[280px]",
+        "flex min-h-0 w-full flex-col rounded-lg border border-gb-border-strong bg-gb-surface",
+        className,
       )}
     >
-      {/* Header */}
       <button
+        type="button"
+        aria-expanded={!collapsed}
         onClick={() => setCollapsed((v) => !v)}
-        className="flex items-center justify-between px-3 py-2 cursor-pointer border-b border-gb-border-subtle hover:bg-gb-surface-raised transition-colors rounded-t-lg"
+        className="flex shrink-0 cursor-pointer items-center justify-between rounded-t-lg border-b border-gb-border-subtle px-3 py-2 transition-colors hover:bg-gb-surface-raised"
       >
         <span className="text-sm font-semibold uppercase tracking-widest text-gb-text-dim">
           Event Log
@@ -192,6 +338,7 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
             height="12"
             viewBox="0 0 12 12"
             fill="currentColor"
+            aria-hidden
             className={cn(
               "text-gb-text-dim transition-transform duration-200",
               collapsed && "rotate-180",
@@ -202,31 +349,22 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
         </div>
       </button>
 
-      {/* Event list */}
       {!collapsed && (
         <div
           ref={scrollRef}
-          className="overflow-y-auto max-h-[200px] px-1 py-1 scrollbar-thin"
+          className="min-h-0 flex-1 overflow-y-auto px-1 py-1 scrollbar-thin"
         >
           {visibleEvents.length === 0 ? (
             <p className="text-sm text-gb-text-dim px-2 py-3 text-center italic">
               No events yet
             </p>
           ) : (
-            visibleEvents.map((entry) => (
+            visibleEvents.map(({ key, entry }) => (
               <div
-                key={entry.key}
-                className="flex items-start gap-1 px-2 py-1 rounded-md hover:bg-gb-surface-raised/50 transition-colors"
+                key={key}
+                className="rounded-md px-2 py-1 transition-colors hover:bg-gb-surface-raised/50"
               >
-                <span className="text-sm leading-5 shrink-0">{entry.icon}</span>
-                <span
-                  className={cn(
-                    "text-sm leading-5",
-                    entry.accent ?? "text-gb-text",
-                  )}
-                >
-                  {entry.text}
-                </span>
+                <EventLogLine entry={entry} cardDb={cardDb} />
               </div>
             ))
           )}

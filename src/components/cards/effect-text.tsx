@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import {
+  parseEffectLine,
   parseEffectText,
   type EffectNotationFamily,
   type EffectSegment,
@@ -202,4 +203,15 @@ export function EffectText({
       ))}
     </div>
   );
+}
+
+/**
+ * One line of notation-bearing prose set inline, with the same chips as
+ * `EffectText` but no paragraph wrapper or type size of its own: it inherits
+ * the surrounding run's size and color. Used where a sentence that is not
+ * card text names notation, such as the game event log (`[Trigger]`,
+ * `[Counter]`, `[Blocker]`).
+ */
+export function EffectInline({ text }: { text: string }) {
+  return <>{renderSegments(parseEffectLine(text))}</>;
 }

@@ -70,8 +70,6 @@ const boardModals = (activePromptId: string) => {
       onCloseZonePreview={vi.fn()}
       me={null}
       opp={null}
-      redistributeTransfers={[]}
-      onRedistributeUndo={vi.fn()}
     />
   );
 };
@@ -139,8 +137,6 @@ const arrangeModals = (activePromptId: string | null) => (
     onCloseZonePreview={vi.fn()}
     me={null}
     opp={null}
-    redistributeTransfers={[]}
-    onRedistributeUndo={vi.fn()}
   />
 );
 
@@ -252,8 +248,6 @@ describe("actionLabel titles every effect modal (OPT-779)", () => {
           onCloseZonePreview={vi.fn()}
           me={null}
           opp={null}
-          redistributeTransfers={[]}
-          onRedistributeUndo={vi.fn()}
         />
       );
     });

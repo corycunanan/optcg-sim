@@ -79,3 +79,73 @@ describe("formatEvent damage direction (OPT-887)", () => {
     expect(formatEvent(self, cardDb, 0)?.text).toBe("You took damage");
   });
 });
+
+describe("formatEvent rich parts (OPT-776)", () => {
+  const db = {
+    "OP01-025": { name: "Roronoa Zoro" },
+    "ST01-006": { name: "Tony Tony.Chopper" },
+  } as unknown as CardDb;
+  const lookup = (id: string) =>
+    ({ zoro: "OP01-025", chopper: "ST01-006" })[id];
+
+  it("carries no emoji icon and names cards as card parts", () => {
+    const played: GameEvent = {
+      type: "CARD_PLAYED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-025", cardInstanceId: "zoro", zone: "CHARACTER", source: "HAND" },
+    };
+    const entry = formatEvent(played, db, 0)!;
+    expect(entry).not.toHaveProperty("icon");
+    expect(entry.text).toBe("You played Roronoa Zoro");
+    expect(entry.parts).toEqual([
+      { kind: "text", text: "You played " },
+      { kind: "card", cardId: "OP01-025", name: "Roronoa Zoro" },
+    ]);
+  });
+
+  it("leads notation events with the printed token so it renders as a chip", () => {
+    const trigger: GameEvent = {
+      type: "TRIGGER_ACTIVATED",
+      playerIndex: 1,
+      timestamp: 2,
+      payload: { cardId: "OP01-025", activated: true },
+    };
+    expect(formatEvent(trigger, db, 0)?.text).toBe(
+      "[Trigger] Opponent activated Roronoa Zoro"
+    );
+
+    const counter: GameEvent = {
+      type: "COUNTER_USED",
+      playerIndex: 0,
+      timestamp: 3,
+      payload: { cardId: "ST01-006", counterValue: 1000 },
+    };
+    expect(formatEvent(counter, db, 0)?.text).toBe(
+      "[Counter] You used Tony Tony.Chopper (+1000)"
+    );
+  });
+
+  it("names attacker, target and blocker through the instance lookup", () => {
+    const attack: GameEvent = {
+      type: "ATTACK_DECLARED",
+      playerIndex: 1,
+      timestamp: 4,
+      payload: { attackerInstanceId: "zoro", targetInstanceId: "chopper", attackerPower: 5000 },
+    };
+    expect(formatEvent(attack, db, 0, lookup)?.text).toBe(
+      "Roronoa Zoro attacked Tony Tony.Chopper"
+    );
+    expect(formatEvent(attack, db, 0)?.text).toBe("Opponent declared an attack");
+
+    const block: GameEvent = {
+      type: "BLOCK_DECLARED",
+      playerIndex: 0,
+      timestamp: 5,
+      payload: { blockerInstanceId: "chopper" },
+    };
+    expect(formatEvent(block, db, 0, lookup)?.text).toBe(
+      "[Blocker] You blocked with Tony Tony.Chopper"
+    );
+  });
+});

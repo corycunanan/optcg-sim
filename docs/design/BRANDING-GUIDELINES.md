@@ -829,7 +829,7 @@ Inside the scaled subtree only — anything that renders within `<ScaledBoard>` 
 - All Radix-portaled overlays — modals, tooltips, popovers, dropdown menus — because Radix `Portal` renders them outside the transformed parent (see `<PortalRoot>` in OPT-309).
 - Side panels and chat sidebars consumed by the `<LiveGameShell>`.
 
-**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-sm` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
+**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (prompt panel, turn pill) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-sm` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
 
 ---
 

@@ -54,7 +54,7 @@ export const selectTargetScenario: Scenario = {
   title: "Select Target",
   category: "prompts",
   description:
-    "A SELECT_TARGET prompt over three visible opponent Characters. Choose on the real board cards, then confirm in the mid-zone; non-candidates stay dimmed and explained.",
+    "A SELECT_TARGET prompt over three visible opponent Characters. Choose on the real board cards, then confirm in the prompt panel; non-candidates stay dimmed and explained.",
   inputMode: "interactive",
   cardsUsed: ["OP05-010", "ST01-006", "OP01-010"],
   initialState: {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PromptOptions } from "@shared/game-types";
-import { getPromptAnnouncement } from "./mid-zone";
+import { getPromptAnnouncement } from "./prompt-panel";
 
 describe("getPromptAnnouncement", () => {
   it("announces modal prompt arrivals and hidden state", () => {

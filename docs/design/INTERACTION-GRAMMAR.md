@@ -45,7 +45,7 @@ The board is a **physical tabletop, rendered**. Every design decision below deri
 - **G-4 — Drop targets are the semantic object, never a proxy zone.** The thing you drop onto is the thing the action affects: counter Characters drop onto the *defending card* (not the trash), Events drop onto the *play surface* (G-8), DON drops onto the *receiving card*. No zone may double as an action button (`counter-trash` is removed by OPT-416).
 - **G-5 — One gesture per logical act.** "Move DON" is one gesture (drag the DON token visual) whether the source is the cost area or another card. The bespoke redistribute gold bar is replaced by the DON token as drag source (OPT-416).
 - **G-6 — Right-click is an alias, never the only path.** Every menu is reachable by left-click (G-1 menu verb) and keyboard (IN-2); right-click is a power-user shortcut.
-- **G-7 — Commits are explicit at step boundaries.** Multi-selection steps (block, in-place targeting, DON redistribute) end with an explicit Confirm/Skip in the mid-zone — never auto-submit on selection.
+- **G-7 — Commits are explicit at step boundaries.** Multi-selection steps (block, in-place targeting, DON redistribute) end with an explicit Confirm/Skip in the prompt panel — never auto-submit on selection.
 - **G-8 — Events are played, not spent.** An Event's gesture is always the play gesture — drag to the player's own field — whether used in Main phase or as a `[Counter]`. On drop, the Event presents in the **spotlight** (§4) while it resolves; after resolving, it *transforms* to the trash (MO-8: fizzle from the spotlight, materialize in the trash pile). Dragging an Event to the trash is never a gesture. Character counters are the deliberate contrast: they are not played, so they drag onto the defender they boost.
 
 ### Action inventory (target state)
@@ -63,8 +63,8 @@ This is the complete verb table after OPT-416–420 land. ✅ = already conforms
 | Declare attack | Drag | Own active card → opponent leader / rested character | `DECLARE_ATTACK {attackerInstanceId, targetInstanceId}` | ✅ (target filtering: OPT-417) |
 | Counter (Character) | Drag | Hand card → **defending card** | `USE_COUNTER {cardInstanceId, counterTargetInstanceId}` | ✅ |
 | Counter (Event) | Drag | Hand card → **own field**; presents in spotlight (SP-1); defender comes from battle state | `USE_COUNTER_EVENT {cardInstanceId, counterTargetInstanceId}` | ✅ (OPT-416, OPT-464, OPT-465) |
-| Select blocker | Click (toggle) + mid-zone **Block** | Eligible blocker | `DECLARE_BLOCKER {blockerInstanceId}` | ✅ |
-| Effect target (visible on board) | Click (toggle) + mid-zone **Confirm/Skip** | Ringed candidates in place | `SELECT_TARGET {selectedInstanceIds}` | ✅ (OPT-419) |
+| Select blocker | Click (toggle) + prompt panel **Block** | Eligible blocker | `DECLARE_BLOCKER {blockerInstanceId}` | ✅ |
+| Effect target (visible on board) | Click (toggle) + prompt panel **Confirm/Skip** | Ringed candidates in place | `SELECT_TARGET {selectedInstanceIds}` | ✅ (OPT-419) |
 | Effect target (hidden/stacked zone, or mixed) | Click in `SelectTargetModal` | Modal grid | `SELECT_TARGET` | ✅ (stays modal) |
 | Activate `[Main]` effect | Menu (left-click or right-click) via ⚡ badge | Own field/stage card | `ACTIVATE_EFFECT {cardInstanceId, effectId}` | ✅ (OPT-420) |
 | Inspect a pile | Click | Deck / trash / **life** | zone preview | 🔧 OPT-422 (life parity) |
@@ -83,7 +83,7 @@ The four `--gb-accent-*` colors used by the interaction layer each carry **one**
 |---|---|---|
 | **Amber** | *Battle & resources* — "this card is in the fight / receiving a boost or DON" | Attacker ring, defender ring, counter flash, DON drop overlay, counter-onto-defender drop overlay, ⚡ prompt vocabulary, ⚡ effect badge |
 | **Blue** | *Eligible candidate* — "you may select or place here" | Blocker-eligible ring, in-place target-eligible ring (OPT-419), play-card drop overlays (character slot **and** stage zone) |
-| **Green** | *Confirmed / selected / go* | Selected ring (blocker, in-place target), affirmative mid-zone buttons, boosted power readout, my-turn indicator |
+| **Green** | *Confirmed / selected / go* | Selected ring (blocker, in-place target), affirmative prompt-panel buttons, boosted power readout, my-turn indicator |
 | **Red** | *Hostile or destructive commit* | Attack-target drop overlay, board-full replacement overlay, concede / fatal errors (chrome) |
 | **Grey (neutral)** | *Unavailable right now* | Ineligible dimming (SIG-8), rejection feedback (FB-2) — never red |
 
@@ -188,12 +188,12 @@ The engine already has full reveal semantics — `REVEAL` / `REVEAL_HAND` action
 
 The client is optimistic-free: the server echo *is* the success feedback (the card flies to its zone via the animation layer). That makes rejection the only silent outcome today — `game:error` is stored (`use-game-ws.ts:95-97`) but has **no UI surface once the board is mounted**, and is even cleared on the next `sendAction`. OPT-418 closes this:
 
-- **FB-1 — Every rejection is visible and explained.** A server-rejected action produces (a) localized feedback on the initiating card (FB-2) and (b) a reason line in the mid-zone using the standard ⚡ prompt vocabulary (amber ⚡, dim body text — **never red**; rejection is "not available," not "danger"), e.g. `⚡ Not available — <reason>`. The reason must be machine-readable from the worker (add `action:rejected` to the protocol if today's message is free-text only).
+- **FB-1 — Every rejection is visible and explained.** A server-rejected action produces (a) localized feedback on the initiating card (FB-2) and (b) a reason line in the prompt panel (amber "Not available." lead, dim body text — **never red**; rejection is "not available," not "danger"), e.g. `Not available. <reason>`. The reason must be machine-readable from the worker (add `action:rejected` to the protocol if today's message is free-text only).
 - **FB-2 — The rejection gesture: shake + disabled flash, once.** X-axis shake (≈4px amplitude, 3 oscillations, ≤400ms, ease-out — added to `motion.ts` as `cardReject`) while the card briefly drops into the SIG-8 disabled treatment (dim toward `--gb-signal-disabled`, ~0.35 opacity) and recovers. The message is "you tried to use something unavailable — here is its disabled state," speaking the same grey vocabulary as ineligibility dimming. Reduced motion: the grey dim beat only, no shake (MO-5).
 - **FB-2a — Rejection is the backstop, not the primary signal.** With the legality layer in place (SIG-6…8: valid targets highlighted, invalid targets dimmed during every selection), routine ineligibility never reaches the server. Rejection feedback is reserved for attempts the soft-disable policy deliberately allows through: plays the player lacks resources for, actions restricted by an opponent's effect, and exotic legality the client model doesn't cover. If rejection feedback is firing often, the legality layer is under-modeling — fix that, don't tune the rejection.
 - **FB-3 — Rejection reasons persist until superseded.** Display until the next *accepted* state update or a new attempted action — not cleared by the send itself (fix the `setGameError(null)`-on-send behavior). Do not confuse client-side duplicate suppression (identical actions within 250ms, `use-game-session.ts:132-142`) with rejection — suppressed duplicates produce no feedback.
-- **FB-4 — Success is never double-announced.** No checkmarks/toasts for accepted moves; the state change and flight animation are the confirmation. Pile receipt indicators (MO-9) don't violate this — they are part of the transition, not a second announcement. (Exception: mid-zone readouts that already exist, e.g. boosted defender power.)
-- **FB-5 — Waiting states are owned by the mid-zone.** Spinner for opponent's turn, `⚡` prompts for required input, battle sub-phase labels. Cards signal *who is involved* (rings); the mid-zone signals *what the game wants*; the spotlight (§4) signals *what is being shown*. Don't move any of these jobs to another surface.
+- **FB-4 — Success is never double-announced.** No checkmarks/toasts for accepted moves; the state change and flight animation are the confirmation. Pile receipt indicators (MO-9) don't violate this — they are part of the transition, not a second announcement. (Exception: prompt-panel readouts that already exist, e.g. boosted defender power.)
+- **FB-5 — Waiting and required input are owned by the prompt panel (OPT-776).** The left-column panel shows required input (instruction, count, Skip/Confirm), block and counter steps with the battle readout, the opponent's "Opponent is choosing" state, and the phase controls (Undo, End Turn, Pass). The strip between the fields shows only the sliding turn pill.
 
 ---
 
