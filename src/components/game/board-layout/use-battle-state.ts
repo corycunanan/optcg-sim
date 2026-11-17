@@ -7,7 +7,7 @@ import type {
   PlayerState,
   TurnState,
 } from "@shared/game-types";
-import type { BattleInfo } from "./mid-zone";
+import type { BattleInfo } from "./prompt-panel";
 
 export interface BattleState {
   phase: string;

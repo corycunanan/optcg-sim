@@ -147,8 +147,8 @@ vi.mock("./board-navbar", () => ({
       onClick: onConcede,
     }),
 }));
-vi.mock("./mid-zone", () => ({
-  MidZone: ({
+vi.mock("./prompt-panel", () => ({
+  PromptPanel: ({
     activePrompt,
     blockerMode,
     canEndPhase,

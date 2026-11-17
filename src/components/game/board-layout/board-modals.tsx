@@ -15,7 +15,6 @@ import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { GameDeckPreviewModal } from "../deck-preview-modal";
 import { LifePreviewModal } from "../life-preview-modal";
 import { TrashPreviewModal } from "../trash-preview-modal";
-import { RedistributeDonOverlay, type RedistributeTransfer } from "../redistribute-don-overlay";
 import { selectTargetPromptKey } from "@/lib/game/target-selection";
 import type { ZonePreview } from "./use-board-modal-routing";
 
@@ -30,8 +29,6 @@ interface BoardModalsProps {
   onCloseZonePreview: () => void;
   me: PlayerState | null;
   opp: PlayerState | null;
-  redistributeTransfers: RedistributeTransfer[];
-  onRedistributeUndo: () => void;
   selectTargetInPlace?: boolean;
 }
 
@@ -46,8 +43,6 @@ export function BoardModals({
   onCloseZonePreview,
   me,
   opp,
-  redistributeTransfers,
-  onRedistributeUndo,
   selectTargetInPlace = false,
 }: BoardModalsProps) {
   const handleZonePreviewOpenChange = useCallback(
@@ -129,15 +124,6 @@ export function BoardModals({
           />
         )}
 
-      {activePrompt?.promptType === "REDISTRIBUTE_DON" && (
-        <RedistributeDonOverlay
-          effectDescription={activePrompt.effectDescription}
-          maxTransfers={activePrompt.maxTransfers}
-          transfers={redistributeTransfers}
-          onUndo={onRedistributeUndo}
-          onAction={onAction}
-        />
-      )}
 
       {activePrompt?.promptType === "OPTIONAL_EFFECT" && (
         <OptionalEffectModal

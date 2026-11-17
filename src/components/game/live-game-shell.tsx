@@ -2,7 +2,7 @@
 
 // Live game shell. Mirrors `<SandboxShell>`'s contract: composes the shared
 // scaled-board primitives and renders live-only chrome (opponent-away banner,
-// EventLog, dev overlay-test panel, gated game overlays, connectivity/loading
+// dev overlay-test panel, gated game overlays, connectivity/loading
 // states) as siblings of `<ScaledBoard>`, outside the scaled subtree.
 //
 // Per the OPT-321 shell contract, this shell may inject only `state` and
@@ -27,7 +27,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { GameButton } from "./game-button";
 import { GameErrorBoundary } from "./game-error-boundary";
-import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
 import { GameOverlayGate } from "./pregame/game-overlay-gate";
 import type { GameAction, PromptOptions } from "@shared/game-types";
@@ -638,11 +637,6 @@ function GameSessionView({
         </div>
       )}
 
-      <EventLog
-        events={game.gameState.eventLog}
-        cardDb={game.cardDb}
-        myIndex={game.myIndex}
-      />
     </GameErrorBoundary>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PromptOptions } from "@shared/game-types";
-import type { RedistributeTransfer } from "../redistribute-don-overlay";
 import {
+  type RedistributeTransfer,
   getRedistributePromptKey,
   stageRedistributeTransfer,
 } from "./use-redistribution-state";

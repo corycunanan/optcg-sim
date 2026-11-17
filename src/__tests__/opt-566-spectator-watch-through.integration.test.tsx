@@ -183,7 +183,7 @@ function createSpectatorAffordanceHarness(cardDb: Map<string, CardData>): {
           )
           .filter(
             (label) =>
-              !/^(Game menu|Inspect deck|Inspect trash|Opponent's life area|Your life area)/.test(
+              !/^(Game menu|Inspect deck|Inspect trash|Opponent's life area|Your life area|Event Log)/.test(
                 label ?? ""
               )
           )

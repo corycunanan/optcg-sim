@@ -7,7 +7,7 @@ _Created 2026-03-25 · Rewritten 2026-09-07 for the shared prompt frame_
 
 This document defines the design, behavior, and component structure for **interruption modals** — UI overlays that block gameplay and require a player to make a decision before the game can continue.
 
-Modals correspond to server-sent `game:prompt` events. Five of the seven `PromptType` values render as modals; the other two (`SELECT_BLOCKER`, `REDISTRIBUTE_DON`) are in-board affordances covered by `docs/design/INTERACTION-GRAMMAR.md`. A `SELECT_TARGET` prompt whose candidates all sit on the battlefield also resolves in place on the board, with the same Confirm and Skip actions in the mid-zone.
+Modals correspond to server-sent `game:prompt` events. Five of the seven `PromptType` values render as modals; the other two (`SELECT_BLOCKER`, `REDISTRIBUTE_DON`) are in-board affordances covered by `docs/design/INTERACTION-GRAMMAR.md`. A `SELECT_TARGET` prompt whose candidates all sit on the battlefield also resolves in place on the board, with the same Confirm and Skip actions in the left-column prompt panel.
 
 ---
 
@@ -39,11 +39,11 @@ Every modal renders through `src/components/game/effect-prompt-dialog.tsx`. One 
 
 ### Hide
 - Every modal has a **[Hide]** button in the header. Hiding collapses the modal and returns the player to the board.
-- While hidden, board actions stay disabled and the mid-zone shows `⚡ ACTION REQUIRED [Show Prompt]`. Show reopens the modal with its selection intact.
+- While hidden, board actions stay disabled and the prompt panel shows `ACTION REQUIRED [Show Prompt]`. Show reopens the modal with its selection intact.
 - There is no full dismiss. The prompt closes only when Skip or Confirm sends a valid response.
 
 ### Opponent view
-- While a prompt is active for one player, the other sees a non-interactive waiting state on the mid-zone.
+- While a prompt is active for one player, the other sees "Opponent is choosing" in the prompt panel.
 - Card faces inside modals are never visible to the opponent. Spectator visibility follows `workers/game/src/engine/visibility.ts`.
 
 ---
@@ -65,7 +65,7 @@ Pregame decisions (`PLAYER_CHOICE` with `source: "PREGAME"`) are owned by `Prega
 
 ## Prompt chaining
 
-Some prompts resolve into a subsequent prompt (`OPTIONAL_EFFECT` → `SELECT_TARGET`). The current modal closes, the next opens immediately, and the mid-zone `ACTION REQUIRED` state persists through the chain. Each modal is keyed on its prompt identity so selection state never leaks between prompts.
+Some prompts resolve into a subsequent prompt (`OPTIONAL_EFFECT` → `SELECT_TARGET`). The current modal closes, the next opens immediately, and the prompt panel's `ACTION REQUIRED` state persists through the chain. Each modal is keyed on its prompt identity so selection state never leaks between prompts.
 
 ---
 

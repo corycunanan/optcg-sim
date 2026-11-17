@@ -135,7 +135,6 @@ vi.mock("@/components/ui", () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock("./event-log", () => ({ EventLog: () => null }));
 vi.mock("./game-button", () => ({ GameButton: () => null }));
 vi.mock("./pregame/pregame-overlay", () => ({ PregameOverlay: () => null }));
 

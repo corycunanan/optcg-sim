@@ -23,7 +23,7 @@ export const actionRejectedScenario: Scenario = {
   title: "Action Rejected",
   category: "effects",
   description:
-    "A soft-enabled card play is rejected by the server. The hand card shakes through the grey disabled treatment while the persistent reason appears in the mid-zone.",
+    "A soft-enabled card play is rejected by the server. The hand card shakes through the grey disabled treatment while the persistent reason appears in the prompt panel.",
   inputMode: "spectator",
   cardsUsed: ["OP01-001", "OP01-025", "OP01-060"],
   initialState: {
