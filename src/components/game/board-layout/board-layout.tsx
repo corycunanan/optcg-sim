@@ -76,11 +76,7 @@ import { mergeDonCountAdjustments } from "./don-count-adjustments";
 // Transient pulse hooks intentionally produce no pulses under reduced motion,
 // but their empty collections can be recreated on a parent render. Reuse one
 // bundle so those no-op values do not pierce the field memo boundaries.
-/** Left column (prompt panel + event log): share of the canvas width, clamped,
- *  and its inner margin. The board centers in the space to its right. */
-const RAIL_SHARE = 0.24;
-const RAIL_MIN_W = 320;
-const RAIL_MAX_W = 480;
+/** Inset of the left column (prompt panel + event log) from the canvas edge. */
 const RAIL_MARGIN = 16;
 
 const EMPTY_FIELD_PULSE_PROPS = {
@@ -219,17 +215,10 @@ function BoardLayoutInner({
 
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
-  // The left column (prompt panel + event log) takes a fixed share of the
-  // canvas; the board, both hands and their scale fit the space to its right.
-  const railColumnWidth = Math.round(
-    Math.min(RAIL_MAX_W, Math.max(RAIL_MIN_W, viewport.width * RAIL_SHARE)),
-  );
-  const railWidth = railColumnWidth - 2 * RAIL_MARGIN;
-  const boardViewport = {
-    width: Math.max(0, viewport.width - railColumnWidth),
-    height: viewport.height,
-  };
-  const { boardScale, boardTop, playerHandTop } = computeBoardScaling(boardViewport);
+  const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
+  // The left gutter beside the centered board hosts the prompt panel and log.
+  const gutterWidth = Math.max(0, (viewport.width - FIELD_W * boardScale) / 2);
+  const railWidth = Math.max(0, gutterWidth - 2 * RAIL_MARGIN);
   const lookupInstance = useMemo(() => {
     const ids = new Map<string, string>();
     for (const player of [me, opp]) {
@@ -457,10 +446,7 @@ function BoardLayoutInner({
       />
 
       {/* ── Opponent Hand Layer ─────────────────────────────────────── */}
-      <div
-        className="pointer-events-none absolute top-0 right-0 z-20 flex justify-center"
-        style={{ left: railColumnWidth }}
-      >
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
         <div
           className="relative flex items-end justify-center"
           style={{
@@ -479,8 +465,8 @@ function BoardLayoutInner({
 
       {/* ── Board Layer ────────────────────────────────────────────── */}
       <div
-        className="absolute right-0 flex justify-center"
-        style={{ top: boardTop, left: railColumnWidth }}
+        className="absolute inset-x-0 flex justify-center"
+        style={{ top: boardTop }}
       >
         <div
           className="relative shrink-0"
@@ -662,8 +648,8 @@ function BoardLayoutInner({
 
       {/* ── Player Hand Layer ──────────────────────────────────────── */}
       <div
-        className="pointer-events-none absolute right-0 flex justify-center"
-        style={{ top: playerHandTop, left: railColumnWidth }}
+        className="pointer-events-none absolute inset-x-0 flex justify-center"
+        style={{ top: playerHandTop }}
       >
         <div
           className="relative flex items-start justify-center"

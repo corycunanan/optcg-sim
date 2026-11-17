@@ -22,8 +22,8 @@ import type { RedistributeTransfer } from "./use-redistribution-state";
  * between the two fields is left empty.
  *
  * The panel renders at native pixels (outside the board's `zoom` wrapper), so
- * it keeps the board's in-board sizes as a floor: `text-base` labels,
- * `text-lg` instruction, `ring-4` focus.
+ * it uses chrome sizes: `text-base` instruction, `text-sm` card name, counts
+ * and buttons. Each prompt reads card name, then instruction, then selection.
  */
 
 export interface BattleInfo {
@@ -61,7 +61,7 @@ export interface RedistributeMode {
   onUndo: () => void;
 }
 
-const IN_BOARD_BTN = "text-base focus-visible:ring-4";
+const IN_BOARD_BTN = "text-sm focus-visible:ring-4";
 
 function formatPower(power: number): string {
   return power >= 1000 ? `${(power / 1000).toFixed(0)}K` : String(power);
@@ -129,31 +129,31 @@ const BattleReadout = React.memo(function BattleReadout({
       data-battle-readout=""
     >
       <div className="flex min-w-0 flex-col">
-        <span className="text-gb-text-bright text-lg font-semibold tabular-nums">
+        <span className="text-gb-text-bright text-base font-semibold tabular-nums">
           {formatPower(info.attackerPower)}
         </span>
-        <span className="text-gb-text-subtle truncate text-base">
+        <span className="text-gb-text-subtle truncate text-sm">
           {info.attackerName}
         </span>
       </div>
-      <span className="text-gb-text-dim text-base font-semibold">VS</span>
+      <span className="text-gb-text-dim text-sm font-semibold">VS</span>
       <div className="flex min-w-0 flex-col items-end text-right">
         <span className="flex items-baseline gap-1">
           <span
             className={cn(
-              "text-lg font-semibold tabular-nums",
+              "text-base font-semibold tabular-nums",
               boosted ? "text-gb-accent-green" : "text-gb-text-bright"
             )}
           >
             {formatPower(info.defenderPower)}
           </span>
           {boosted && (
-            <span className="text-gb-accent-green/70 text-base font-semibold tabular-nums">
+            <span className="text-gb-accent-green/70 text-sm font-semibold tabular-nums">
               +{formatPower(info.counterPowerAdded)}
             </span>
           )}
         </span>
-        <span className="text-gb-text-subtle w-full truncate text-base">
+        <span className="text-gb-text-subtle w-full truncate text-sm">
           {info.defenderName}
         </span>
       </div>
@@ -172,7 +172,7 @@ function Eyebrow({
     <span
       data-panel-eyebrow={tone}
       className={cn(
-        "text-base font-semibold uppercase tracking-wider",
+        "text-sm font-semibold uppercase tracking-wider",
         tone === "battle" && "text-gb-accent-amber",
         tone === "counter" && "text-gb-accent-red",
         tone === "quiet" && "text-gb-text-dim"
@@ -195,7 +195,7 @@ function SourceCardChip({
     <CardTooltip data={data} cardId={sourceCard.cardId}>
       <span
         tabIndex={data ? 0 : undefined}
-        className="text-gb-text-dim w-fit cursor-help text-base underline decoration-gb-text-subtle underline-offset-2 outline-none hover:decoration-current focus-visible:ring-4 focus-visible:ring-gb-accent-blue"
+        className="text-gb-text-dim w-fit cursor-help text-sm font-semibold underline decoration-gb-text-subtle underline-offset-2 outline-none hover:decoration-current focus-visible:ring-4 focus-visible:ring-gb-accent-blue"
       >
         {data?.name ?? sourceCard.cardId}
       </span>
@@ -255,7 +255,13 @@ export const PromptPanel = React.memo(function PromptPanel({
   if (targetSelectionMode) {
     body = (
       <>
-        <p className="text-gb-text-bright text-lg leading-snug">
+        {targetSelectionMode.sourceCard && (
+          <SourceCardChip
+            sourceCard={targetSelectionMode.sourceCard}
+            cardDb={cardDb}
+          />
+        )}
+        <p className="text-gb-text-bright text-base leading-snug">
           <EffectInline
             text={
               targetSelectionMode.instruction ||
@@ -264,13 +270,7 @@ export const PromptPanel = React.memo(function PromptPanel({
             }
           />
         </p>
-        {targetSelectionMode.sourceCard && (
-          <SourceCardChip
-            sourceCard={targetSelectionMode.sourceCard}
-            cardDb={cardDb}
-          />
-        )}
-        <p className="text-gb-text-dim text-base">
+        <p className="text-gb-text-dim text-sm">
           {targetSelectionMode.countLabel} &middot;{" "}
           {targetSelectionMode.selectedCount} selected
           {targetSelectionMode.aggregateLabel && (
@@ -311,7 +311,7 @@ export const PromptPanel = React.memo(function PromptPanel({
     body = (
       <>
         {battleInfo && <BattleReadout info={battleInfo} />}
-        <p className="text-gb-text text-lg leading-snug">
+        <p className="text-gb-text text-base leading-snug">
           {blockerMode.selectedBlockerId
             ? "Block with the selected Character?"
             : "Choose a Blocker, or skip."}
@@ -346,7 +346,7 @@ export const PromptPanel = React.memo(function PromptPanel({
     const remaining = Math.max(0, maxTransfers - transfers.length);
     body = (
       <>
-        <p className="text-gb-text-bright text-lg leading-snug">
+        <p className="text-gb-text-bright text-base leading-snug">
           <EffectInline
             text={
               redistributeMode.effectDescription ||
@@ -354,7 +354,7 @@ export const PromptPanel = React.memo(function PromptPanel({
             }
           />
         </p>
-        <p className="text-gb-text-dim text-base">
+        <p className="text-gb-text-dim text-sm">
           {transfers.length} moved &middot; {remaining} remaining
         </p>
       </>
@@ -391,12 +391,17 @@ export const PromptPanel = React.memo(function PromptPanel({
       </GameButton>
     );
   } else if (activePrompt) {
+    const promptSource =
+      "sourceCard" in activePrompt ? activePrompt.sourceCard : undefined;
     body = (
       <>
-        <p className="text-gb-text-bright text-lg leading-snug">
+        {promptSource && (
+          <SourceCardChip sourceCard={promptSource} cardDb={cardDb} />
+        )}
+        <p className="text-gb-text-bright text-base leading-snug">
           {modalPromptLabel(activePrompt)}
         </p>
-        <p className="text-gb-text-dim text-base">
+        <p className="text-gb-text-dim text-sm">
           {isPromptHidden
             ? "The prompt is hidden. Show it to respond."
             : "Respond in the prompt window."}
@@ -469,7 +474,7 @@ export const PromptPanel = React.memo(function PromptPanel({
       <>
         <BattleReadout info={battleInfo} />
         {counter && canPass && (
-          <p className="text-gb-text-dim text-base">
+          <p className="text-gb-text-dim text-sm">
             Drag Counter cards onto the defender, or pass.
           </p>
         )}
@@ -539,12 +544,12 @@ export const PromptPanel = React.memo(function PromptPanel({
       {eyebrow}
       {body}
       {actions.length > 0 && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-start gap-2">
           {actions}
         </div>
       )}
       {rejectionReason && (
-        <p role="status" aria-live="polite" className="text-gb-text-dim text-base">
+        <p role="status" aria-live="polite" className="text-gb-text-dim text-sm">
           <span className="text-gb-accent-amber font-semibold">Not available.</span>{" "}
           {rejectionReason}
         </p>
