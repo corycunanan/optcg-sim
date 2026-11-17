@@ -79,6 +79,7 @@ import { mergeDonCountAdjustments } from "./don-count-adjustments";
 /** Gap between the left column (prompt panel + event log) and the navbar,
  *  board and canvas bottom. The prompt panel itself is flush left. */
 const RAIL_MARGIN = 16;
+const RAIL_WIDTH_FACTOR = 1.15;
 
 const EMPTY_FIELD_PULSE_PROPS = {
   winnerPulseIds: new Set<string>(),
@@ -219,9 +220,13 @@ function BoardLayoutInner({
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
   // The left gutter beside the centered board hosts the prompt panel and log.
   const gutterWidth = Math.max(0, (viewport.width - FIELD_W * boardScale) / 2);
-  // The prompt panel sits flush against the left edge; the rail keeps only the
-  // margin on the board side.
-  const railWidth = Math.max(0, gutterWidth - RAIL_MARGIN);
+  // The prompt panel sits flush against the left edge, 15% wider than the
+  // gutter beside the centered board leaves room for.
+  const railWidth = Math.round(Math.max(0, gutterWidth - RAIL_MARGIN) * RAIL_WIDTH_FACTOR);
+  // Where the wider rail would reach the field, the board and both hands slide
+  // right just far enough to keep the margin between them.
+  const boardShift = Math.max(0, railWidth + RAIL_MARGIN - gutterWidth);
+  const boardLayerInset = { left: boardShift, right: -boardShift };
   const lookupInstance = useMemo(() => {
     const ids = new Map<string, string>();
     for (const player of [me, opp]) {
@@ -449,7 +454,10 @@ function BoardLayoutInner({
       />
 
       {/* ── Opponent Hand Layer ─────────────────────────────────────── */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
+      <div
+        className="pointer-events-none absolute top-0 z-20 flex justify-center"
+        style={boardLayerInset}
+      >
         <div
           className="relative flex items-end justify-center"
           style={{
@@ -468,8 +476,8 @@ function BoardLayoutInner({
 
       {/* ── Board Layer ────────────────────────────────────────────── */}
       <div
-        className="absolute inset-x-0 flex justify-center"
-        style={{ top: boardTop }}
+        className="absolute flex justify-center"
+        style={{ top: boardTop, ...boardLayerInset }}
       >
         <div
           className="relative shrink-0"
@@ -651,8 +659,8 @@ function BoardLayoutInner({
 
       {/* ── Player Hand Layer ──────────────────────────────────────── */}
       <div
-        className="pointer-events-none absolute inset-x-0 flex justify-center"
-        style={{ top: playerHandTop }}
+        className="pointer-events-none absolute flex justify-center"
+        style={{ top: playerHandTop, ...boardLayerInset }}
       >
         <div
           className="relative flex items-start justify-center"
