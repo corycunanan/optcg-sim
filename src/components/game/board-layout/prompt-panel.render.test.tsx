@@ -73,7 +73,7 @@ describe("PromptPanel", () => {
       },
     });
     const out = text();
-    expect(out).toContain("Action required");
+    expect(root.findAll((n) => n.props["data-panel-eyebrow"] !== undefined)).toHaveLength(0);
     expect(out).toContain("K.O. up to 1 Character");
     expect(out).toContain("Nami");
     expect(buttonLabels(root)).toEqual(["Skip", "Confirm"]);

@@ -19,7 +19,7 @@ import type { RedistributeTransfer } from "./use-redistribution-state";
  * one place that says what the player can do now: the instruction for a
  * pending prompt with its Skip and Confirm, the block and counter steps, the
  * battle readout, and the phase controls (Undo, End Turn, Pass). The strip
- * between the two fields carries only the turn pill.
+ * between the two fields is left empty.
  *
  * The panel renders at native pixels (outside the board's `zoom` wrapper), so
  * it keeps the board's in-board sizes as a floor: `text-base` labels,
@@ -165,7 +165,7 @@ function Eyebrow({
   tone,
   children,
 }: {
-  tone: "action" | "battle" | "counter" | "quiet";
+  tone: "battle" | "counter" | "quiet";
   children: React.ReactNode;
 }) {
   return (
@@ -173,7 +173,6 @@ function Eyebrow({
       data-panel-eyebrow={tone}
       className={cn(
         "text-base font-semibold uppercase tracking-wider",
-        tone === "action" && "text-gb-accent-amber",
         tone === "battle" && "text-gb-accent-amber",
         tone === "counter" && "text-gb-accent-red",
         tone === "quiet" && "text-gb-text-dim"
@@ -254,7 +253,6 @@ export const PromptPanel = React.memo(function PromptPanel({
   const actions: React.ReactNode[] = [];
 
   if (targetSelectionMode) {
-    eyebrow = <Eyebrow tone="action">Action required</Eyebrow>;
     body = (
       <>
         <p className="text-gb-text-bright text-lg leading-snug">
@@ -346,7 +344,6 @@ export const PromptPanel = React.memo(function PromptPanel({
   } else if (redistributeMode) {
     const { transfers, maxTransfers } = redistributeMode;
     const remaining = Math.max(0, maxTransfers - transfers.length);
-    eyebrow = <Eyebrow tone="action">Action required</Eyebrow>;
     body = (
       <>
         <p className="text-gb-text-bright text-lg leading-snug">
@@ -394,7 +391,6 @@ export const PromptPanel = React.memo(function PromptPanel({
       </GameButton>
     );
   } else if (activePrompt) {
-    eyebrow = <Eyebrow tone="action">Action required</Eyebrow>;
     body = (
       <>
         <p className="text-gb-text-bright text-lg leading-snug">
