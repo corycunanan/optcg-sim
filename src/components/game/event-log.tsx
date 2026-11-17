@@ -323,7 +323,7 @@ export function EventLog({
     <div
       data-event-log=""
       className={cn(
-        "flex min-h-0 w-full flex-col rounded-lg border border-gb-border-strong bg-gb-surface",
+        "flex min-h-0 w-full flex-col rounded-r-lg border border-l-0 border-gb-border-strong bg-gb-surface-raised shadow-md",
         className,
       )}
     >
@@ -331,7 +331,7 @@ export function EventLog({
         type="button"
         aria-expanded={!collapsed}
         onClick={() => setCollapsed((v) => !v)}
-        className="flex shrink-0 cursor-pointer items-center justify-between rounded-t-lg border-b border-gb-border-subtle px-3 py-2 transition-colors hover:bg-gb-surface-raised"
+        className="flex shrink-0 cursor-pointer items-center justify-between rounded-tr-lg border-b border-gb-border-subtle px-3 py-2 transition-colors hover:bg-gb-surface"
       >
         <span className="text-sm font-semibold uppercase tracking-widest text-gb-text-dim">
           Event Log
@@ -371,7 +371,7 @@ export function EventLog({
             visibleEvents.map(({ key, entry }) => (
               <div
                 key={key}
-                className="rounded-md px-2 py-1 transition-colors hover:bg-gb-surface-raised/50"
+                className="rounded-md px-2 py-1 transition-colors hover:bg-gb-surface/50"
               >
                 <EventLogLine entry={entry} cardDb={cardDb} />
               </div>

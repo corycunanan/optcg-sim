@@ -645,7 +645,7 @@ function BoardLayoutInner({
           cardDb={cardDb}
           myIndex={myIndex}
           lookupInstance={lookupInstance}
-          className="ml-4 max-h-[40%] shrink-0"
+          className="max-h-[40%] shrink-0"
         />
       </div>
 
