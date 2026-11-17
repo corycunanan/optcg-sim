@@ -76,7 +76,8 @@ import { mergeDonCountAdjustments } from "./don-count-adjustments";
 // Transient pulse hooks intentionally produce no pulses under reduced motion,
 // but their empty collections can be recreated on a parent render. Reuse one
 // bundle so those no-op values do not pierce the field memo boundaries.
-/** Inset of the left column (prompt panel + event log) from the canvas edge. */
+/** Gap between the left column (prompt panel + event log) and the navbar,
+ *  board and canvas bottom. The prompt panel itself is flush left. */
 const RAIL_MARGIN = 16;
 
 const EMPTY_FIELD_PULSE_PROPS = {
@@ -218,7 +219,9 @@ function BoardLayoutInner({
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
   // The left gutter beside the centered board hosts the prompt panel and log.
   const gutterWidth = Math.max(0, (viewport.width - FIELD_W * boardScale) / 2);
-  const railWidth = Math.max(0, gutterWidth - 2 * RAIL_MARGIN);
+  // The prompt panel sits flush against the left edge; the rail keeps only the
+  // margin on the board side.
+  const railWidth = Math.max(0, gutterWidth - RAIL_MARGIN);
   const lookupInstance = useMemo(() => {
     const ids = new Map<string, string>();
     for (const player of [me, opp]) {
@@ -561,7 +564,7 @@ function BoardLayoutInner({
       <div
         className="absolute flex flex-col gap-4"
         style={{
-          left: RAIL_MARGIN,
+          left: 0,
           top: NAVBAR_H + RAIL_MARGIN,
           bottom: RAIL_MARGIN,
           width: railWidth,
@@ -642,7 +645,7 @@ function BoardLayoutInner({
           cardDb={cardDb}
           myIndex={myIndex}
           lookupInstance={lookupInstance}
-          className="max-h-[40%] shrink-0"
+          className="ml-4 max-h-[40%] shrink-0"
         />
       </div>
 

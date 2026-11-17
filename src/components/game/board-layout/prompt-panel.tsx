@@ -61,7 +61,8 @@ export interface RedistributeMode {
   onUndo: () => void;
 }
 
-const IN_BOARD_BTN = "text-sm focus-visible:ring-4";
+/** Panel buttons: raised surface with the small hard elevation shadow. */
+const IN_BOARD_BTN = "text-sm shadow-sm focus-visible:ring-4";
 
 function formatPower(power: number): string {
   return power >= 1000 ? `${(power / 1000).toFixed(0)}K` : String(power);
@@ -535,7 +536,7 @@ export const PromptPanel = React.memo(function PromptPanel({
       className={cn(
         "flex w-full flex-col gap-3",
         hasContent &&
-          "border-gb-border-strong bg-gb-surface rounded-lg border p-4"
+          "border-gb-border-strong bg-gb-surface-raised rounded-r-lg border border-l-0 p-4 shadow-md"
       )}
     >
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
