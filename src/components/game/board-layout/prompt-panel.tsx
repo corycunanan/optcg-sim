@@ -22,8 +22,8 @@ import type { RedistributeTransfer } from "./use-redistribution-state";
  * between the two fields is left empty.
  *
  * The panel renders at native pixels (outside the board's `zoom` wrapper), so
- * it uses chrome sizes: `text-base` instruction, `text-sm` card name, counts
- * and buttons. Each prompt reads card name, then instruction, then selection.
+ * it uses chrome sizes: `text-sm` throughout (instruction in medium weight),
+ * including buttons. Each prompt reads card name, then instruction, then selection.
  */
 
 export interface BattleInfo {
@@ -262,7 +262,7 @@ export const PromptPanel = React.memo(function PromptPanel({
             cardDb={cardDb}
           />
         )}
-        <p className="text-gb-text-bright text-base leading-snug">
+        <p className="text-gb-text-bright text-sm font-medium leading-snug">
           <EffectInline
             text={
               targetSelectionMode.instruction ||
@@ -312,7 +312,7 @@ export const PromptPanel = React.memo(function PromptPanel({
     body = (
       <>
         {battleInfo && <BattleReadout info={battleInfo} />}
-        <p className="text-gb-text text-base leading-snug">
+        <p className="text-gb-text text-sm font-medium leading-snug">
           {blockerMode.selectedBlockerId
             ? "Block with the selected Character?"
             : "Choose a Blocker, or skip."}
@@ -347,7 +347,7 @@ export const PromptPanel = React.memo(function PromptPanel({
     const remaining = Math.max(0, maxTransfers - transfers.length);
     body = (
       <>
-        <p className="text-gb-text-bright text-base leading-snug">
+        <p className="text-gb-text-bright text-sm font-medium leading-snug">
           <EffectInline
             text={
               redistributeMode.effectDescription ||
@@ -399,7 +399,7 @@ export const PromptPanel = React.memo(function PromptPanel({
         {promptSource && (
           <SourceCardChip sourceCard={promptSource} cardDb={cardDb} />
         )}
-        <p className="text-gb-text-bright text-base leading-snug">
+        <p className="text-gb-text-bright text-sm font-medium leading-snug">
           {modalPromptLabel(activePrompt)}
         </p>
         <p className="text-gb-text-dim text-sm">
