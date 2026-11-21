@@ -47,6 +47,14 @@ export function resolveAmount(cost: SimpleCost, fallback = 1): number {
 }
 
 /**
+ * OPT-1047: the Life cards a Life cost moves. An "all" cost moves the whole
+ * Life area, and needs at least 1 card (qa_op18.md OP18-020, OP18-117).
+ */
+export function lifeCostAmount(cost: SimpleCost & { type: "LIFE_TO_HAND" | "TRASH_FROM_LIFE" }, lifeCount: number): number {
+  return cost.all ? Math.max(lifeCount, 1) : resolveAmount(cost);
+}
+
+/**
  * Number of cards the player selects to pay a selection cost. For most costs
  * this is the printed amount; a GIVE_DON cost's amount counts DON!!, while the
  * player selects exactly one recipient (OPT-824).

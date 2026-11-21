@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 5** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 4** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,19 +415,19 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (5 cards) — 2026-11-20
+## OP-18 Deferred Effects (4 cards) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
 approximated**: in play the card behaves as if that clause were absent. Each
 needs engine vocabulary first; the ticket is named on each entry.
 
-### OP18-020 Stop Fighting!!! — NO SCHEMA
+### ~~OP18-020 Stop Fighting!!!~~ — ENCODED
 **Tags:** `ALL_LIFE_COST` · **Ticket:** OPT-1047
 
 > [Counter] You may add all of your Life cards to your hand: If your Leader is [Nefeltari Vivi], give your opponent's Leader and all of their Characters −5000 power during this turn.
 
-**Blocker:** the `LIFE_TO_HAND` cost takes a fixed number only. The FAQ (`docs/FAQs/qa_op18.md`) makes the cost unpayable at 0 Life.
+OPT-1047 added `all: true` to the `LIFE_TO_HAND` and `TRASH_FROM_LIFE` costs: every Life card moves, and the cost needs at least 1 (FAQ: at 0 Life the −5000 does not happen). The Life-to-hand form keeps the Life replacement and one `CARD_REMOVED_FROM_LIFE` per card. The Vivi check is a post-cost condition.
 
 ---
 
@@ -503,7 +503,7 @@ OPT-1051 added the `RETURN_SELF_TO_HAND` cost, fixed to the source Character lik
 
 > [Main] You may trash all of your Life cards: If your Leader is [Spandam], trash all Characters and play up to a total of 5 {Vice Admiral} type Character cards with different card names from your deck or trash. Then, shuffle your deck.
 
-**Blocker:** the `TRASH_FROM_LIFE` cost takes a fixed number only (FAQ: at 0 Life nothing happens), and no play selection spans the deck and the trash with one total and unique names.
+**Blocker:** the cost is ready (`TRASH_FROM_LIFE` with `all: true`, OPT-1047; FAQ: at 0 Life nothing happens), but no play selection spans the deck and the trash with one total and unique names.
 
 ---
 
@@ -541,10 +541,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 43 cards | 0 | 0 |
+| Historical card entries in this document | 44 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 5 cards | 5 | 0 |
-| **Tracked cards still needing disposition** | — | **5** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 4 cards | 4 | 0 |
+| **Tracked cards still needing disposition** | — | **4** | **0** |

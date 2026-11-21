@@ -12,7 +12,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, isOpponentLifePlacement } from "./targets.js";
+import { computeCostTargets, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, isOpponentLifePlacement, lifeCostAmount } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 import { lifeFaceCostIndices } from "./payability.js";
@@ -249,10 +249,10 @@ function payCostsUnreleased(
       }
 
       case "LIFE_TO_HAND": {
-        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        const amount = lifeCostAmount(cost, p.life.length);
         const position = cost.position ?? "TOP";
         if (position === "TOP_OR_BOTTOM") return null; // Needs player selection
-        const p = nextState.players[controller];
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
@@ -276,10 +276,10 @@ function payCostsUnreleased(
         // player never picks WHICH life card, only whether to pay (the
         // optional-effect prompt). OPT-259 (F6): not damage, never fires
         // [Trigger].
-        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        const amount = lifeCostAmount(cost, p.life.length);
         const position = cost.position ?? "TOP";
         if (position === "TOP_OR_BOTTOM") return null; // Needs player selection
-        const p = nextState.players[controller];
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);

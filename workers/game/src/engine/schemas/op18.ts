@@ -7,7 +7,7 @@
  * Partial cards (every expressible block authored; the missing clause is named
  * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
  * OP18-021, OP18-080. Cards with no expressible block have no schema
- * yet: OP18-020, OP18-105, OP18-117.
+ * yet: OP18-105, OP18-117.
  */
 import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
@@ -628,9 +628,36 @@ export const OP18_019_QUACK: EffectSchema = {
   ],
 };
 
-// OP18-020 Stop Fighting!!! — no schema yet. Its only effect is paid by "add all
-// of your Life cards to your hand", and no cost type takes all of the Life
-// (FAQ: unusable at 0 Life). See DEFERRED-CARD-EFFECTS.md.
+// OP18-020 Stop Fighting!!!
+// [Counter] You may add all of your Life cards to your hand: If your Leader is
+// [Nefeltari Vivi], give your opponent's Leader and all of their Characters
+// −5000 power during this turn.
+// FAQ: at 0 Life the cost cannot be paid, so the −5000 does not happen.
+
+export const OP18_020_STOP_FIGHTING: EffectSchema = {
+  card_id: "OP18-020",
+  card_name: "Stop Fighting!!!",
+  card_type: "Event",
+  effects: [
+    {
+      id: "counter_all_life_debuff",
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
+      flags: { optional: true },
+      costs: [{ type: "LIFE_TO_HAND", all: true }],
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: leaderName("Nefeltari Vivi"),
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "LEADER_OR_CHARACTER", controller: "OPPONENT", count: { all: true } },
+          params: { amount: -5000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GREEN (and the Green/Purple Leader)
@@ -2605,7 +2632,7 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_001_KAROO, OP18_002_IGARAM, OP18_004_KAROO, OP18_005_KUNG_FU_JUGON, OP18_006_KOZA,
     OP18_007_SMOKER, OP18_008_CHAKA, OP18_009_SUPER_SPOT_BILLED_DUCK_TROOPS, OP18_010_TONY_TONY_CHOPPER,
     OP18_011_NEFELTARI_VIVI, OP18_012_PINCERS, OP18_013_PELL, OP18_014_PORTGAS_D_ACE, OP18_015_EYELASHES,
-    OP18_016_MONKEY_D_LUFFY, OP18_017_RORONOA_ZORO, OP18_018_LETS_GO_KAROO, OP18_019_QUACK,
+    OP18_016_MONKEY_D_LUFFY, OP18_017_RORONOA_ZORO, OP18_018_LETS_GO_KAROO, OP18_019_QUACK, OP18_020_STOP_FIGHTING,
     OP18_021_FRANKY, OP18_022_MONKEY_D_LUFFY, OP18_023_GAIMON, OP18_024_KOKORO, OP18_025_GONBE,
     OP18_026_SANJI, OP18_027_ZORO_AND_SOGEKING, OP18_028_CHIMNEY, OP18_029_TONY_TONY_CHOPPER, OP18_030_NAMI,
     OP18_031_NICO_ROBIN, OP18_032_BUGGY, OP18_033_BANBAN, OP18_034_FRANKY, OP18_036_MONKEY_D_LUFFY,

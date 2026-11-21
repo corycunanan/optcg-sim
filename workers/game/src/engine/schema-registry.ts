@@ -566,6 +566,20 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     errors.push(`${prefix}: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE requires a non-empty 'card_name'`);
   }
 
+  // OPT-1047: `all` takes the whole Life area — Life costs only, with no
+  // amount and no TOP_OR_BOTTOM choice (every card moves).
+  const all = (cost as { all?: unknown }).all;
+  if (all !== undefined) {
+    if (cost.type !== "LIFE_TO_HAND" && cost.type !== "TRASH_FROM_LIFE") {
+      errors.push(`${prefix}: cost type '${cost.type}' does not accept 'all'`);
+    } else if (all !== true) {
+      errors.push(`${prefix}: 'all' must be true`);
+    } else {
+      if ((cost as { amount?: unknown }).amount !== undefined) errors.push(`${prefix}: an 'all' Life cost takes no 'amount'`);
+      if ((cost as { position?: unknown }).position === "TOP_OR_BOTTOM") errors.push(`${prefix}: an 'all' Life cost cannot take position TOP_OR_BOTTOM`);
+    }
+  }
+
   // OPT-798 / OPT-828: a cost-level `controller` widens a Character-selection
   // or Stage cost beyond the payer's own field (OPT-866 adds the Stage cost).
   const costController = (cost as { controller?: unknown }).controller;

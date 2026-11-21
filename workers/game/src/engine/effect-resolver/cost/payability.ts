@@ -4,7 +4,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, costSelectionCount, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, lifeCostAmount, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -198,7 +198,7 @@ export function isCostPayable(
 
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE": {
-      const amt = resolveAmount(cost);
+      const amt = lifeCostAmount(cost, player.life.length);
       return player.life.length >= amt;
     }
 

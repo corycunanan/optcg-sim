@@ -1440,7 +1440,9 @@ export type SimpleCost = {
           ? GiveDonCostFields
           : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
             ? AddCharacterToLifeCostFields
-            : unknown
+            : Type extends "LIFE_TO_HAND" | "TRASH_FROM_LIFE"
+              ? LifeCostFields
+              : unknown
   );
 }[SimpleCostType];
 
@@ -1476,6 +1478,15 @@ interface PlaceStageToDeckCostFields {
  * end after choosing the Character. Omitted or "SELF" keeps the historical
  * own-Characters-only ST13-001 cost. Only this cost type accepts the field.
  */
+interface LifeCostFields {
+  /**
+   * OPT-1047: "add all of your Life cards to your hand" / "trash all of your
+   * Life cards" (OP18-020, OP18-117). Moves every Life card; payable only with
+   * at least 1 (qa_op18.md). Replaces `amount` and never takes TOP_OR_BOTTOM.
+   */
+  all?: true;
+}
+
 interface AddCharacterToLifeCostFields {
   controller?: "SELF" | "OPPONENT";
 }
