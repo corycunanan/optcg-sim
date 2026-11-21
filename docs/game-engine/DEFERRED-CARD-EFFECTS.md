@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 4** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 3** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (4 cards) — 2026-11-20
+## OP-18 Deferred Effects (3 cards) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -431,14 +431,12 @@ OPT-1047 added `all: true` to the `LIFE_TO_HAND` and `TRASH_FROM_LIFE` costs: ev
 
 ---
 
-### OP18-021 Franky (Leader) — PARTIAL
+### ~~OP18-021 Franky (Leader)~~ — ENCODED
 **Tags:** `STAGE_SYMBOL_COUNTER` · **Ticket:** OPT-1046
 
 > All Stage cards in your hand have a +3000 Counter.
 
-**Blocker:** the Counter Step accepts only Character cards as symbol counters (`validation.ts` `validateUseCounter`), so a Stage `COUNTER_GRANT` could never be used.
-
-**Encoded:** the [Activate: Main] Stage play.
+OPT-1046 lets the Counter Step accept a Stage whose effective counter value is above 0, and the board offers it the same way it offers a Character. The Leader carries a `COUNTER_GRANT` of 3000 with `filter: { card_type: "STAGE" }`, beside its [Activate: Main] Stage play.
 
 ---
 
@@ -541,10 +539,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 44 cards | 0 | 0 |
+| Historical card entries in this document | 45 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 4 cards | 4 | 0 |
-| **Tracked cards still needing disposition** | — | **4** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 3 cards | 3 | 0 |
+| **Tracked cards still needing disposition** | — | **3** | **0** |

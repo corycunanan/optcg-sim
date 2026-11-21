@@ -6,7 +6,7 @@
  *
  * Partial cards (every expressible block authored; the missing clause is named
  * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
- * OP18-021, OP18-080. Cards with no expressible block have no schema
+ * OP18-080. Cards with no expressible block have no schema
  * yet: OP18-105, OP18-117.
  */
 import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
@@ -668,10 +668,13 @@ export const OP18_021_FRANKY: EffectSchema = {
   card_name: "Franky",
   card_type: "Leader",
   effects: [
-    // Partial: "All Stage cards in your hand have a +3000 Counter" is deferred.
-    // The Counter Step accepts only Character cards as symbol counters
-    // (validation.ts validateUseCounter), so a COUNTER_GRANT on Stages would
-    // never be usable.
+    {
+      // All Stage cards in your hand have a +3000 Counter. FAQ: a Stage is
+      // used in the Counter Step like a Character with a printed Counter.
+      id: "stage_counter_grant",
+      category: "rule_modification",
+      rule: { rule_type: "COUNTER_GRANT", value: 3000, filter: { card_type: "STAGE" } },
+    },
     {
       id: "activate_play_stage",
       category: "activate",

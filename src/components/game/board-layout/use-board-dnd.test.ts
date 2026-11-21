@@ -95,6 +95,17 @@ describe("resolveHandCardDropAction", () => {
     ).toBeNull();
   });
 
+  it("OPT-1046: sends a Stage dropped on the defender as a symbol counter", () => {
+    const drag = { type: "hand-card" as const, card: handCard("stage-1") };
+    expect(
+      resolveHandCardDropAction(drag, { type: "counter-target", targetInstanceId: "defender-1" }, db, battle)
+    ).toEqual({
+      type: "USE_COUNTER",
+      cardInstanceId: "stage-1-instance",
+      counterTargetInstanceId: "defender-1",
+    });
+  });
+
   it("plays Counter Events on the own-field surface using the battle defender", () => {
     const drag = {
       type: "hand-card" as const,

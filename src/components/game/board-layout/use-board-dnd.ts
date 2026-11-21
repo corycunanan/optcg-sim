@@ -127,8 +127,10 @@ export function resolveHandCardDropAction(
     return null;
   }
 
+  // OPT-1046: a Stage with a granted Counter (OP18-021) counters like a
+  // Character; the server rejects one whose effective value is 0.
   if (
-    cardData.type === "Character" &&
+    (cardData.type === "Character" || cardData.type === "Stage") &&
     dropData.type === "counter-target" &&
     battle &&
     dropData.targetInstanceId === battle.targetInstanceId
