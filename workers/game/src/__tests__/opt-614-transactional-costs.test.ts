@@ -287,7 +287,11 @@ describe("OPT-614 — transactional multi-cost payment", () => {
     // EB05-048 Hedgehog Stinger (rest DON!! + K.O. own Character) and
     // ST34-004 Charlotte Linlin (DON!! −4 + hand trash). EB05-048's later
     // K.O. cost joins the existing replaceable-field-exit stranding shape.
-    expect(mixedBlocks).toHaveLength(61);
+    // 2026-11-20 adds OP18-028 Chimney (rest named card + rest self), OP18-059
+    // I Pray For Your Success. (rest DON!! + hand trash), OP18-070 Tom
+    // (DON!! −1 + hand trash) and OP18-079 Spandam (rest DON!! + rest self +
+    // hand trash). None has a later field-exit cost, so none can strand.
+    expect(mixedBlocks).toHaveLength(65);
     expect([...strandableCardIds].sort()).toEqual([
       "EB01-011",
       "EB02-047",

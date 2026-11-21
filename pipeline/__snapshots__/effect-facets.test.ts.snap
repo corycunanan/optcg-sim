@@ -2,9 +2,11 @@
 
 exports[`extractCardFacets > snapshots every distinct authored effect trait with its role 1`] = `
 [
+  "cost:Alabasta",
   "cost:Amazon Lily",
   "cost:Animal Kingdom Pirates",
   "cost:Baroque Works",
+  "cost:Big Mom Pirates",
   "cost:CP",
   "cost:Celestial Dragons",
   "cost:Dressrosa",
@@ -53,6 +55,7 @@ exports[`extractCardFacets > snapshots every distinct authored effect trait with
   "search:Foxy Pirates",
   "search:GERMA",
   "search:Heart Pirates",
+  "search:Holy Knights of God",
   "search:Impel Down",
   "search:Kid Pirates",
   "search:Kuja Pirates",
@@ -102,6 +105,7 @@ exports[`extractCardFacets > snapshots every distinct authored effect trait with
   "target:GERMA 66",
   "target:Galley-La Company",
   "target:Heart Pirates",
+  "target:Holy Knights of God",
   "target:Homies",
   "target:Impel Down",
   "target:Jailer Beast",
@@ -131,6 +135,7 @@ exports[`extractCardFacets > snapshots every distinct authored effect trait with
   "target:Straw Hat Crew",
   "target:Supernovas",
   "target:The Akazaya Nine",
+  "target:The Franky Family",
   "target:The Seven Warlords of the Sea",
   "target:The Tontattas",
   "target:The Vinsmoke Family",

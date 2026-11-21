@@ -214,6 +214,8 @@ const EXPECTED_OWNER: Record<string, "SELF" | "OPPONENT"> = {
   "ST13-015 .effects[0].actions[2]": "SELF",
   "ST20-002 .effects[0].replacement_actions[0]": "SELF",
   "ST20-005 .effects[0].actions[0].params.options[1][0]": "OPPONENT",
+  "OP18-103 .effects[0].actions[1]": "OPPONENT",
+  "OP18-113 .effects[0].actions[0]": "OPPONENT",
 };
 
 function authoredTrashFromLifeActions(): Map<string, Action> {
