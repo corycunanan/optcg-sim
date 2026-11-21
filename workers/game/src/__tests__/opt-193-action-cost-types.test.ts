@@ -61,6 +61,7 @@ describe("OPT-193 exhaustive cost narrowing", () => {
     { cost: { type: "PLACE_STAGE_TO_DECK" }, needsSelection: false },
     { cost: { type: "ADD_OWN_CHARACTER_TO_LIFE" }, needsSelection: true },
     { cost: { type: "TRASH_OWN_STAGE" }, needsSelection: false },
+    { cost: { type: "KO_OWN_STAGE" }, needsSelection: false },
     { cost: { type: "PLACE_FROM_TRASH_TO_DECK" }, needsSelection: true },
     { cost: { type: "LEADER_POWER_REDUCTION" }, needsSelection: false },
     { cost: { type: "GIVE_OPPONENT_DON" }, needsSelection: false },

@@ -364,6 +364,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_OWN_CHARACTER_TO_DECK` | "Place Character at deck bottom" — add `controller: "EITHER"` when the text says "place 1 Character … the owner's deck" (either player's; the card goes to its owner's deck) |
 | `ADD_OWN_CHARACTER_TO_LIFE` | "Add your Character to Life" — add `controller: "OPPONENT"` (amount 1) when the text says "place 1 of your opponent's Characters … at the top or bottom of your opponent's Life cards" (the card goes to its owner's Life; `position: "TOP_OR_BOTTOM"` lets the payer choose the end) |
 | `TRASH_OWN_STAGE` | "Trash your Stage" |
+| `KO_OWN_STAGE` | "K.O. 1 of your Stages" (optional `filter`, e.g. `{ cost_max: 5 }`; not `TRASH_OWN_STAGE`, which trashes) |
 
 ### Other Costs
 

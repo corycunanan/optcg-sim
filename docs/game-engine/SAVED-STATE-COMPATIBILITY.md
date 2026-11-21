@@ -557,7 +557,7 @@ ordinary6 behavior.
 
 | Saved family/stage | Domain and canonical replay |
 | --- | --- |
-| TRASH_SELF, PLACE_SELF_TO_DECK, RETURN_SELF_TO_HAND, TRASH_OWN_STAGE, PLACE_STAGE_TO_DECK; no arrange flag | Empty domain; only PLAYER_CHOICE `__PAY_FIXED_COST__` |
+| TRASH_SELF, PLACE_SELF_TO_DECK, RETURN_SELF_TO_HAND, TRASH_OWN_STAGE, KO_OWN_STAGE, PLACE_STAGE_TO_DECK; no arrange flag | Empty domain; only PLAYER_CHOICE `__PAY_FIXED_COST__` |
 | Generic field exit, including named hand-or-Stage and fixed/default Life destination; no arrange flag | Unique nonempty candidate IDs; SELECT_TARGET of exactly the printed positive count, all offered |
 | Opponent Life TOP_OR_BOTTOM; no arrange flag | Exactly TOP and BOTTOM choices bound to the same ordered positive-count unique IDs; exact offered PLAYER_CHOICE |
 | Either self+hand/trash compound; no arrange flag, block shuffles | Unique secondary candidate IDs excluding source, more candidates than printed count; SELECT_TARGET of exactly the printed count, allowing zero |
@@ -567,7 +567,7 @@ Compound selection without shuffle is intermediate, and arrangement with shuffle
 is unreachable; neither can own a captured replacement replay. Compound hand is
 never a fixed-sentinel family, even for amount zero. The legacy
 `fixedCostExitTarget` helper keeps its old membership because ordinary6 uses it;
-only native replay uses the five-family fixed set. All five capture sites pass
+only native replay uses the six-family fixed set. All five capture sites pass
 saved producer evidence to this same parser. No new persisted field is required.
 
 This checks stage/action compatibility and domain structure. It does not

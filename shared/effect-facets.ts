@@ -272,6 +272,7 @@ export const EFFECT_FACET_GROUPS = [
       ["place_stage_to_deck", "Place Stage to Deck"],
       ["add_own_character_to_life", "Add Own Character to Life"],
       ["trash_own_stage", "Trash Own Stage"],
+      ["ko_own_stage", "K.O. Own Stage"],
       ["place_from_trash_to_deck", "Place from Trash to Deck"],
       ["leader_power_reduction", "Leader Power Reduction"],
       ["give_opponent_don", "Give Opponent DON!!"],

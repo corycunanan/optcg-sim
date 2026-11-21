@@ -7,7 +7,7 @@ import type { Cost, CostResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { CostPaymentResult } from "../types.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
-import { detachDonToCostArea, setCardState, trashCharacter, trashStage } from "../card-mutations.js";
+import { detachDonToCostArea, koCharacter, setCardState, trashCharacter, trashStage } from "../card-mutations.js";
 import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
@@ -488,6 +488,20 @@ function payCostsUnreleased(
         events.push(...result.events);
         costResult.cardsTrashedCount += 1;
         costResult.cardsTrashedInstanceIds.push(stageId);
+        break;
+      }
+
+      case "KO_OWN_STAGE": {
+        // OPT-1050: "K.O. 1 of your Stages": the same CARD_KO an effect K.O.
+        // of a Stage publishes (cardType STAGE), marked as a cost movement.
+        // "Cannot be K.O.'d" protections make it unpayable (COST_MOVEMENT).
+        const p = nextState.players[controller];
+        if (!p.stage) return null;
+        if (cost.filter && !matchesFilter(p.stage, cost.filter, _cardDb, nextState, undefined, undefined, controller)) return null;
+        const result = koCharacter(nextState, p.stage.instanceId, controller, _cardDb, nextState, "COST");
+        if (!result) return null;
+        nextState = result.state;
+        events.push(...result.events);
         break;
       }
 

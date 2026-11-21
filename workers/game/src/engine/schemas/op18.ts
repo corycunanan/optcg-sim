@@ -6,10 +6,10 @@
  *
  * Partial cards (every expressible block authored; the missing clause is named
  * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
- * OP18-021, OP18-072, OP18-080. Cards with no expressible block have no schema
- * yet: OP18-020, OP18-063, OP18-066, OP18-105, OP18-117.
+ * OP18-021, OP18-080. Cards with no expressible block have no schema
+ * yet: OP18-020, OP18-105, OP18-117.
  */
-import type { Action, Condition, EffectSchema, TargetFilter } from "../effect-types.js";
+import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
 type Block = EffectSchema["effects"][number];
 
@@ -1527,9 +1527,28 @@ export const OP18_061_ICEBURG: EffectSchema = {
   ],
 };
 
-// OP18-063 Kiwi & Mozu — no schema yet: its only effect is paid by "K.O. 1 of
-// your Stages", and no cost type K.O.s a Stage (KO_OWN_CHARACTER offers
-// Characters only). See DEFERRED-CARD-EFFECTS.md.
+// "You may K.O. 1 of your Stages with a cost of 5 or less:" (OPT-1050).
+const KO_OWN_STAGE_COST_5: Cost[] = [{ type: "KO_OWN_STAGE", filter: { cost_max: 5 } }];
+
+// OP18-063 Kiwi & Mozu
+// [On Play] You may K.O. 1 of your Stages with a cost of 5 or less: Add up to
+// 1 DON!! card as rested from your DON!! deck.
+
+export const OP18_063_KIWI_AND_MOZU: EffectSchema = {
+  card_id: "OP18-063",
+  card_name: "Kiwi & Mozu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_ko_stage_add_don",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      flags: { optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
+    },
+  ],
+};
 
 export const OP18_064_SAINT_KILLINGHAM: EffectSchema = {
   card_id: "OP18-064",
@@ -1589,8 +1608,27 @@ export const OP18_065_SAINT_GUNKO: EffectSchema = {
   ],
 };
 
-// OP18-066 Zambai — no schema yet: its only effect is paid by "K.O. 1 of your
-// Stages" (see OP18-063).
+// OP18-066 Zambai
+// [Activate: Main] You may K.O. 1 of your Stages with a cost of 5 or less:
+// This Character gains [Rush] during this turn.
+
+export const OP18_066_ZAMBAI: EffectSchema = {
+  card_id: "OP18-066",
+  card_name: "Zambai",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_ko_stage_rush",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      flags: { optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      actions: [
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "RUSH" }, duration: { type: "THIS_TURN" } },
+      ],
+    },
+  ],
+};
 
 export const OP18_067_CHARLOTTE_SMOOTHIE: EffectSchema = {
   card_id: "OP18-067",
@@ -1699,9 +1737,27 @@ export const OP18_072_THE_FRANKY_FAMILY: EffectSchema = {
   card_name: "The Franky Family",
   card_type: "Character",
   effects: [
-    // Partial: the [Activate: Main] is paid by "K.O. 1 of your Stages", which no
-    // cost type expresses (see OP18-063).
     { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      // [Activate: Main] [Once Per Turn] You may K.O. 1 of your Stages with a
+      // cost of 5 or less: If this Character was played on this turn, give up
+      // to 1 of your opponent's Characters −3000 power during this turn.
+      id: "activate_ko_stage_debuff",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      flags: { once_per_turn: true, optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: { type: "WAS_PLAYED_THIS_TURN" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { amount: -3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
   ],
 };
 
@@ -2560,7 +2616,8 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_052_MR_5_AND_MISS_VALENTINE, OP18_053_MR_7_AND_MISS_FATHERSDAY, OP18_054_MR_8_AND_MS_MONDAY,
     OP18_055_MR_9_AND_MS_WEDNESDAY, OP18_056_MR_13_AND_MS_FRIDAY, OP18_057_ATOMIC_DICER,
     OP18_058_THIS_KINGDOM_IS_DOOMED, OP18_059_I_PRAY_FOR_YOUR_SUCCESS,
-    OP18_060_SAINT_GUNKO, OP18_061_ICEBURG, OP18_064_SAINT_KILLINGHAM, OP18_065_SAINT_GUNKO,
+    OP18_060_SAINT_GUNKO, OP18_061_ICEBURG, OP18_063_KIWI_AND_MOZU, OP18_064_SAINT_KILLINGHAM, OP18_065_SAINT_GUNKO,
+    OP18_066_ZAMBAI,
     OP18_067_CHARLOTTE_SMOOTHIE, OP18_068_SENOR_PINK, OP18_069_SODOMU_AND_GOMORA, OP18_070_TOM, OP18_071_TREBOL,
     OP18_072_THE_FRANKY_FAMILY, OP18_074_CAN_YOU_PLEASE_SAIL, OP18_075_THOUSAND_SUNNY, OP18_076_SHARK_SUBMERGE_3,
     OP18_077_WHITE_HOBBY_HORSE_1, OP18_078_MINI_MERRY,

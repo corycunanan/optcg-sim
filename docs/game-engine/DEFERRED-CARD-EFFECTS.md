@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 8** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 5** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (8 cards) — 2026-11-20
+## OP-18 Deferred Effects (5 cards) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -442,32 +442,30 @@ needs engine vocabulary first; the ticket is named on each entry.
 
 ---
 
-### OP18-063 Kiwi & Mozu — NO SCHEMA
+### ~~OP18-063 Kiwi & Mozu~~ — ENCODED
 **Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
 
 > [On Play] You may K.O. 1 of your Stages with a cost of 5 or less: Add up to 1 DON!! card as rested from your DON!! deck.
 
-**Blocker:** `KO_OWN_CHARACTER` offers Characters only, and `TRASH_OWN_STAGE` trashes rather than K.O.s.
+OPT-1050 added the `KO_OWN_STAGE` cost: it K.O.s your Stage (filter `cost_max: 5`), honors "cannot be K.O.'d" protections, and publishes the same `CARD_KO` (`cardType: "STAGE"`) an effect K.O. does, marked as a cost movement.
 
 ---
 
-### OP18-066 Zambai — NO SCHEMA
+### ~~OP18-066 Zambai~~ — ENCODED
 **Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
 
 > [Activate: Main] You may K.O. 1 of your Stages with a cost of 5 or less: This Character gains [Rush] during this turn.
 
-**Blocker:** as OP18-063.
+Encoded with `KO_OWN_STAGE` (see OP18-063).
 
 ---
 
-### OP18-072 The Franky Family — PARTIAL
+### ~~OP18-072 The Franky Family~~ — ENCODED
 **Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
 
 > [Activate: Main] [Once Per Turn] You may K.O. 1 of your Stages with a cost of 5 or less: If this Character was played on this turn, give up to 1 of your opponent's Characters −3000 power during this turn.
 
-**Blocker:** as OP18-063.
-
-**Encoded:** [Blocker].
+Encoded with `KO_OWN_STAGE` and a post-cost `WAS_PLAYED_THIS_TURN` gate, beside [Blocker].
 
 ---
 
@@ -543,10 +541,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 40 cards | 0 | 0 |
+| Historical card entries in this document | 43 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 8 cards | 8 | 0 |
-| **Tracked cards still needing disposition** | — | **8** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 5 cards | 5 | 0 |
+| **Tracked cards still needing disposition** | — | **5** | **0** |

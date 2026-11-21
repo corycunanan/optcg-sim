@@ -198,6 +198,7 @@ const COST_MOVEMENT: Partial<Record<Cost["type"], RemovalAction>> = {
   PLACE_SELF_AND_HAND_TO_DECK: "RETURN_TO_DECK",
   PLACE_STAGE_TO_DECK: "RETURN_TO_DECK",
   TRASH_OWN_STAGE: "TRASH",
+  KO_OWN_STAGE: "KO",
 };
 
 /**
@@ -233,6 +234,7 @@ export function isFixedCostMovementProhibited(
       fixedId = state.players[controller].stage?.instanceId;
       break;
     case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE":
       fixedId = state.players[controller].stage?.instanceId;
       break;
     default:

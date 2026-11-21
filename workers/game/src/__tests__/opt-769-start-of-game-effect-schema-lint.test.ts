@@ -108,7 +108,7 @@ describe("OPT-769 — START_OF_GAME_EFFECT schema lint", () => {
 
   it("accepts the complete authored schema corpus", () => {
     expect(execFileSync("node", [linter], execOptions)).toContain(
-      "Schema validation clean — 2669 card(s).",
+      "Schema validation clean — 2671 card(s).",
     );
   });
 });

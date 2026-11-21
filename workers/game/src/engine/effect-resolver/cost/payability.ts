@@ -50,6 +50,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "PLACE_SELF_TO_DECK":
     case "RETURN_SELF_TO_HAND":
     case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE":
     case "LEADER_POWER_REDUCTION":
     case "GIVE_OPPONENT_DON":
     case "RETURN_ATTACHED_DON_TO_COST":
@@ -232,7 +233,8 @@ export function isCostPayable(
       return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);
     }
 
-    case "TRASH_OWN_STAGE": {
+    case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE": {
       if (!player.stage) return false;
       if (!cost.filter) return true;
       return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);
