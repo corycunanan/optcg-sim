@@ -268,6 +268,7 @@ export const EFFECT_FACET_GROUPS = [
       ["place_own_character_to_deck", "Place Own Character to Deck"],
       ["mill", "Mill from Deck"],
       ["place_self_to_deck", "Place Self to Deck"],
+      ["return_self_to_hand", "Return Self to Hand"],
       ["place_stage_to_deck", "Place Stage to Deck"],
       ["add_own_character_to_life", "Add Own Character to Life"],
       ["trash_own_stage", "Trash Own Stage"],

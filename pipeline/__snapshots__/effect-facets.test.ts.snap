@@ -208,6 +208,7 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "cost:rest_self",
   "cost:return_attached_don_to_cost",
   "cost:return_own_character_to_hand",
+  "cost:return_self_to_hand",
   "cost:reveal_from_hand",
   "cost:trash_from_hand",
   "cost:trash_from_life",
