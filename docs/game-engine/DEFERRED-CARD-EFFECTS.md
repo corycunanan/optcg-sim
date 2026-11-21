@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 1** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 0.** The OP-18 audit gaps (2026-11-20) are all encoded (OPT-1046 to OPT-1052).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (1 card) — 2026-11-20
+## OP-18 Deferred Effects (all encoded) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -494,12 +494,12 @@ OPT-1049 added `source_ref` to `REUSE_EFFECT`: the reused block belongs to the o
 
 ---
 
-### OP18-117 Buster Call — NO SCHEMA
+### ~~OP18-117 Buster Call~~ — ENCODED
 **Tags:** `ALL_LIFE_COST`, `MULTI_ZONE_BATCH_PLAY` · **Tickets:** OPT-1047, OPT-1048
 
 > [Main] You may trash all of your Life cards: If your Leader is [Spandam], trash all Characters and play up to a total of 5 {Vice Admiral} type Character cards with different card names from your deck or trash. Then, shuffle your deck.
 
-**Blocker:** the cost is ready (`TRASH_FROM_LIFE` with `all: true`, OPT-1047; FAQ: at 0 Life nothing happens), but no play selection spans the deck and the trash with one total and unique names.
+The cost is `TRASH_FROM_LIFE` with `all: true` (OPT-1047; FAQ: at 0 Life nothing happens and the card is trashed). OPT-1048 authors the play as one `CHARACTER_CARD` selection with `source_zone: ["DECK", "TRASH"]`, `count: { up_to: 5 }` and `unique_names: true`, so the total and the name check span both zones. "Trash all Characters" is `TRASH_CARD` on both players' Characters before the play, and `SHUFFLE_DECK` follows.
 
 ---
 
@@ -537,10 +537,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 47 cards | 0 | 0 |
+| Historical card entries in this document | 48 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 1 card | 1 | 0 |
-| **Tracked cards still needing disposition** | — | **1** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 0 cards | 0 | 0 |
+| **Tracked cards still needing disposition** | — | **0** | **0** |

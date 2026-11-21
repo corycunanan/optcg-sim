@@ -4,8 +4,8 @@
  * Effect-bearing new IDs. Reprint slots are authored in their origin sets.
  * Rulings: docs/FAQs/qa_op18.md.
  *
- * Cards with no expressible block have no schema yet (named in
- * docs/game-engine/DEFERRED-CARD-EFFECTS.md): OP18-117.
+ * Every effect-bearing card is authored (OPT-1046..1052 closed the audit gaps
+ * recorded in docs/game-engine/DEFERRED-CARD-EFFECTS.md).
  */
 import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
@@ -2622,10 +2622,50 @@ export const OP18_116_IRON_BODY_EMPTY_TREE: EffectSchema = {
   ],
 };
 
-// OP18-117 Buster Call — no schema yet: it is paid by "trash all of your Life
-// cards" (no cost type takes all of the Life; FAQ: at 0 Life nothing happens),
-// and "play up to a total of 5 ... with different card names from your deck
-// or trash" has no batch play from two zones. See DEFERRED-CARD-EFFECTS.md.
+// ─── OP18-117 Buster Call (Event) ────────────────────────────────────────────
+// [Main] You may trash all of your Life cards: If your Leader is [Spandam],
+// trash all Characters and play up to a total of 5 {Vice Admiral} type
+// Character cards with different card names from your deck or trash. Then,
+// shuffle your deck.
+// qa_op18: at 0 Life nothing happens and this card is trashed (the all-Life
+// cost needs at least 1 card, OPT-1047). OPT-1048: one CHARACTER_CARD
+// selection spans the deck and the trash, shares the total of 5, and
+// `unique_names` applies across the whole selection.
+
+export const OP18_117_BUSTER_CALL: EffectSchema = {
+  card_id: "OP18-117",
+  card_name: "Buster Call",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_buster_call",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      flags: { optional: true },
+      costs: [{ type: "TRASH_FROM_LIFE", all: true }],
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: leaderName("Spandam"),
+      actions: [
+        {
+          type: "TRASH_CARD",
+          target: { type: "CHARACTER", controller: "EITHER", count: { all: true } },
+        },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: ["DECK", "TRASH"],
+            count: { up_to: 5 },
+            filter: { traits: ["Vice Admiral"], unique_names: true },
+          },
+          params: { source_zone: "DECK_OR_TRASH" },
+        },
+        { type: "SHUFFLE_DECK", chain: "THEN" },
+      ],
+    },
+  ],
+};
 
 export const OP18_118_MONKEY_D_LUFFY: EffectSchema = {
   card_id: "OP18-118",
@@ -2701,7 +2741,7 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_096_ILL_MAKE_THE_CALL, OP18_097_ABYSS_PENTAGRAM,
     OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY, OP18_105_SPANDAM,
     OP18_106_DOBERMAN, OP18_107_NERO, OP18_108_FUNKFREED, OP18_109_FUKUROU, OP18_110_BLUENO, OP18_111_MOMONGA,
-    OP18_112_YAMAKAJI, OP18_113_ROB_LUCCI, OP18_114_WANZE, OP18_115_TEN_FINGER_PISTOL, OP18_116_IRON_BODY_EMPTY_TREE,
+    OP18_112_YAMAKAJI, OP18_113_ROB_LUCCI, OP18_114_WANZE, OP18_115_TEN_FINGER_PISTOL, OP18_116_IRON_BODY_EMPTY_TREE, OP18_117_BUSTER_CALL,
     OP18_118_MONKEY_D_LUFFY, OP18_119_SAINT_SHAMROCK,
   ].map((schema) => [schema.card_id!, schema]),
 );
