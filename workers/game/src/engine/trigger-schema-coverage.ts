@@ -49,10 +49,7 @@ function isDirectTriggerBlock(
  * Each entry names its ticket and must be removed when the ticket lands; this
  * is not a general escape hatch for unauthored cards.
  */
-export const DEFERRED_TRIGGER_SCHEMAS: ReadonlyMap<string, string> = new Map([
-  // Activates the [Trigger] of a revealed hand card (no action does this).
-  ["OP18-105", "OPT-1049"],
-]);
+export const DEFERRED_TRIGGER_SCHEMAS: ReadonlyMap<string, string> = new Map<string, string>([]);
 
 export function findMissingTriggerSchemas(
   manifest: Readonly<CardTextManifest>,

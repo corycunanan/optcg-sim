@@ -1354,7 +1354,8 @@ function validateOptionalActionPlacement(block: EffectBlock, prefix: string): st
  * OPT-913: every REUSE_EFFECT `target_effect` resolves to exactly one OTHER
  * block of the same card, by block id or by trigger keyword (any_of included);
  * see `findReuseTargetBlocks`. An unresolvable or ambiguous target is a silent
- * no-op at runtime, so it fails schema validation instead.
+ * no-op at runtime, so it fails schema validation instead. With `source_ref`
+ * (OPT-1049) the block is on the referenced card and is looked up at runtime.
  */
 function validateReuseEffectTargets(effects: EffectBlock[], prefix: string): string[] {
   const errors: string[] = [];
@@ -1368,8 +1369,14 @@ function validateReuseEffectTargets(effects: EffectBlock[], prefix: string): str
     if (record.type === "REUSE_EFFECT") {
       const params = record.params as Record<string, unknown> | undefined;
       const target = params?.target_effect;
+      const sourceRef = params?.source_ref;
       if (typeof target !== "string" || target.length === 0) {
         errors.push(`${path}.params.target_effect: Must be a non-empty block id or trigger keyword (OPT-913)`);
+      } else if (sourceRef !== undefined) {
+        // OPT-1049: the block belongs to the referenced card, known only at runtime.
+        if (typeof sourceRef !== "string" || sourceRef.length === 0) {
+          errors.push(`${path}.params.source_ref: Must be a non-empty result ref (OPT-1049)`);
+        }
       } else {
         const matches = findReuseTargetBlocks(effects, target);
         if (matches.length !== 1) {

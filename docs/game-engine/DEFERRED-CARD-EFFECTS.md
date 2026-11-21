@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 2** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 1** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (2 cards) — 2026-11-20
+## OP-18 Deferred Effects (1 card) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -485,12 +485,12 @@ OPT-1051 added the `RETURN_SELF_TO_HAND` cost, fixed to the source Character lik
 
 ---
 
-### OP18-105 Spandam — NO SCHEMA
+### ~~OP18-105 Spandam~~ — ENCODED
 **Tags:** `ACTIVATE_REVEALED_TRIGGER` · **Ticket:** OPT-1049
 
 > [Trigger] If your Leader's type includes "CP", reveal up to 1 card with a type including "CP" other than [Spandam] from your hand. Activate the [Trigger] effect of the revealed card.
 
-**Blocker:** no action resolves another card's [Trigger]; `REUSE_EFFECT` reuses the source card's own blocks. The FAQ returns the revealed card to hand and trashes this Spandam. `trigger-schema-coverage.ts` exempts this card from the OPT-590 gate until OPT-1049 lands.
+OPT-1049 added `source_ref` to `REUSE_EFFECT`: the reused block belongs to the one card in that result ref, here the revealed hand card, which becomes the block's source. The FAQ returns the revealed card to hand and trashes this Spandam, so the card never moves; a revealed "Play this card" [Trigger] (OP17-071) does nothing. The OPT-590 exemption in `trigger-schema-coverage.ts` is gone.
 
 ---
 
@@ -537,10 +537,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 46 cards | 0 | 0 |
+| Historical card entries in this document | 47 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 2 cards | 2 | 0 |
-| **Tracked cards still needing disposition** | — | **2** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 1 card | 1 | 0 |
+| **Tracked cards still needing disposition** | — | **1** | **0** |

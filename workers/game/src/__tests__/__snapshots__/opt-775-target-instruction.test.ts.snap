@@ -2,7 +2,7 @@
 
 exports[`OPT-775 target instructions > snapshots every authored action target and the distinct wording set 1`] = `
 {
-  "fallbackCount": 635,
+  "fallbackCount": 636,
   "fallbacks": [
     "EB01-008 :: ko_replacement :: replacement_actions[0] (TRASH_FROM_HAND)",
     "EB01-013 :: activate_play_and_draw :: actions[0] (PLAY_CARD)",
@@ -530,6 +530,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "OP18-092.effects.0.modifiers.0.target (non-action target)",
     "OP18-092.effects.1.modifiers.0.target (non-action target)",
     "OP18-097.effects.0.modifiers.0.target (non-action target)",
+    "OP18-105 :: trigger_cp :: actions[0] (REVEAL)",
     "P-001.effects.0.modifiers.0.target (non-action target)",
     "P-003.effects.0.modifiers.0.target (non-action target)",
     "P-004.effects.0.modifiers.0.target (non-action target)",
@@ -640,7 +641,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST35-004.effects.0.modifiers.1.target (non-action target)",
     "ST35-005.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 2174,
+  "generatedCount": 2175,
   "instructions": [
     "Add to Life the card being replaced.",
     "Add to Life up to 1 of Characters with a cost of 6 or less.",
@@ -967,6 +968,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give −4000 power to up to 1 of your opponent's Characters.",
     "Give −5 cost to up to 1 of your opponent's Characters.",
     "Give −5000 power to up to 1 of your opponent's Characters.",
+    "Give −5000 power to your opponent's Leaders or Characters.",
     "Give −6000 power to up to 1 of your opponent's Characters that are rested.",
     "Give −6000 power to up to 1 of your opponent's Characters.",
     "Give −7 cost to up to 1 of your opponent's Characters.",
@@ -1386,6 +1388,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your cards in hand.",
     "Trash your opponent's Life cards.",
   ],
-  "targetCount": 2809,
+  "targetCount": 2811,
 }
 `;

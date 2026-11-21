@@ -5,7 +5,7 @@
  * Rulings: docs/FAQs/qa_op18.md.
  *
  * Cards with no expressible block have no schema yet (named in
- * docs/game-engine/DEFERRED-CARD-EFFECTS.md): OP18-105, OP18-117.
+ * docs/game-engine/DEFERRED-CARD-EFFECTS.md): OP18-117.
  */
 import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
@@ -2429,9 +2429,39 @@ export const OP18_104_STRAWBERRY: EffectSchema = {
   effects: [{ id: "banish", category: "permanent", flags: { keywords: ["BANISH"] } }],
 };
 
-// OP18-105 Spandam — no schema yet: its [Trigger] activates the [Trigger] of a
-// revealed hand card, and no action does that (FAQ: the revealed card returns
-// to hand and this card is trashed). See DEFERRED-CARD-EFFECTS.md.
+// ─── OP18-105 Spandam (Character) ────────────────────────────────────────────
+// [Trigger] If your Leader's type includes "CP", reveal up to 1 card with a type
+// including "CP" other than [Spandam] from your hand. Activate the [Trigger]
+// effect of the revealed card.
+// qa_op18: the revealed card is returned to your hand and this Spandam is
+// trashed. OPT-1049: REUSE_EFFECT with source_ref resolves the revealed card's
+// [Trigger] block with that card as its source; a "Play this card" [Trigger]
+// does nothing because the card stays in hand.
+
+export const OP18_105_SPANDAM: EffectSchema = {
+  card_id: "OP18-105",
+  card_name: "Spandam",
+  card_type: "Character",
+  effects: [
+    cpTrigger([
+      {
+        type: "REVEAL",
+        target: {
+          type: "CARD_IN_HAND",
+          controller: "SELF",
+          count: { up_to: 1 },
+          filter: { ...CP, exclude_name: "Spandam" },
+        },
+        result_ref: "revealed_cp",
+      },
+      {
+        type: "REUSE_EFFECT",
+        params: { target_effect: "TRIGGER", source_ref: "revealed_cp" },
+        chain: "THEN",
+      },
+    ]),
+  ],
+};
 
 export const OP18_106_DOBERMAN: EffectSchema = {
   card_id: "OP18-106",
@@ -2669,7 +2699,7 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_084_SAINT_GUNKO, OP18_085_CERBERUS, OP18_086_GOLDBERG, OP18_087_STANSEN, OP18_088_SAINT_SOMMERS, OP18_089_DORRY,
     OP18_091_BROGY, OP18_092_RORONOA_ZORO, OP18_093_SLEEPTIDS, OP18_094_HEE_HEE_HEE, OP18_095_IM_LATE,
     OP18_096_ILL_MAKE_THE_CALL, OP18_097_ABYSS_PENTAGRAM,
-    OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY,
+    OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY, OP18_105_SPANDAM,
     OP18_106_DOBERMAN, OP18_107_NERO, OP18_108_FUNKFREED, OP18_109_FUKUROU, OP18_110_BLUENO, OP18_111_MOMONGA,
     OP18_112_YAMAKAJI, OP18_113_ROB_LUCCI, OP18_114_WANZE, OP18_115_TEN_FINGER_PISTOL, OP18_116_IRON_BODY_EMPTY_TREE,
     OP18_118_MONKEY_D_LUFFY, OP18_119_SAINT_SHAMROCK,

@@ -1035,7 +1035,16 @@ export interface ActionParamsMap {
 
   ACTIVATE_EVENT_FROM_HAND: Record<string, never>;
   ACTIVATE_EVENT_FROM_TRASH: Record<string, never>;
-  REUSE_EFFECT: { target_effect: string };
+  REUSE_EFFECT: {
+    target_effect: string;
+    /**
+     * OPT-1049: reuse a block of the single card in this result ref instead of
+     * the source card's own block ("Activate the [Trigger] effect of the
+     * revealed card", OP18-105). The card is the reused block's source and
+     * stays where it is.
+     */
+    source_ref?: string;
+  };
   NEGATE_TRIGGER_TYPE: {
     trigger_type: KeywordTriggerType;
     affected_controller?: "SELF" | "OPPONENT";

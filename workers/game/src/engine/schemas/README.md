@@ -542,7 +542,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `OPPONENT_ACTION` | "Opponent does X" | `{ action: Action }` |
 | `CHOOSE_VALUE` | "Choose a number" | Player selects a value |
 | `SCHEDULE_ACTION` | "At end of turn, do X" | `{ timing: "END_OF_THIS_TURN", action: {...} }` |
-| `REUSE_EFFECT` | "Activate [Trigger] effect" | `{ target_effect: "COUNTER" \| "MAIN_EVENT" }` |
+| `REUSE_EFFECT` | "Activate [Trigger] effect" | `{ target_effect: "COUNTER" \| "MAIN_EVENT", source_ref?: "<ref>" }` (`source_ref`: a revealed card's block, OPT-1049) |
 | `WIN_GAME` | "You win the game" | — |
 | `EXTRA_TURN` | "Take an extra turn" | — |
 
