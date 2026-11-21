@@ -313,11 +313,9 @@ export function executeReuseEffect(
   const matches = findReuseTargetBlocks(schema.effects, targetEffect);
   if (matches.length !== 1) return { state, events, succeeded: false };
   const targetBlock = matches[0];
-  // qa_op18 OP18-105: the revealed card is returned to your hand, so a reused
-  // "Play this card" (PLAY_SELF) cannot move it; such a block does nothing.
-  if (reusedSourceId !== sourceCardInstanceId && blockContainsAction(targetBlock, "PLAY_SELF")) {
-    return { state, events, succeeded: false };
-  }
+  // OP18-105 (Cory ruling 2026-11-21): the revealed card goes back to hand by
+  // default, but a reused block that moves it ("Play this card", trash it,
+  // add it to Life) overrides that, so the block resolves as printed.
 
   // OP16-103 Van Augur FAQ: the reused block's turn_restriction still applies —
   // reusing an OPPONENT_TURN-only [On K.O.] during your own turn does nothing.
@@ -344,10 +342,3 @@ export function executeReuseEffect(
   };
 }
 
-function blockContainsAction(node: unknown, actionType: string): boolean {
-  if (Array.isArray(node)) return node.some((child) => blockContainsAction(child, actionType));
-  if (!node || typeof node !== "object") return false;
-  const record = node as Record<string, unknown>;
-  if (record.type === actionType) return true;
-  return Object.values(record).some((child) => blockContainsAction(child, actionType));
-}

@@ -132,16 +132,41 @@ describe("OPT-1049 — OP18-105 Spandam", () => {
     expect(f.state.pendingPrompt).toBeNull();
   });
 
-  it("a revealed 'Play this card' [Trigger] does nothing: the card stays in hand", () => {
+  // Cory ruling 2026-11-21: returning to hand is the default; a reused block
+  // that moves its own card overrides it.
+  it("a revealed 'Play this card' [Trigger] plays the card from hand", () => {
     const f = fixture();
     f.setup();
     // OP17-071 Who's.Who: "[Trigger] Play this card."
     const whosWho = f.put("OP17-071", OWNER, "HAND", f.trigger);
     f.attackToTrigger();
     f.act({ type: "SELECT_TARGET", selectedInstanceIds: [whosWho.instanceId] });
-    expect(inHand(f.state, whosWho.instanceId)).toBe(true);
-    expect(f.state.players[OWNER].characters.some((c) => c?.cardId === "OP17-071")).toBe(false);
+    expect(f.state.players[OWNER].hand.some((c) => c.cardId === "OP17-071")).toBe(false);
+    expect(f.state.players[OWNER].characters.some((c) => c?.cardId === "OP17-071")).toBe(true);
     expect(inTrash(f.state, "OP18-105")).toBe(true);
+  });
+
+  it("a revealed [Trigger] that trashes its own card trashes it", () => {
+    const f = fixture();
+    f.setup();
+    const selfTrash = f.put("CP-SELF-TRASH", OWNER, "HAND", {
+      ...f.trigger,
+      effectSchema: {
+        card_id: "CP-SELF-TRASH",
+        card_name: "CP-SELF-TRASH",
+        card_type: "Character",
+        effects: [{
+          id: "trigger_trash_self",
+          category: "auto",
+          trigger: { keyword: "TRIGGER" },
+          actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+        }],
+      },
+    });
+    f.attackToTrigger();
+    f.act({ type: "SELECT_TARGET", selectedInstanceIds: [selfTrash.instanceId] });
+    expect(inHand(f.state, selfTrash.instanceId)).toBe(false);
+    expect(inTrash(f.state, "CP-SELF-TRASH")).toBe(true);
   });
 
   it("does nothing when your Leader's type does not include CP", () => {

@@ -490,7 +490,7 @@ OPT-1051 added the `RETURN_SELF_TO_HAND` cost, fixed to the source Character lik
 
 > [Trigger] If your Leader's type includes "CP", reveal up to 1 card with a type including "CP" other than [Spandam] from your hand. Activate the [Trigger] effect of the revealed card.
 
-OPT-1049 added `source_ref` to `REUSE_EFFECT`: the reused block belongs to the one card in that result ref, here the revealed hand card, which becomes the block's source. The FAQ returns the revealed card to hand and trashes this Spandam, so the card never moves; a revealed "Play this card" [Trigger] (OP17-071) does nothing. The OPT-590 exemption in `trigger-schema-coverage.ts` is gone.
+OPT-1049 added `source_ref` to `REUSE_EFFECT`: the reused block belongs to the one card in that result ref, here the revealed hand card, which becomes the block's source. The FAQ returns the revealed card to hand and trashes this Spandam. Returning to hand is the default only: a revealed [Trigger] that moves its own card, such as OP17-071 "Play this card", resolves as printed (Cory ruling, 2026-11-21). The OPT-590 exemption in `trigger-schema-coverage.ts` is gone.
 
 ---
 

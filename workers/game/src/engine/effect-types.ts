@@ -1041,7 +1041,7 @@ export interface ActionParamsMap {
      * OPT-1049: reuse a block of the single card in this result ref instead of
      * the source card's own block ("Activate the [Trigger] effect of the
      * revealed card", OP18-105). The card is the reused block's source and
-     * stays where it is.
+     * stays where it is unless the reused block itself moves it.
      */
     source_ref?: string;
   };

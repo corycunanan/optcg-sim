@@ -2577,7 +2577,7 @@ interface ReuseEffectParams {
 }
 ```
 
-With `source_ref` (OPT-1049, OP18-105 Spandam: "Activate the [Trigger] effect of the revealed card") the block is looked up at runtime on the single card in that result ref, which becomes the block's source and stays where it is. Schema validation skips the same-card lookup. A reused block containing `PLAY_SELF` does nothing, because the FAQ returns the revealed card to hand.
+With `source_ref` (OPT-1049, OP18-105 Spandam: "Activate the [Trigger] effect of the revealed card") the block is looked up at runtime on the single card in that result ref, which becomes the block's source. Schema validation skips the same-card lookup. The card stays in hand by default (qa_op18); a reused block that moves its own card ("Play this card", trash it, add it to Life) overrides that and resolves as printed (Cory ruling, 2026-11-21).
 
 See [Triggers — Self-Referencing Effect Reuse](./02-TRIGGERS.md) for the full pattern analysis.
 
