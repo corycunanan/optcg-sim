@@ -258,7 +258,7 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
     expect(next.players[0].deck.map((c) => c.instanceId)).toEqual(deckBefore);
   });
 
-  it("is the only authored REVEAL with a hand target", () => {
+  it("is one of the two authored REVEALs with a hand target", () => {
     // Inventory for OPT-999: every other REVEAL reads the deck or Life top
     // from params (their CARD_ON_TOP_OF_DECK / LIFE_CARD targets only name
     // the owner).
@@ -273,7 +273,11 @@ describe("OPT-999: OP10-058 Rebecca reveals chosen hand cards", () => {
       Object.values(record).forEach((child) => visit(child, cardId));
     };
     for (const [cardId, schema] of Object.entries(getAllAuthoredSchemas())) visit(schema.effects, cardId);
-    expect(handReveals.filter((entry) => entry.endsWith(":CARD_IN_HAND"))).toEqual([`${REBECCA}:CARD_IN_HAND`]);
+    expect(handReveals.filter((entry) => entry.endsWith(":CARD_IN_HAND"))).toEqual([
+      `${REBECCA}:CARD_IN_HAND`,
+      // OPT-1049: Spandam reveals 1 CP card from hand, then activates its [Trigger].
+      "OP18-105:CARD_IN_HAND",
+    ]);
     expect(
       handReveals.filter((entry) => !/:(CARD_IN_HAND|CARD_ON_TOP_OF_DECK|LIFE_CARD)$/.test(entry)),
     ).toEqual([]);

@@ -21,6 +21,8 @@ export function koCharacter(
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
   snapshotState: GameState = state,
+  // OPT-1050: a K.O. paid as a cost (KO_OWN_STAGE) is a COST movement.
+  movementCause: "EFFECT" | "COST" = "EFFECT",
 ): CardMutationResult | null {
   // Capture before zone exit clears both this identity and source auras. A
   // simultaneous batch supplies its common post-replacement field state.
@@ -55,7 +57,7 @@ export function koCharacter(
         causingController,
         sourceZone: moved.fact.source,
         sourceController: moved.fact.controller,
-        movementCause: "EFFECT",
+        movementCause,
         preKO_donCount: moved.fact.detachedDonInstanceIds.length,
         ...(preKO_basePower !== undefined ? { preKO_basePower } : {}),
         ...(preKO_keywords !== undefined ? { preKO_keywords } : {}),

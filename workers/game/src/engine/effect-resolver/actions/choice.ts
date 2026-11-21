@@ -291,7 +291,15 @@ export function executeReuseEffect(
   const events: PendingEvent[] = [];
   const params = getActionParams(action, "REUSE_EFFECT");
   const targetEffect = params.target_effect;
-  const card = findCardInstance(state, sourceCardInstanceId);
+  // OPT-1049: with source_ref the reused block belongs to the one card in that
+  // result (OP18-105 Spandam's revealed hand card), which becomes its source.
+  let reusedSourceId = sourceCardInstanceId;
+  if (params.source_ref !== undefined) {
+    const refIds = _resultRefs.get(params.source_ref)?.targetInstanceIds ?? [];
+    if (refIds.length !== 1) return { state, events, succeeded: false };
+    reusedSourceId = refIds[0];
+  }
+  const card = findCardInstance(state, reusedSourceId);
   if (!card) return { state, events, succeeded: false };
 
   const data = cardDb.get(card.cardId);
@@ -305,6 +313,11 @@ export function executeReuseEffect(
   const matches = findReuseTargetBlocks(schema.effects, targetEffect);
   if (matches.length !== 1) return { state, events, succeeded: false };
   const targetBlock = matches[0];
+  // qa_op18 OP18-105: the revealed card is returned to your hand, so a reused
+  // "Play this card" (PLAY_SELF) cannot move it; such a block does nothing.
+  if (reusedSourceId !== sourceCardInstanceId && blockContainsAction(targetBlock, "PLAY_SELF")) {
+    return { state, events, succeeded: false };
+  }
 
   // OP16-103 Van Augur FAQ: the reused block's turn_restriction still applies —
   // reusing an OPPONENT_TURN-only [On K.O.] during your own turn does nothing.
@@ -320,7 +333,7 @@ export function executeReuseEffect(
     if (restriction === "OPPONENT_TURN" && isOwnersTurn) return { state, events, succeeded: false };
   }
 
-  const resolveResult = services.resolveEffect(state, targetBlock, sourceCardInstanceId, controller, cardDb);
+  const resolveResult = services.resolveEffect(state, targetBlock, reusedSourceId, controller, cardDb);
   return {
     state: resolveResult.state,
     events: [...events, ...resolveResult.events],
@@ -329,4 +342,12 @@ export function executeReuseEffect(
       ? { pendingPrompt: resolveResult.pendingPrompt }
       : {}),
   };
+}
+
+function blockContainsAction(node: unknown, actionType: string): boolean {
+  if (Array.isArray(node)) return node.some((child) => blockContainsAction(child, actionType));
+  if (!node || typeof node !== "object") return false;
+  const record = node as Record<string, unknown>;
+  if (record.type === actionType) return true;
+  return Object.values(record).some((child) => blockContainsAction(child, actionType));
 }

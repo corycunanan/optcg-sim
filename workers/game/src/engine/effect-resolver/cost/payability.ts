@@ -4,7 +4,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, costSelectionCount, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, isEitherPlayerStagePlacement, isFixedCostMovementProhibited, lifeCostAmount, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -50,6 +50,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "PLACE_SELF_TO_DECK":
     case "RETURN_SELF_TO_HAND":
     case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE":
     case "LEADER_POWER_REDUCTION":
     case "GIVE_OPPONENT_DON":
     case "RETURN_ATTACHED_DON_TO_COST":
@@ -197,7 +198,7 @@ export function isCostPayable(
 
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE": {
-      const amt = resolveAmount(cost);
+      const amt = lifeCostAmount(cost, player.life.length);
       return player.life.length >= amt;
     }
 
@@ -232,7 +233,8 @@ export function isCostPayable(
       return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);
     }
 
-    case "TRASH_OWN_STAGE": {
+    case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE": {
       if (!player.stage) return false;
       if (!cost.filter) return true;
       return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);

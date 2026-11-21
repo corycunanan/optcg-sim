@@ -31,6 +31,7 @@ import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
+import { grantsStageCounter } from "@/lib/game/counter-eligibility";
 import { MidZone } from "./mid-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
 import { BoardNavbar } from "./board-navbar";
@@ -611,6 +612,7 @@ function BoardLayoutInner({
               !modalRouting.targetSelectionActive &&
               bs.canDragCounter
             }
+            stageCounterGranted={grantsStageCounter(bottomPlayer, cardDb)}
             availableDon={
               !dndDisabled && bs.canInteract
                 ? (bottomPlayer?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)

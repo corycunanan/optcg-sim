@@ -208,7 +208,12 @@ export interface EventFilter {
   controller?: Controller;
   cause?: EventCause;
   /** Causal effect source, distinct from the discarded card. */
-  effect_source?: { controller?: Controller; traits?: string[] };
+  /**
+   * OPT-1052: `name` and `card_type` narrow the source card ("by your
+   * [Marshall.D.Teach] Leader's effect", OP18-080); the name honors aliases
+   * and the all-names Leader rule as target filters do.
+   */
+  effect_source?: { controller?: Controller; traits?: string[]; name?: string; card_type?: "LEADER" | "CHARACTER" | "STAGE" | "EVENT" };
   source_card_type?: "CHARACTER";
   target_filter?: TargetFilter;
   source_zone?: string;
@@ -1030,7 +1035,16 @@ export interface ActionParamsMap {
 
   ACTIVATE_EVENT_FROM_HAND: Record<string, never>;
   ACTIVATE_EVENT_FROM_TRASH: Record<string, never>;
-  REUSE_EFFECT: { target_effect: string };
+  REUSE_EFFECT: {
+    target_effect: string;
+    /**
+     * OPT-1049: reuse a block of the single card in this result ref instead of
+     * the source card's own block ("Activate the [Trigger] effect of the
+     * revealed card", OP18-105). The card is the reused block's source and
+     * stays where it is.
+     */
+    source_ref?: string;
+  };
   NEGATE_TRIGGER_TYPE: {
     trigger_type: KeywordTriggerType;
     affected_controller?: "SELF" | "OPPONENT";
@@ -1440,7 +1454,9 @@ export type SimpleCost = {
           ? GiveDonCostFields
           : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
             ? AddCharacterToLifeCostFields
-            : unknown
+            : Type extends "LIFE_TO_HAND" | "TRASH_FROM_LIFE"
+              ? LifeCostFields
+              : unknown
   );
 }[SimpleCostType];
 
@@ -1476,6 +1492,15 @@ interface PlaceStageToDeckCostFields {
  * end after choosing the Character. Omitted or "SELF" keeps the historical
  * own-Characters-only ST13-001 cost. Only this cost type accepts the field.
  */
+interface LifeCostFields {
+  /**
+   * OPT-1047: "add all of your Life cards to your hand" / "trash all of your
+   * Life cards" (OP18-020, OP18-117). Moves every Life card; payable only with
+   * at least 1 (qa_op18.md). Replaces `amount` and never takes TOP_OR_BOTTOM.
+   */
+  all?: true;
+}
+
 interface AddCharacterToLifeCostFields {
   controller?: "SELF" | "OPPONENT";
 }
@@ -1540,6 +1565,9 @@ export type CostType =
   // ... at the top or bottom of your opponent's Life cards".
   | "ADD_OWN_CHARACTER_TO_LIFE"
   | "TRASH_OWN_STAGE"
+  // OPT-1050: "K.O. 1 of your Stages [with a cost of N or less]" — fixed to
+  // your Stage (at most one), K.O. rather than trash.
+  | "KO_OWN_STAGE"
   | "PLACE_FROM_TRASH_TO_DECK"
   | "LEADER_POWER_REDUCTION"
   | "GIVE_OPPONENT_DON"
@@ -1564,7 +1592,7 @@ export const ALL_COST_TYPES = [
   "PLAY_NAMED_CARD_FROM_HAND", "REST_CARDS", "REST_NAMED_CARD", "KO_OWN_CHARACTER",
   "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
   "MILL", "PLACE_SELF_TO_DECK", "RETURN_SELF_TO_HAND", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
-  "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
+  "TRASH_OWN_STAGE", "KO_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
   "GIVE_OPPONENT_DON", "GIVE_DON", "GIVE_OPPONENT_DON_TO_OPPONENT", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",
   "TURN_LIFE_FACE_DOWN", "CHOOSE_ONE_COST", "CHOICE",

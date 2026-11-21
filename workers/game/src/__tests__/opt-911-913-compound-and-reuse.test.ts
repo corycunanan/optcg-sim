@@ -421,7 +421,8 @@ describe("OPT-913 — REUSE_EFFECT target_effect resolves to exactly one block",
       if (Array.isArray(node)) return node.forEach((n) => visit(n, block));
       if (!node || typeof node !== "object") return;
       const r = node as Record<string, unknown>;
-      if (r.type === "REUSE_EFFECT") {
+      // OPT-1049: a source_ref reuse targets another card's block at runtime.
+      if (r.type === "REUSE_EFFECT" && !(r.params as { source_ref?: string }).source_ref) {
         found.push({ block, target: (r.params as { target_effect: string }).target_effect });
       }
       Object.values(r).forEach((v) => visit(v, block));

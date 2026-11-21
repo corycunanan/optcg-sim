@@ -296,7 +296,9 @@ function validateUseCounter(
 
   const cardData = cardDb.get(found.card.cardId);
   if (!cardData) return "Card data not found";
-  if (cardData.type !== "Character") return "Symbol counters are on Character cards";
+  // OPT-1046: a Stage with a granted Counter (OP18-021 Franky) is a symbol
+  // counter too (qa_op18.md); Events use their [Counter] effect instead.
+  if (cardData.type !== "Character" && cardData.type !== "Stage") return "Symbol counters are on Character or Stage cards";
   // OPT-400: COUNTER_GRANT rule mods can give counterless cards a value.
   if (getEffectiveCounterValue(found.card, cardData, state, cardDb) <= 0) {
     return "This card has no counter value";

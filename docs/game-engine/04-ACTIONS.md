@@ -2559,12 +2559,13 @@ Activate another EffectBlock on the same card by referencing its block `id` or a
 ```typescript
 interface ReuseEffectParams {
   target_effect: string; // block id or KeywordTriggerType
+  source_ref?: string; // OPT-1049: reuse a block of the one card in this result ref
 }
 ```
 
 | Field | Value |
 |-------|-------|
-| **Target** | None (operates on the source card's own effects) |
+| **Target** | None (operates on the source card's own effects, or with `source_ref` on the referenced card's) |
 | **Failure mode** | `target_effect` must resolve to exactly one other block (OPT-913); schema validation rejects anything else. If the referenced effect's conditions are not met, it does not resolve. |
 | **Fired events** | Depends on the referenced EffectBlock's actions |
 | **Example cards** | ST03-016 (Trigger activates Counter), ST21-017 (Trigger activates Main), OP13-113 (Trigger activates On Play) |
@@ -2575,6 +2576,8 @@ interface ReuseEffectParams {
   "params": { "target_effect": "COUNTER_EVENT" }
 }
 ```
+
+With `source_ref` (OPT-1049, OP18-105 Spandam: "Activate the [Trigger] effect of the revealed card") the block is looked up at runtime on the single card in that result ref, which becomes the block's source and stays where it is. Schema validation skips the same-card lookup. A reused block containing `PLAY_SELF` does nothing, because the FAQ returns the revealed card to hand.
 
 See [Triggers — Self-Referencing Effect Reuse](./02-TRIGGERS.md) for the full pattern analysis.
 

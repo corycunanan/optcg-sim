@@ -4,12 +4,10 @@
  * Effect-bearing new IDs. Reprint slots are authored in their origin sets.
  * Rulings: docs/FAQs/qa_op18.md.
  *
- * Partial cards (every expressible block authored; the missing clause is named
- * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
- * OP18-021, OP18-072, OP18-080. Cards with no expressible block have no schema
- * yet: OP18-020, OP18-063, OP18-066, OP18-105, OP18-117.
+ * Every effect-bearing card is authored (OPT-1046..1052 closed the audit gaps
+ * recorded in docs/game-engine/DEFERRED-CARD-EFFECTS.md).
  */
-import type { Action, Condition, EffectSchema, TargetFilter } from "../effect-types.js";
+import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
 type Block = EffectSchema["effects"][number];
 
@@ -628,9 +626,36 @@ export const OP18_019_QUACK: EffectSchema = {
   ],
 };
 
-// OP18-020 Stop Fighting!!! — no schema yet. Its only effect is paid by "add all
-// of your Life cards to your hand", and no cost type takes all of the Life
-// (FAQ: unusable at 0 Life). See DEFERRED-CARD-EFFECTS.md.
+// OP18-020 Stop Fighting!!!
+// [Counter] You may add all of your Life cards to your hand: If your Leader is
+// [Nefeltari Vivi], give your opponent's Leader and all of their Characters
+// −5000 power during this turn.
+// FAQ: at 0 Life the cost cannot be paid, so the −5000 does not happen.
+
+export const OP18_020_STOP_FIGHTING: EffectSchema = {
+  card_id: "OP18-020",
+  card_name: "Stop Fighting!!!",
+  card_type: "Event",
+  effects: [
+    {
+      id: "counter_all_life_debuff",
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
+      flags: { optional: true },
+      costs: [{ type: "LIFE_TO_HAND", all: true }],
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: leaderName("Nefeltari Vivi"),
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "LEADER_OR_CHARACTER", controller: "OPPONENT", count: { all: true } },
+          params: { amount: -5000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GREEN (and the Green/Purple Leader)
@@ -641,10 +666,13 @@ export const OP18_021_FRANKY: EffectSchema = {
   card_name: "Franky",
   card_type: "Leader",
   effects: [
-    // Partial: "All Stage cards in your hand have a +3000 Counter" is deferred.
-    // The Counter Step accepts only Character cards as symbol counters
-    // (validation.ts validateUseCounter), so a COUNTER_GRANT on Stages would
-    // never be usable.
+    {
+      // All Stage cards in your hand have a +3000 Counter. FAQ: a Stage is
+      // used in the Counter Step like a Character with a printed Counter.
+      id: "stage_counter_grant",
+      category: "rule_modification",
+      rule: { rule_type: "COUNTER_GRANT", value: 3000, filter: { card_type: "STAGE" } },
+    },
     {
       id: "activate_play_stage",
       category: "activate",
@@ -1527,9 +1555,28 @@ export const OP18_061_ICEBURG: EffectSchema = {
   ],
 };
 
-// OP18-063 Kiwi & Mozu — no schema yet: its only effect is paid by "K.O. 1 of
-// your Stages", and no cost type K.O.s a Stage (KO_OWN_CHARACTER offers
-// Characters only). See DEFERRED-CARD-EFFECTS.md.
+// "You may K.O. 1 of your Stages with a cost of 5 or less:" (OPT-1050).
+const KO_OWN_STAGE_COST_5: Cost[] = [{ type: "KO_OWN_STAGE", filter: { cost_max: 5 } }];
+
+// OP18-063 Kiwi & Mozu
+// [On Play] You may K.O. 1 of your Stages with a cost of 5 or less: Add up to
+// 1 DON!! card as rested from your DON!! deck.
+
+export const OP18_063_KIWI_AND_MOZU: EffectSchema = {
+  card_id: "OP18-063",
+  card_name: "Kiwi & Mozu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_ko_stage_add_don",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      flags: { optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
+    },
+  ],
+};
 
 export const OP18_064_SAINT_KILLINGHAM: EffectSchema = {
   card_id: "OP18-064",
@@ -1589,8 +1636,27 @@ export const OP18_065_SAINT_GUNKO: EffectSchema = {
   ],
 };
 
-// OP18-066 Zambai — no schema yet: its only effect is paid by "K.O. 1 of your
-// Stages" (see OP18-063).
+// OP18-066 Zambai
+// [Activate: Main] You may K.O. 1 of your Stages with a cost of 5 or less:
+// This Character gains [Rush] during this turn.
+
+export const OP18_066_ZAMBAI: EffectSchema = {
+  card_id: "OP18-066",
+  card_name: "Zambai",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_ko_stage_rush",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      flags: { optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      actions: [
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "RUSH" }, duration: { type: "THIS_TURN" } },
+      ],
+    },
+  ],
+};
 
 export const OP18_067_CHARLOTTE_SMOOTHIE: EffectSchema = {
   card_id: "OP18-067",
@@ -1699,9 +1765,27 @@ export const OP18_072_THE_FRANKY_FAMILY: EffectSchema = {
   card_name: "The Franky Family",
   card_type: "Character",
   effects: [
-    // Partial: the [Activate: Main] is paid by "K.O. 1 of your Stages", which no
-    // cost type expresses (see OP18-063).
     { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      // [Activate: Main] [Once Per Turn] You may K.O. 1 of your Stages with a
+      // cost of 5 or less: If this Character was played on this turn, give up
+      // to 1 of your opponent's Characters −3000 power during this turn.
+      id: "activate_ko_stage_debuff",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      flags: { once_per_turn: true, optional: true },
+      costs: KO_OWN_STAGE_COST_5,
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: { type: "WAS_PLAYED_THIS_TURN" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { amount: -3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
   ],
 };
 
@@ -1867,9 +1951,25 @@ export const OP18_080_VAN_AUGUR: EffectSchema = {
   card_name: "Van Augur",
   card_type: "Character",
   effects: [
-    // Partial: "When a card is trashed from your hand by your [Marshall.D.Teach]
-    // Leader's effect" is deferred. The CARD_TRASHED_FROM_HAND effect_source
-    // filter matches only controller and traits, not a name or the Leader.
+    {
+      // [Your Turn] [Once Per Turn] When a card is trashed from your hand by
+      // your [Marshall.D.Teach] Leader's effect, if you have no other [Van
+      // Augur], draw 1 card.
+      id: "your_turn_teach_leader_hand_trash_draw",
+      category: "auto",
+      trigger: {
+        event: "CARD_TRASHED_FROM_HAND",
+        turn_restriction: "YOUR_TURN",
+        filter: {
+          controller: "SELF",
+          cause: "BY_EFFECT",
+          effect_source: { controller: "SELF", card_type: "LEADER", name: "Marshall.D.Teach" },
+        },
+      },
+      flags: { once_per_turn: true },
+      conditions: { not: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Van Augur" }, exclude_self: true } },
+      actions: [draw(1)],
+    },
     { id: "on_ko_draw", category: "auto", trigger: { keyword: "ON_KO" }, actions: [draw(1)] },
   ],
 };
@@ -2329,9 +2429,39 @@ export const OP18_104_STRAWBERRY: EffectSchema = {
   effects: [{ id: "banish", category: "permanent", flags: { keywords: ["BANISH"] } }],
 };
 
-// OP18-105 Spandam — no schema yet: its [Trigger] activates the [Trigger] of a
-// revealed hand card, and no action does that (FAQ: the revealed card returns
-// to hand and this card is trashed). See DEFERRED-CARD-EFFECTS.md.
+// ─── OP18-105 Spandam (Character) ────────────────────────────────────────────
+// [Trigger] If your Leader's type includes "CP", reveal up to 1 card with a type
+// including "CP" other than [Spandam] from your hand. Activate the [Trigger]
+// effect of the revealed card.
+// qa_op18: the revealed card is returned to your hand and this Spandam is
+// trashed. OPT-1049: REUSE_EFFECT with source_ref resolves the revealed card's
+// [Trigger] block with that card as its source; a "Play this card" [Trigger]
+// does nothing because the card stays in hand.
+
+export const OP18_105_SPANDAM: EffectSchema = {
+  card_id: "OP18-105",
+  card_name: "Spandam",
+  card_type: "Character",
+  effects: [
+    cpTrigger([
+      {
+        type: "REVEAL",
+        target: {
+          type: "CARD_IN_HAND",
+          controller: "SELF",
+          count: { up_to: 1 },
+          filter: { ...CP, exclude_name: "Spandam" },
+        },
+        result_ref: "revealed_cp",
+      },
+      {
+        type: "REUSE_EFFECT",
+        params: { target_effect: "TRIGGER", source_ref: "revealed_cp" },
+        chain: "THEN",
+      },
+    ]),
+  ],
+};
 
 export const OP18_106_DOBERMAN: EffectSchema = {
   card_id: "OP18-106",
@@ -2492,10 +2622,50 @@ export const OP18_116_IRON_BODY_EMPTY_TREE: EffectSchema = {
   ],
 };
 
-// OP18-117 Buster Call — no schema yet: it is paid by "trash all of your Life
-// cards" (no cost type takes all of the Life; FAQ: at 0 Life nothing happens),
-// and "play up to a total of 5 ... with different card names from your deck
-// or trash" has no batch play from two zones. See DEFERRED-CARD-EFFECTS.md.
+// ─── OP18-117 Buster Call (Event) ────────────────────────────────────────────
+// [Main] You may trash all of your Life cards: If your Leader is [Spandam],
+// trash all Characters and play up to a total of 5 {Vice Admiral} type
+// Character cards with different card names from your deck or trash. Then,
+// shuffle your deck.
+// qa_op18: at 0 Life nothing happens and this card is trashed (the all-Life
+// cost needs at least 1 card, OPT-1047). OPT-1048: one CHARACTER_CARD
+// selection spans the deck and the trash, shares the total of 5, and
+// `unique_names` applies across the whole selection.
+
+export const OP18_117_BUSTER_CALL: EffectSchema = {
+  card_id: "OP18-117",
+  card_name: "Buster Call",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_buster_call",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      flags: { optional: true },
+      costs: [{ type: "TRASH_FROM_LIFE", all: true }],
+      // Post-colon "If" gate — evaluated once after costs are paid (rule 8-3-1).
+      post_cost_conditions: leaderName("Spandam"),
+      actions: [
+        {
+          type: "TRASH_CARD",
+          target: { type: "CHARACTER", controller: "EITHER", count: { all: true } },
+        },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: ["DECK", "TRASH"],
+            count: { up_to: 5 },
+            filter: { traits: ["Vice Admiral"], unique_names: true },
+          },
+          params: { source_zone: "DECK_OR_TRASH" },
+        },
+        { type: "SHUFFLE_DECK", chain: "THEN" },
+      ],
+    },
+  ],
+};
 
 export const OP18_118_MONKEY_D_LUFFY: EffectSchema = {
   card_id: "OP18-118",
@@ -2549,7 +2719,7 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_001_KAROO, OP18_002_IGARAM, OP18_004_KAROO, OP18_005_KUNG_FU_JUGON, OP18_006_KOZA,
     OP18_007_SMOKER, OP18_008_CHAKA, OP18_009_SUPER_SPOT_BILLED_DUCK_TROOPS, OP18_010_TONY_TONY_CHOPPER,
     OP18_011_NEFELTARI_VIVI, OP18_012_PINCERS, OP18_013_PELL, OP18_014_PORTGAS_D_ACE, OP18_015_EYELASHES,
-    OP18_016_MONKEY_D_LUFFY, OP18_017_RORONOA_ZORO, OP18_018_LETS_GO_KAROO, OP18_019_QUACK,
+    OP18_016_MONKEY_D_LUFFY, OP18_017_RORONOA_ZORO, OP18_018_LETS_GO_KAROO, OP18_019_QUACK, OP18_020_STOP_FIGHTING,
     OP18_021_FRANKY, OP18_022_MONKEY_D_LUFFY, OP18_023_GAIMON, OP18_024_KOKORO, OP18_025_GONBE,
     OP18_026_SANJI, OP18_027_ZORO_AND_SOGEKING, OP18_028_CHIMNEY, OP18_029_TONY_TONY_CHOPPER, OP18_030_NAMI,
     OP18_031_NICO_ROBIN, OP18_032_BUGGY, OP18_033_BANBAN, OP18_034_FRANKY, OP18_036_MONKEY_D_LUFFY,
@@ -2560,7 +2730,8 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_052_MR_5_AND_MISS_VALENTINE, OP18_053_MR_7_AND_MISS_FATHERSDAY, OP18_054_MR_8_AND_MS_MONDAY,
     OP18_055_MR_9_AND_MS_WEDNESDAY, OP18_056_MR_13_AND_MS_FRIDAY, OP18_057_ATOMIC_DICER,
     OP18_058_THIS_KINGDOM_IS_DOOMED, OP18_059_I_PRAY_FOR_YOUR_SUCCESS,
-    OP18_060_SAINT_GUNKO, OP18_061_ICEBURG, OP18_064_SAINT_KILLINGHAM, OP18_065_SAINT_GUNKO,
+    OP18_060_SAINT_GUNKO, OP18_061_ICEBURG, OP18_063_KIWI_AND_MOZU, OP18_064_SAINT_KILLINGHAM, OP18_065_SAINT_GUNKO,
+    OP18_066_ZAMBAI,
     OP18_067_CHARLOTTE_SMOOTHIE, OP18_068_SENOR_PINK, OP18_069_SODOMU_AND_GOMORA, OP18_070_TOM, OP18_071_TREBOL,
     OP18_072_THE_FRANKY_FAMILY, OP18_074_CAN_YOU_PLEASE_SAIL, OP18_075_THOUSAND_SUNNY, OP18_076_SHARK_SUBMERGE_3,
     OP18_077_WHITE_HOBBY_HORSE_1, OP18_078_MINI_MERRY,
@@ -2568,9 +2739,9 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_084_SAINT_GUNKO, OP18_085_CERBERUS, OP18_086_GOLDBERG, OP18_087_STANSEN, OP18_088_SAINT_SOMMERS, OP18_089_DORRY,
     OP18_091_BROGY, OP18_092_RORONOA_ZORO, OP18_093_SLEEPTIDS, OP18_094_HEE_HEE_HEE, OP18_095_IM_LATE,
     OP18_096_ILL_MAKE_THE_CALL, OP18_097_ABYSS_PENTAGRAM,
-    OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY,
+    OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY, OP18_105_SPANDAM,
     OP18_106_DOBERMAN, OP18_107_NERO, OP18_108_FUNKFREED, OP18_109_FUKUROU, OP18_110_BLUENO, OP18_111_MOMONGA,
-    OP18_112_YAMAKAJI, OP18_113_ROB_LUCCI, OP18_114_WANZE, OP18_115_TEN_FINGER_PISTOL, OP18_116_IRON_BODY_EMPTY_TREE,
+    OP18_112_YAMAKAJI, OP18_113_ROB_LUCCI, OP18_114_WANZE, OP18_115_TEN_FINGER_PISTOL, OP18_116_IRON_BODY_EMPTY_TREE, OP18_117_BUSTER_CALL,
     OP18_118_MONKEY_D_LUFFY, OP18_119_SAINT_SHAMROCK,
   ].map((schema) => [schema.card_id!, schema]),
 );

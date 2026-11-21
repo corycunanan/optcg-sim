@@ -185,6 +185,7 @@ const COST_PRODUCES: Record<Cost["type"], readonly PruneResource[]> = {
   REST_SELF: [],
   TRASH_SELF: [],
   TRASH_OWN_STAGE: [],
+  KO_OWN_STAGE: [],
   LEADER_POWER_REDUCTION: [],
   GIVE_OPPONENT_DON: [],
   RETURN_ATTACHED_DON_TO_COST: [],

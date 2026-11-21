@@ -202,7 +202,7 @@ function PlayerFieldComponent({
     draggedHandData?.type === "Event" &&
     (canInteract || (canDragCounter && isCounterEvent(draggedHandData)));
   const characterCounterDragActive =
-    canDragCounter && draggedHandData?.type === "Character";
+    canDragCounter && (draggedHandData?.type === "Character" || draggedHandData?.type === "Stage");
   const playSignalActive =
     activeDrag?.type !== "hand-card" || activeDrag.affordable !== false;
 
