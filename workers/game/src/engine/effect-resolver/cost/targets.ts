@@ -193,6 +193,7 @@ const COST_MOVEMENT: Partial<Record<Cost["type"], RemovalAction>> = {
   TRASH_NAMED_CARD_FROM_HAND_OR_STAGE: "TRASH",
   TRASH_SELF: "TRASH",
   PLACE_SELF_TO_DECK: "RETURN_TO_DECK",
+  RETURN_SELF_TO_HAND: "RETURN_TO_HAND",
   PLACE_SELF_AND_TRASH_TO_DECK: "RETURN_TO_DECK",
   PLACE_SELF_AND_HAND_TO_DECK: "RETURN_TO_DECK",
   PLACE_STAGE_TO_DECK: "RETURN_TO_DECK",
@@ -220,6 +221,7 @@ export function isFixedCostMovementProhibited(
   switch (cost.type) {
     case "TRASH_SELF":
     case "PLACE_SELF_TO_DECK":
+    case "RETURN_SELF_TO_HAND":
     case "PLACE_SELF_AND_TRASH_TO_DECK":
     case "PLACE_SELF_AND_HAND_TO_DECK":
       fixedId = sourceCardInstanceId;

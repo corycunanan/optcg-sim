@@ -1573,7 +1573,7 @@ export const OP07_047_TRAFALGAR_LAW: EffectSchema = {
       id: "OP07-047_effect_1",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
+      costs: [{ type: "RETURN_SELF_TO_HAND" }],
       // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
       post_cost_conditions: {
         type: "HAND_COUNT",

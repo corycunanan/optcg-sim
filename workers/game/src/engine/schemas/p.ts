@@ -1831,7 +1831,7 @@ export const P_074_PORTGAS_D_ACE: EffectSchema = {
       id: "activate_return_self_scry",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
+      costs: [{ type: "RETURN_SELF_TO_HAND" }],
       actions: [
         { type: "DECK_SCRY", params: { look_at: 5 } },
       ],
@@ -2027,7 +2027,7 @@ export const P_081_DRACULE_MIHAWK: EffectSchema = {
       id: "activate_return_self_play_cross_guild",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
+      costs: [{ type: "RETURN_SELF_TO_HAND" }],
       // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
       post_cost_conditions: {
         type: "CARD_ON_FIELD",

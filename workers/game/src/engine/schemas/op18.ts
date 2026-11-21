@@ -7,7 +7,7 @@
  * Partial cards (every expressible block authored; the missing clause is named
  * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
  * OP18-021, OP18-072, OP18-080. Cards with no expressible block have no schema
- * yet: OP18-020, OP18-063, OP18-066, OP18-085, OP18-105, OP18-117.
+ * yet: OP18-020, OP18-063, OP18-066, OP18-105, OP18-117.
  */
 import type { Action, Condition, EffectSchema, TargetFilter } from "../effect-types.js";
 
@@ -1999,9 +1999,44 @@ export const OP18_084_SAINT_GUNKO: EffectSchema = {
   ],
 };
 
-// OP18-085 Cerberus — no schema yet: its only effect is paid by "return this
-// Character to the owner's hand". RETURN_OWN_CHARACTER_TO_HAND offers any of
-// your Characters and has no this-card form. See DEFERRED-CARD-EFFECTS.md.
+// OP18-085 Cerberus
+// [Activate: Main] You may return this Character to the owner's hand: Up to 1
+// of your [Saint Shamrock] Characters gains [Rush], [Banish] or [Unblockable]
+// during this turn.
+
+function grantSaintShamrock(keyword: "RUSH" | "BANISH" | "UNBLOCKABLE"): Action[] {
+  return [{
+    type: "GRANT_KEYWORD",
+    target: { type: "CHARACTER", controller: "SELF", count: { up_to: 1 }, filter: { name: "Saint Shamrock" } },
+    params: { keyword },
+    duration: { type: "THIS_TURN" },
+  }];
+}
+
+export const OP18_085_CERBERUS: EffectSchema = {
+  card_id: "OP18-085",
+  card_name: "Cerberus",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_return_self_grant_keyword",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      flags: { optional: true },
+      // OPT-1051: only this Character can pay the cost.
+      costs: [{ type: "RETURN_SELF_TO_HAND" }],
+      actions: [
+        {
+          type: "PLAYER_CHOICE",
+          params: {
+            options: [grantSaintShamrock("RUSH"), grantSaintShamrock("BANISH"), grantSaintShamrock("UNBLOCKABLE")],
+            labels: ["Rush", "Banish", "Unblockable"],
+          },
+        },
+      ],
+    },
+  ],
+};
 
 export const OP18_086_GOLDBERG: EffectSchema = {
   card_id: "OP18-086",
@@ -2530,7 +2565,7 @@ export const OP18_SCHEMAS: Record<string, EffectSchema> = Object.fromEntries(
     OP18_072_THE_FRANKY_FAMILY, OP18_074_CAN_YOU_PLEASE_SAIL, OP18_075_THOUSAND_SUNNY, OP18_076_SHARK_SUBMERGE_3,
     OP18_077_WHITE_HOBBY_HORSE_1, OP18_078_MINI_MERRY,
     OP18_079_SPANDAM, OP18_080_VAN_AUGUR, OP18_081_OARS, OP18_082_CATARINA_DEVON, OP18_083_SAINT_KILLINGHAM,
-    OP18_084_SAINT_GUNKO, OP18_086_GOLDBERG, OP18_087_STANSEN, OP18_088_SAINT_SOMMERS, OP18_089_DORRY,
+    OP18_084_SAINT_GUNKO, OP18_085_CERBERUS, OP18_086_GOLDBERG, OP18_087_STANSEN, OP18_088_SAINT_SOMMERS, OP18_089_DORRY,
     OP18_091_BROGY, OP18_092_RORONOA_ZORO, OP18_093_SLEEPTIDS, OP18_094_HEE_HEE_HEE, OP18_095_IM_LATE,
     OP18_096_ILL_MAKE_THE_CALL, OP18_097_ABYSS_PENTAGRAM,
     OP18_098_ONIGUMO, OP18_099_KAKU, OP18_100_KALIFA, OP18_101_KUMADORI, OP18_103_JABRA, OP18_104_STRAWBERRY,

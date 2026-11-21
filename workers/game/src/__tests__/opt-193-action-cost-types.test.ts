@@ -57,6 +57,7 @@ describe("OPT-193 exhaustive cost narrowing", () => {
     { cost: { type: "PLACE_OWN_CHARACTER_TO_DECK" }, needsSelection: true },
     { cost: { type: "MILL", amount: 2 }, needsSelection: false },
     { cost: { type: "PLACE_SELF_TO_DECK" }, needsSelection: false },
+    { cost: { type: "RETURN_SELF_TO_HAND" }, needsSelection: false },
     { cost: { type: "PLACE_STAGE_TO_DECK" }, needsSelection: false },
     { cost: { type: "ADD_OWN_CHARACTER_TO_LIFE" }, needsSelection: true },
     { cost: { type: "TRASH_OWN_STAGE" }, needsSelection: false },

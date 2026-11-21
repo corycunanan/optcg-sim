@@ -940,7 +940,7 @@ export const OP02_034_CHOPPER: EffectSchema = {
 };
 
 // ─── OP02-035 Trafalgar Law — ACTIVATE_MAIN + DON_REST cost +
-//     RETURN_OWN_CHARACTER_TO_HAND cost (self) + PLAY_CARD ────────────────────
+//     RETURN_SELF_TO_HAND cost + PLAY_CARD ────────────────────
 // [Activate: Main] 1 You may return this Character to the owner's hand:
 //   Play up to 1 Character with a cost of 3 from your hand.
 
@@ -955,7 +955,7 @@ export const OP02_035_TRAFALGAR_LAW: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [
         { type: "DON_REST", amount: 1 },
-        { type: "RETURN_OWN_CHARACTER_TO_HAND" },
+        { type: "RETURN_SELF_TO_HAND" },
       ],
       actions: [
         {
