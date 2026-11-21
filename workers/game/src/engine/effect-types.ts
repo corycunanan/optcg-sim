@@ -208,7 +208,12 @@ export interface EventFilter {
   controller?: Controller;
   cause?: EventCause;
   /** Causal effect source, distinct from the discarded card. */
-  effect_source?: { controller?: Controller; traits?: string[] };
+  /**
+   * OPT-1052: `name` and `card_type` narrow the source card ("by your
+   * [Marshall.D.Teach] Leader's effect", OP18-080); the name honors aliases
+   * and the all-names Leader rule as target filters do.
+   */
+  effect_source?: { controller?: Controller; traits?: string[]; name?: string; card_type?: "LEADER" | "CHARACTER" | "STAGE" | "EVENT" };
   source_card_type?: "CHARACTER";
   target_filter?: TargetFilter;
   source_zone?: string;

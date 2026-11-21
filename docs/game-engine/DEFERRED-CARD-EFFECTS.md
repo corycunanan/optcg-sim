@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 3** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 2** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (3 cards) — 2026-11-20
+## OP-18 Deferred Effects (2 cards) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -467,14 +467,12 @@ Encoded with `KO_OWN_STAGE` and a post-cost `WAS_PLAYED_THIS_TURN` gate, beside 
 
 ---
 
-### OP18-080 Van Augur — PARTIAL
+### ~~OP18-080 Van Augur~~ — ENCODED
 **Tags:** `EFFECT_SOURCE_NAME_FILTER` · **Ticket:** OPT-1052
 
 > [Your Turn] [Once Per Turn] When a card is trashed from your hand by your [Marshall.D.Teach] Leader's effect, if you have no other [Van Augur], draw 1 card.
 
-**Blocker:** the `CARD_TRASHED_FROM_HAND` `effect_source` filter matches controller and traits only, not a name or the Leader card type.
-
-**Encoded:** the [On K.O.] draw.
+OPT-1052 added `name` and `card_type` to the `CARD_TRASHED_FROM_HAND` `effect_source` filter. The name honors aliases and the all-names Leader rule, as target filters do. The watcher uses `turn_restriction: "YOUR_TURN"`, once per turn, and `not CARD_ON_FIELD { name: "Van Augur" } exclude_self`, beside the [On K.O.] draw.
 
 ---
 
@@ -539,10 +537,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 45 cards | 0 | 0 |
+| Historical card entries in this document | 46 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 3 cards | 3 | 0 |
-| **Tracked cards still needing disposition** | — | **3** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 2 cards | 2 | 0 |
+| **Tracked cards still needing disposition** | — | **2** | **0** |

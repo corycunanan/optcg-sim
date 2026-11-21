@@ -4,10 +4,8 @@
  * Effect-bearing new IDs. Reprint slots are authored in their origin sets.
  * Rulings: docs/FAQs/qa_op18.md.
  *
- * Partial cards (every expressible block authored; the missing clause is named
- * in a "Partial:" comment and in docs/game-engine/DEFERRED-CARD-EFFECTS.md):
- * OP18-080. Cards with no expressible block have no schema
- * yet: OP18-105, OP18-117.
+ * Cards with no expressible block have no schema yet (named in
+ * docs/game-engine/DEFERRED-CARD-EFFECTS.md): OP18-105, OP18-117.
  */
 import type { Action, Condition, Cost, EffectSchema, TargetFilter } from "../effect-types.js";
 
@@ -1953,9 +1951,25 @@ export const OP18_080_VAN_AUGUR: EffectSchema = {
   card_name: "Van Augur",
   card_type: "Character",
   effects: [
-    // Partial: "When a card is trashed from your hand by your [Marshall.D.Teach]
-    // Leader's effect" is deferred. The CARD_TRASHED_FROM_HAND effect_source
-    // filter matches only controller and traits, not a name or the Leader.
+    {
+      // [Your Turn] [Once Per Turn] When a card is trashed from your hand by
+      // your [Marshall.D.Teach] Leader's effect, if you have no other [Van
+      // Augur], draw 1 card.
+      id: "your_turn_teach_leader_hand_trash_draw",
+      category: "auto",
+      trigger: {
+        event: "CARD_TRASHED_FROM_HAND",
+        turn_restriction: "YOUR_TURN",
+        filter: {
+          controller: "SELF",
+          cause: "BY_EFFECT",
+          effect_source: { controller: "SELF", card_type: "LEADER", name: "Marshall.D.Teach" },
+        },
+      },
+      flags: { once_per_turn: true },
+      conditions: { not: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Van Augur" }, exclude_self: true } },
+      actions: [draw(1)],
+    },
     { id: "on_ko_draw", category: "auto", trigger: { keyword: "ON_KO" }, actions: [draw(1)] },
   ],
 };

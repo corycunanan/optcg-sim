@@ -1,6 +1,8 @@
 import { getBattleOpponentInstanceId } from "./events.js";
 import { damagedPlayerOf } from "../../../../shared/game-types.js";
 import { isHandTrashByEffect } from "./hand-trash.js";
+import { cardHasName, cardNameAliases } from "../../../../shared/card-names.js";
+import { cardTreatsAsAll } from "./condition-queries.js";
 /**
  * M4 Trigger System
  *
@@ -1143,6 +1145,12 @@ function matchesEventFilter(
     if (source.controller === "OPPONENT" && event.payload.effectSourceController === sourceController) return false;
     const sourceData = cardDb.get(event.payload.effectSourceCardId!);
     if (source.traits && (!sourceData || !source.traits.some(trait => sourceData.types.includes(trait)))) return false;
+    if (source.card_type && sourceData?.type.toUpperCase() !== source.card_type) return false;
+    if (source.name && (!sourceData || !cardHasName({
+      name: sourceData.name,
+      nameAliases: cardNameAliases(sourceData.effectSchema),
+      treatsAsAllNames: cardTreatsAsAll(sourceData, "names"),
+    }, source.name))) return false;
   }
 
   if (filter.cause && event.type === "CARD_TRASHED" && event.payload.from === "HAND") {

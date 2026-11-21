@@ -996,7 +996,10 @@ Hand-trash watchers preserve `EFFECT` versus activation `COST` provenance. For
 OP12-040 Kuzan, add `effect_source: { controller: "SELF", traits: ["Navy"] }`
 to the filter and read `{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" }`
 for the actual discarded count. Do not use a discarded-card target filter for
-Navy. The OP14 activation-cost interpretation is explicitly flagged in
+Navy. For a named source, such as OP18-080's "by your [Marshall.D.Teach]
+Leader's effect", add `name` and `card_type`:
+`effect_source: { controller: "SELF", card_type: "LEADER", name: "Marshall.D.Teach" }`
+(OPT-1052; aliases and the all-names Leader rule apply). The OP14 activation-cost interpretation is explicitly flagged in
 [the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
 
 ### `*_THIS_WAY` counts: cost or action

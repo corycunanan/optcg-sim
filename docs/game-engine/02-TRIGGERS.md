@@ -151,7 +151,7 @@ type CustomEventType =
 interface EventFilter {
   controller?: Controller;
   cause?: EventCause;
-  effect_source?: { controller?: Controller; traits?: string[] };
+  effect_source?: { controller?: Controller; traits?: string[]; name?: string; card_type?: "LEADER" | "CHARACTER" | "STAGE" | "EVENT" }; // name/card_type: OPT-1052
   target_filter?: TargetFilter;
   source_zone?: Zone;
   includes_trigger_keyword?: boolean;
