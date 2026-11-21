@@ -2435,8 +2435,9 @@ export const OP18_104_STRAWBERRY: EffectSchema = {
 // effect of the revealed card.
 // qa_op18: the revealed card is returned to your hand and this Spandam is
 // trashed. OPT-1049: REUSE_EFFECT with source_ref resolves the revealed card's
-// [Trigger] block with that card as its source; a "Play this card" [Trigger]
-// does nothing because the card stays in hand.
+// [Trigger] block with that card as its source. Returning to hand is only the
+// default: a revealed [Trigger] that moves its own card (play, trash, add to
+// Life) resolves as printed (Cory ruling 2026-11-21).
 
 export const OP18_105_SPANDAM: EffectSchema = {
   card_id: "OP18-105",
