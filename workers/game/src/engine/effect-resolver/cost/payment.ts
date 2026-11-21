@@ -537,6 +537,25 @@ function payCostsUnreleased(
         break;
       }
 
+      case "RETURN_SELF_TO_HAND": {
+        // OPT-1051: "return this Character to the owner's hand" — fixed to
+        // the source card (rules 8-3-1/8-3-1-7), via the canonical
+        // RETURN_OWN_CHARACTER_TO_HAND transition (CARD_RETURNED_TO_HAND).
+        if (!sourceCardInstanceId) return null;
+        const p = nextState.players[controller];
+        if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
+        const applied = applyCostSelection(
+          nextState,
+          { type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1 },
+          [sourceCardInstanceId],
+          controller, _cardDb);
+        nextState = applied.state;
+        events.push(...applied.events);
+        costResult.cardsReturnedCount += 1;
+        costResult.cardsReturnedInstanceIds.push(sourceCardInstanceId);
+        break;
+      }
+
       case "PLACE_SELF_AND_HAND_TO_DECK": {
         if (!sourceCardInstanceId) return null;
         // Move source card + specified hand cards to deck bottom.

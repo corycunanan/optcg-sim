@@ -341,6 +341,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `REST_SELF` | "Rest this card" |
 | `TRASH_SELF` | "Trash this card" (not K.O.) |
 | `PLACE_SELF_TO_DECK` | "Place this card at the bottom of the owner's deck" |
+| `RETURN_SELF_TO_HAND` | "Return this Character to the owner's hand" (not "1 of your Characters": that is `RETURN_OWN_CHARACTER_TO_HAND`) |
 
 ### Hand Costs
 

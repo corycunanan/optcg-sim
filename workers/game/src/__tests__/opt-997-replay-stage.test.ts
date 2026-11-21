@@ -119,7 +119,7 @@ for (const hand of [false, true]) for (const shuffle of [false, true]) for (cons
   expect(r.state.players[0].trash).toHaveLength(1);
 });
 
-for (const type of ["PLACE_SELF_TO_DECK", "KO_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE"] as const) for (const accept of [false, true]) it(`actual remaining field exit ${type} accept=${accept}`, async () => {
+for (const type of ["PLACE_SELF_TO_DECK", "RETURN_SELF_TO_HAND", "KO_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE"] as const) for (const accept of [false, true]) it(`actual remaining field exit ${type} accept=${accept}`, async () => {
   const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("field-source", 0, "CHARACTER", { schema: synSchema("field-source", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }] },

@@ -181,6 +181,7 @@ An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: {
 | "You may give N active DON!! card(s) to 1 of your [Name]:" | `{ "type": "GIVE_DON", "amount": N, "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "exact": 1 }, "filter": { "name": "Name" } } }` — a Leader or Character with that name; never `GIVE_OPPONENT_DON` or a first `GIVE_DON` action |
 | "You may give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters:" | `{ "type": "GIVE_OPPONENT_DON_TO_OPPONENT", "amount": 1, "target": { "type": "CHARACTER", "controller": "OPPONENT", "count": { "exact": 1 } } }` — the opponent's DON!! goes to the opponent's Character; never `GIVE_OPPONENT_DON` (which moves your own DON!!) |
 | "return 1 of your Characters to your hand:" | `{ "type": "RETURN_OWN_CHARACTER_TO_HAND" }` |
+| "You may return this Character to the owner's hand:" | `{ "type": "RETURN_SELF_TO_HAND" }` — fixed to the source; never `RETURN_OWN_CHARACTER_TO_HAND`, which lets any of your Characters pay |
 | "rest any number of your DON!!" | `{ "type": "DON_REST", "amount": "ANY_NUMBER" }` |
 
 **Key rule:** Everything before the colon (`:`) in auto/activate text is a cost. Everything after is actions.

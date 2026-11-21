@@ -37,9 +37,9 @@ export const FIELD_EXIT_COSTS: ReadonlySet<Cost["type"]> = new Set([
   // own-Stage form on the fixed-exit path.
   "PLACE_STAGE_TO_DECK",
 ]);
-const FIXED_SOURCE_EXIT_COSTS = ["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"];
+const FIXED_SOURCE_EXIT_COSTS = ["TRASH_SELF", "PLACE_SELF_TO_DECK", "RETURN_SELF_TO_HAND", "PLACE_SELF_AND_HAND_TO_DECK"];
 const FIXED_STAGE_EXIT_COSTS = ["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"];
-const FIXED_REPLAY_COSTS: ReadonlySet<string> = new Set(["TRASH_SELF", "PLACE_SELF_TO_DECK", ...FIXED_STAGE_EXIT_COSTS]);
+const FIXED_REPLAY_COSTS: ReadonlySet<string> = new Set(["TRASH_SELF", "PLACE_SELF_TO_DECK", "RETURN_SELF_TO_HAND", ...FIXED_STAGE_EXIT_COSTS]);
 /** OPT-866: the EITHER Stage cost is a field selection, not a fixed exit. */
 function isFixedReplayCost(cost: Cost): boolean {
   return FIXED_REPLAY_COSTS.has(cost.type) && !isEitherPlayerStagePlacement(cost);

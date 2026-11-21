@@ -10,7 +10,7 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 9** (OP-18, 2026-11-20; see below).
+**Remaining deferred cards: 8** (OP-18, 2026-11-20; see below).
 EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
@@ -415,7 +415,7 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
-## OP-18 Deferred Effects (9 cards) — 2026-11-20
+## OP-18 Deferred Effects (8 cards) — 2026-11-20
 
 Each card ships with every expressible block authored, or with no schema when
 nothing on it is expressible. The quoted clause is **not encoded and not
@@ -482,12 +482,12 @@ needs engine vocabulary first; the ticket is named on each entry.
 
 ---
 
-### OP18-085 Cerberus — NO SCHEMA
+### ~~OP18-085 Cerberus~~ — ENCODED
 **Tags:** `SELF_RETURN_COST` · **Ticket:** OPT-1051
 
 > [Activate: Main] You may return this Character to the owner's hand: Up to 1 of your [Saint Shamrock] Characters gains [Rush], [Banish] or [Unblockable] during this turn.
 
-**Blocker:** `RETURN_OWN_CHARACTER_TO_HAND` offers any of your Characters and has no this-card form. OPT-1051 also covers five older cards authored with that cost.
+OPT-1051 added the `RETURN_SELF_TO_HAND` cost, fixed to the source Character like `PLACE_SELF_TO_DECK`. OP02-035, OP07-047, OP08-041, P-074 and P-081 moved to it from `RETURN_OWN_CHARACTER_TO_HAND`, which had let any of your Characters pay.
 
 ---
 
@@ -543,10 +543,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 39 cards | 0 | 0 |
+| Historical card entries in this document | 40 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
-| OP-18 partial or unauthored cards (2026-11-20) | 9 cards | 9 | 0 |
-| **Tracked cards still needing disposition** | — | **9** | **0** |
+| OP-18 partial or unauthored cards (2026-11-20) | 8 cards | 8 | 0 |
+| **Tracked cards still needing disposition** | — | **8** | **0** |

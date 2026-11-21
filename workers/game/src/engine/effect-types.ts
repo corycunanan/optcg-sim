@@ -1531,6 +1531,9 @@ export type CostType =
   // OPT-454: "place this Character at the bottom of the owner's deck" —
   // fixed to the source card, auto-pays like TRASH_SELF (no selection).
   | "PLACE_SELF_TO_DECK"
+  // OPT-1051: "return this Character to the owner's hand" — fixed to the
+  // source card, auto-pays like PLACE_SELF_TO_DECK (no selection).
+  | "RETURN_SELF_TO_HAND"
   | "PLACE_STAGE_TO_DECK"
   // OPT-455: "add 1 of your Characters ... to the top of your Life cards"
   // OPT-828: controller "OPPONENT" — "place 1 of your opponent's Characters
@@ -1560,7 +1563,7 @@ export const ALL_COST_TYPES = [
   "TRASH_FROM_HAND", "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", "TRASH_FROM_LIFE", "PLACE_HAND_TO_DECK", "REVEAL_FROM_HAND",
   "PLAY_NAMED_CARD_FROM_HAND", "REST_CARDS", "REST_NAMED_CARD", "KO_OWN_CHARACTER",
   "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
-  "MILL", "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
+  "MILL", "PLACE_SELF_TO_DECK", "RETURN_SELF_TO_HAND", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
   "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
   "GIVE_OPPONENT_DON", "GIVE_DON", "GIVE_OPPONENT_DON_TO_OPPONENT", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",

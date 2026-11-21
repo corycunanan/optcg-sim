@@ -48,6 +48,7 @@ const SELECTION_COST_TYPES = new Set<Cost["type"]>([
 const REPLACEABLE_FIELD_EXIT_COST_TYPES = new Set<Cost["type"]>([
   "TRASH_SELF",
   "PLACE_SELF_TO_DECK",
+  "RETURN_SELF_TO_HAND",
   "PLACE_STAGE_TO_DECK",
   "TRASH_OWN_STAGE",
   "PLACE_SELF_AND_TRASH_TO_DECK",
@@ -291,13 +292,14 @@ describe("OPT-614 — transactional multi-cost payment", () => {
     // I Pray For Your Success. (rest DON!! + hand trash), OP18-070 Tom
     // (DON!! −1 + hand trash) and OP18-079 Spandam (rest DON!! + rest self +
     // hand trash). None has a later field-exit cost, so none can strand.
-    expect(mixedBlocks).toHaveLength(65);
+    // OPT-1051 moves OP02-035 Trafalgar Law (DON!! rest + return this
+    // Character) to the fixed RETURN_SELF_TO_HAND, so it has no selection cost.
+    expect(mixedBlocks).toHaveLength(64);
     expect([...strandableCardIds].sort()).toEqual([
       "EB01-011",
       "EB02-047",
       "EB03-062",
       "EB05-048",
-      "OP02-035",
       "OP04-055",
       "OP04-073",
       "OP05-089",

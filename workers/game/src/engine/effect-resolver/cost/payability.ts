@@ -48,6 +48,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "REST_SELF":
     case "TRASH_SELF":
     case "PLACE_SELF_TO_DECK":
+    case "RETURN_SELF_TO_HAND":
     case "TRASH_OWN_STAGE":
     case "LEADER_POWER_REDUCTION":
     case "GIVE_OPPONENT_DON":
@@ -186,8 +187,10 @@ export function isCostPayable(
       return false;
     }
 
-    case "PLACE_SELF_TO_DECK": {
-      // OPT-454: payable only while the source Character is on the field.
+    case "PLACE_SELF_TO_DECK":
+    case "RETURN_SELF_TO_HAND": {
+      // OPT-454 / OPT-1051: payable only while the source Character is on
+      // the field (rule 8-3-1-3: another Character cannot pay it).
       if (!sourceCardInstanceId) return false;
       return player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
     }

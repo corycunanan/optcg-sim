@@ -640,7 +640,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST35-004.effects.0.modifiers.1.target (non-action target)",
     "ST35-005.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 2169,
+  "generatedCount": 2172,
   "instructions": [
     "Add to Life the card being replaced.",
     "Add to Life up to 1 of Characters with a cost of 6 or less.",
@@ -891,6 +891,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give 4 DON!! to 1 of your Characters.",
     "Give [Banish] to this card.",
     "Give [Banish] to up to 1 of your Characters named [Monkey.D.Luffy].",
+    "Give [Banish] to up to 1 of your Characters named [Saint Shamrock].",
     "Give [Banish] to up to 1 of your Leaders or Characters named [Charlotte Linlin].",
     "Give [Banish] to up to 1 of your Leaders or Characters with the {East Blue} type.",
     "Give [Banish] to up to 1 of your Leaders or Characters.",
@@ -923,9 +924,11 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give [Rush] to the triggering card.",
     "Give [Rush] to this card.",
     "Give [Rush] to up to 1 of your Characters named [Kalgara].",
+    "Give [Rush] to up to 1 of your Characters named [Saint Shamrock].",
     "Give [Rush] to up to 1 of your Characters with a power of 6000 or less with the {Neptunian} type.",
     "Give [Rush] to up to 1 of your Characters with the {Alabasta} type.",
     "Give [Rush] to up to 1 of your Characters.",
+    "Give [Unblockable] to up to 1 of your Characters named [Saint Shamrock].",
     "Give [Unblockable] to up to 1 of your Characters that are black with the {Land of Wano} type.",
     "Give [Unblockable] to up to 1 of your Characters with the {Alabasta} type.",
     "Give [Unblockable] to up to 1 of your Characters.",
@@ -1383,6 +1386,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your cards in hand.",
     "Trash your opponent's Life cards.",
   ],
-  "targetCount": 2804,
+  "targetCount": 2807,
 }
 `;
