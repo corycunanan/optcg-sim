@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   cardActivate,
   cardBlockerHighlight,
-  cardBreathing,
   cardFlip,
   cardHover,
   cardKO,
@@ -14,7 +13,6 @@ import {
 import {
   faceDownRotateY,
   flipTransition,
-  idleBreathingConfig,
   stateToMotionConfig,
 } from "./state-presets";
 import type { CardState, CardVariant } from "./types";
@@ -154,50 +152,6 @@ describe("stateToMotionConfig", () => {
     expect(cfg.animate.scale).toBe(1);
     expect(cfg.animate.opacity).toBe(1);
     expect(cfg.transition).toEqual({ duration: 0 });
-  });
-});
-
-describe("idleBreathingConfig", () => {
-  it("returns the cardBreathing loop for focal active field/hand/modal cards", () => {
-    for (const v of ["field", "hand", "modal"] as const) {
-      const cfg = idleBreathingConfig("active", v, false, false);
-      expect(cfg).toBeDefined();
-      const { transition: _, ...animateOnly } = cardBreathing;
-      expect(cfg!.animate).toEqual(animateOnly);
-      expect(cfg!.transition).toBe(cardBreathing.transition);
-    }
-  });
-
-  it("returns the loop for selected cards (target picker keeps them alive)", () => {
-    expect(idleBreathingConfig("selected", "field", false, false)).toBeDefined();
-  });
-
-  it("skips non-focal zones (trash / life / don)", () => {
-    for (const v of ["trash", "life", "don"] as const) {
-      expect(idleBreathingConfig("active", v, false, false)).toBeUndefined();
-    }
-  });
-
-  it("skips non-idle states (rest / invalid / dragging / in-flight / attacking / blocking / kod)", () => {
-    for (const s of [
-      "rest",
-      "invalid",
-      "dragging",
-      "in-flight",
-      "attacking",
-      "blocking",
-      "kod",
-    ] as const) {
-      expect(idleBreathingConfig(s, "field", false, false)).toBeUndefined();
-    }
-  });
-
-  it("skips face-down cards — sleeves don't breathe", () => {
-    expect(idleBreathingConfig("active", "field", true, false)).toBeUndefined();
-  });
-
-  it("honors prefers-reduced-motion", () => {
-    expect(idleBreathingConfig("active", "field", false, true)).toBeUndefined();
   });
 });
 

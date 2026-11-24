@@ -1,7 +1,6 @@
 "use client";
 
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
-import { cn } from "@/lib/utils";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
 import {
   Dialog,
@@ -9,6 +8,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Card } from "../card";
 import { GameButton } from "../game-button";
 
 interface MulliganModalProps {
@@ -58,6 +59,7 @@ export function MulliganModal({
 
         {isResponder && (
           <>
+            <TooltipProvider delayDuration={0} disableHoverableContent>
             <div className="flex gap-3" role="list" aria-label="Opening hand">
               {myHand.map((card) => {
                 const data = cardDb[card.cardId];
@@ -74,28 +76,20 @@ export function MulliganModal({
                     onKeyDown={(event) =>
                       rovingFocus.onKeyDown(event, card.instanceId)
                     }
-                    className={cn(
-                      "border-gb-border-strong w-card-thumb aspect-card rounded-card focus-visible:ring-gb-signal-eligible overflow-hidden border-2 shadow-md focus-visible:ring-2 focus-visible:outline-none"
-                    )}
+                    className="rounded-card focus-visible:ring-gb-signal-eligible focus-visible:ring-2 focus-visible:outline-none"
                   >
-                    {data?.imageUrl ? (
-                      <img
-                        src={data.imageUrl}
-                        alt={data.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="bg-gb-surface-raised flex h-full w-full items-center justify-center p-2">
-                        <span className="text-gb-text-dim text-center text-sm">
-                          {data?.name ?? card.cardId}
-                        </span>
-                      </div>
-                    )}
+                    {/* Same primitive as the hand and the effect modals, so
+                        the opening hand gets the shared hover and the card
+                        inspection tooltip. */}
+                    <Card
+                      variant="modal"
+                      data={{ card, cardId: card.cardId, cardDb }}
+                    />
                   </div>
                 );
               })}
             </div>
+            </TooltipProvider>
 
             <div className="flex gap-3">
               <GameButton

@@ -2,7 +2,6 @@ import type { Transition, TargetAndTransition } from "motion/react";
 import {
   cardActivate,
   cardBlockerHighlight,
-  cardBreathing,
   cardFlip,
   cardHover,
   cardKO,
@@ -171,34 +170,6 @@ function variantTap(
   // Under reduced-motion the 3D dip (rotateX) is suppressed but a simple
   // scale tap remains, per OPT-275 spec.
   return reducedMotion ? cardTapReduced : cardTap;
-}
-
-/**
- * Ambient "card feels alive" idle loop (Balatro-style). Disabled on:
- * `prefers-reduced-motion`, face-down cards, non-focal zones (trash /
- * life / DON tokens), and non-idle states (rest / invalid / dragging /
- * in-flight). When disabled, the layer still renders but animates once
- * to a baseline — no infinite loop cost.
- */
-export function idleBreathingConfig(
-  state: CardState,
-  variant: CardVariant,
-  faceDown: boolean | undefined,
-  reducedMotion: boolean,
-): { animate: TargetAndTransition; transition: Transition } | undefined {
-  if (reducedMotion) return undefined;
-  if (faceDown) return undefined;
-  // Non-idle states skip breathing. `attacking` is rested (90°) so its
-  // breathing y-axis would translate horizontally — the attacker ring pulse
-  // carries the "alive" feel instead. `blocking` has its own one-shot pop
-  // on transition and reverts to the standard idle once settled, so it
-  // stays out here too to avoid stacking motion on top of a spring pop.
-  if (state !== "active" && state !== "selected") return undefined;
-  if (variant === "trash" || variant === "life" || variant === "don") {
-    return undefined;
-  }
-  const { transition, ...animate } = cardBreathing;
-  return { animate, transition };
 }
 
 /**

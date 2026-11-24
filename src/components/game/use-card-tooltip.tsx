@@ -36,11 +36,13 @@ export function CardTooltip({
         so the type/ID/color badges above it and the DON!! badge below it can
         sit outside the surface. The primitive's padding, border, fill and edge
         are reset here through tailwind-merge rather than by editing it.
+        z-[250] lifts it over the full-screen pregame overlays (z-[200], e.g.
+        the mulligan dialog), which would otherwise cover the primitive's z-50.
       */}
       <TooltipContent
         side="right"
         sideOffset={8}
-        className="w-[352px] max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
+        className="z-[250] w-[352px] max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
       >
         <CardTooltipContent
           data={data}
