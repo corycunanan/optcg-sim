@@ -62,17 +62,13 @@ const variants = {
 
 const board = {
   card: {
-    /** Field card hover: scale bounce + a single back-and-forth tilt.
-     *  Springs in, tweens out. The `rotate` keyframes live on the card's
-     *  *inner* motion layer (see `card.tsx`) so the wiggle is additive to
-     *  state rotation (e.g. a rested card wiggles around 90°, not 0°). */
+    /** Field card hover: a plain scale-up. Short easeOut tween with no
+     *  spring overshoot and no wiggle (the bounce + tilt-wiggle was removed
+     *  as distracting, 2026-11-24). Lives on the card's *inner* motion layer
+     *  (see `card.tsx`) so it composes with state rotation. */
     hover: {
       scale: 1.08,
-      rotate: [0, 1.2, -1.2, 0] as number[],
-      transition: {
-        scale: { type: "spring" as const, stiffness: 420, damping: 13 },
-        rotate: { duration: 0.55, ease: "easeInOut" as const },
-      },
+      transition: { duration: 0.15, ease: "easeOut" as const },
     },
     /** Field card tap: scale-down + 3D `rotateX` dip, ~120ms (OPT-275).
      *  Composes with the outer state rotation (rest = rotateZ 90°) and with
@@ -86,19 +82,6 @@ const board = {
     tapReduced: {
       scale: 0.96,
       transition: { duration: 0.12, ease: "easeOut" as const },
-    },
-    /** Balatro-style passive breathing (OPT-275). Subtle drift + scale pulse,
-     *  3.5s loop. Applied on a dedicated motion layer inside state rotation
-     *  so hover/tap composes on top without clobbering the loop. */
-    breathing: {
-      y: [0, -2, 0] as number[],
-      scale: [1, 1.008, 1] as number[],
-      transition: {
-        duration: 3.5,
-        ease: "easeInOut" as const,
-        repeat: Infinity,
-        repeatType: "loop" as const,
-      },
     },
     /** Face-up ↔ face-down flip (OPT-276). ~300ms spring so the card lands
      *  before a follow-up state change overlays its own transition. Reduced
@@ -293,17 +276,12 @@ const board = {
       stiffness: 360,
       damping: 18,
     },
-    /** Hand card hover: lift + scale, same spring-in / tween-out shape,
-     *  same wiggle. */
+    /** Hand card hover: lift + scale on the same short easeOut tween as
+     *  the field hover. No spring overshoot, no wiggle. */
     handHover: {
       scale: 1.05,
       y: -8,
-      rotate: [0, 1.2, -1.2, 0] as number[],
-      transition: {
-        scale: { type: "spring" as const, stiffness: 420, damping: 13 },
-        y: { type: "spring" as const, stiffness: 420, damping: 13 },
-        rotate: { duration: 0.55, ease: "easeInOut" as const },
-      },
+      transition: { duration: 0.15, ease: "easeOut" as const },
     },
   },
   flight: {
@@ -385,7 +363,6 @@ export const motionPresets = {
 export const cardHover = board.card.hover;
 export const cardTap = board.card.tap;
 export const cardTapReduced = board.card.tapReduced;
-export const cardBreathing = board.card.breathing;
 export const cardFlip = board.card.flip;
 export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;

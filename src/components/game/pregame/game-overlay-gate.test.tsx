@@ -26,6 +26,9 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogDescription: ({ children }: { children: React.ReactNode }) => children,
   DialogTitle: ({ children }: { children: React.ReactNode }) => children,
 }));
+vi.mock("@/components/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("../game-button", () => ({
   GameButton: ({
     children,

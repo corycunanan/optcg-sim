@@ -24,22 +24,18 @@ import { CardDonBadge } from "./overlays/card-don-badge";
 import { CardHighlightRing } from "./overlays/card-highlight-ring";
 import { PerspectiveContainer } from "./perspective-container";
 import { resolveSize } from "./sizes";
-import { idleBreathingConfig, stateToMotionConfig } from "./state-presets";
+import { stateToMotionConfig } from "./state-presets";
 import type { CardProps } from "./types";
 
-/** Max pointer-tilt deflection in degrees (OPT-275). Stays inside the
- *  ticket's 10–15° target; further composes with the outer state rotation. */
-const TILT_MAX_DEG = 12;
+/** Max pointer-tilt deflection in degrees (OPT-275). Cut from 12° to 4° on
+ *  2026-11-24: a slight lean toward the cursor, not a swing. Composes with
+ *  the outer state rotation. */
+const TILT_MAX_DEG = 4;
 
 /** Spring for the pointer-driven tilt motion values. Gentle enough that a
  *  fast flick reads as a smooth lean, stiff enough that leaving the card
  *  snaps back promptly. */
 const TILT_SPRING = { stiffness: 220, damping: 22, mass: 0.6 } as const;
-
-/** Used when idle breathing is disabled for a given card — animate once to
- *  baseline, then stay put. No infinite loop cost. */
-const BREATHING_BASELINE = { y: 0, scale: 1 };
-const BREATHING_BASELINE_TRANSITION = { duration: 0 };
 
 /**
  * `<Card>` — unified primitive for every game card rendering surface.
@@ -82,13 +78,6 @@ export const Card = React.memo(function Card({
     variant,
     reducedMotion ?? false,
     motionDelay,
-  );
-
-  const breathing = idleBreathingConfig(
-    state,
-    variant,
-    faceDown,
-    reducedMotion ?? false,
   );
 
   // Pointer-driven 3D tilt (OPT-275). Raw motion values track the pointer
@@ -203,7 +192,7 @@ export const Card = React.memo(function Card({
   // clip art, the power flash tints, and `CardHighlightRing` draws over the
   // same box — `box-shadow` and `overflow` both follow `border-radius`, so a
   // single layer left at chrome radius traces a visibly different corner over
-  // the one beneath it. The three transform layers (state rotation, breathing,
+  // the one beneath it. The two transform layers (state rotation and
   // interaction) paint nothing today and carry the radius so that anything
   // added to them inherits the silhouette instead of re-deciding it.
   const cardElement = (
@@ -225,94 +214,83 @@ export const Card = React.memo(function Card({
       {/* Outer layer owns state rotation (rest = 90°) / opacity / filter.
           Nesting the interaction layer inside means hover/tap transforms
           *compose* with state rotation instead of overwriting it — so a
-          rested card wiggles around 90°, not 0°. */}
+          rested card scales around 90°, not 0°. */}
       <motion.div
         className="absolute inset-0 rounded-card"
         animate={motionConfig.animate}
         transition={motionConfig.transition}
       >
-        {/* Breathing layer (OPT-275): passive idle drift + scale pulse.
-            Always mounted so the DOM tree is stable across state changes —
-            when breathing is disabled (non-focal zones, face-down, reduced
-            motion, non-idle states) the layer animates once to baseline and
-            stays put. */}
+        {/* Interaction layer: the hover scale/lift tweens in via
+            whileHover; all interaction transforms tween *out* via this
+            default transition so hover-off/tap-off don't inherit the
+            state-change spring and bounce back. Pointer-driven tilt values
+            ride on `style` (motion values) so they compose cleanly with
+            `whileHover` / `whileTap` on independent transform axes. */}
         <motion.div
-          className="absolute inset-0 rounded-card"
-          animate={breathing?.animate ?? BREATHING_BASELINE}
-          transition={breathing?.transition ?? BREATHING_BASELINE_TRANSITION}
+          ref={interactionRef}
+          className={cn(
+            "absolute inset-0 rounded-card will-change-transform",
+            interaction?.clickable && "cursor-pointer",
+          )}
+          transition={{ duration: 0.15, ease: "easeOut" as const }}
+          whileHover={motionConfig.whileHover}
+          whileTap={motionConfig.whileTap}
+          style={{ rotateX: tiltX, rotateY: tiltY }}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
         >
-          {/* Interaction layer: scale spring + wiggle keyframes spring *in*
-              via whileHover; all interaction transforms tween *out* via this
-              default transition so hover-off/tap-off don't inherit the
-              state-change spring and bounce back. Pointer-driven tilt values
-              ride on `style` (motion values) so they compose cleanly with
-              `whileHover` / `whileTap` on independent transform axes. */}
-          <motion.div
-            ref={interactionRef}
-            className={cn(
-              "absolute inset-0 rounded-card will-change-transform",
-              interaction?.clickable && "cursor-pointer",
-            )}
-            transition={{ duration: 0.15, ease: "easeOut" as const }}
-            whileHover={motionConfig.whileHover}
-            whileTap={motionConfig.whileTap}
-            style={{ rotateX: tiltX, rotateY: tiltY }}
-            onPointerMove={handlePointerMove}
-            onPointerLeave={handlePointerLeave}
-          >
-            <CardFaces faceDown={!!faceDown}>
-              <CardFront
-                data={cardData}
-                fallbackLabel={overlays?.label}
-                imageUrlOverride={artUrl}
-              />
-              <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
-            </CardFaces>
+          <CardFaces faceDown={!!faceDown}>
+            <CardFront
+              data={cardData}
+              fallbackLabel={overlays?.label}
+              imageUrlOverride={artUrl}
+            />
+            <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
+          </CardFaces>
 
-            {/* Highlight ring follows the card outline, so it sits inside the
-                rotating layer without any counter-rotation. */}
-            {powerMod && !reducedMotion && (
-              <motion.div
-                key={`power-flash:${powerMod.nonce ?? powerMod.value}`}
-                aria-hidden
-                className={cn(
-                  "pointer-events-none absolute inset-0 z-10 rounded-card",
-                  powerModTone === "absolute"
-                    ? "bg-gb-accent-blue/30"
-                    : powerModTone === "positive"
-                      ? "bg-gb-accent-green/30"
-                      : "bg-gb-accent-red/30",
-                )}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: powerModifiedFlash.opacity }}
-                transition={powerModifiedFlash.transition}
-              />
-            )}
+          {/* Highlight ring follows the card outline, so it sits inside the
+              rotating layer without any counter-rotation. */}
+          {powerMod && !reducedMotion && (
+            <motion.div
+              key={`power-flash:${powerMod.nonce ?? powerMod.value}`}
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-0 z-10 rounded-card",
+                powerModTone === "absolute"
+                  ? "bg-gb-accent-blue/30"
+                  : powerModTone === "positive"
+                    ? "bg-gb-accent-green/30"
+                    : "bg-gb-accent-red/30",
+              )}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: powerModifiedFlash.opacity }}
+              transition={powerModifiedFlash.transition}
+            />
+          )}
 
-            {overlays?.highlightRing && (
-              <CardHighlightRing
-                key={`${overlays.highlightRing}:${overlays.highlightRingNonce ?? 0}`}
-                color={overlays.highlightRing}
-              />
-            )}
+          {overlays?.highlightRing && (
+            <CardHighlightRing
+              key={`${overlays.highlightRing}:${overlays.highlightRingNonce ?? 0}`}
+              color={overlays.highlightRing}
+            />
+          )}
 
-            {/* Count badge: rides with the card face, counter-rotated so its
-                label stays horizontal regardless of card rotation. Stacked-zone
-                cards (life, deck, trash) don't rest, so pinning to a card-local
-                corner is fine here. */}
-            {overlays?.countBadge != null && (
-              <motion.div
-                className={cn(
-                  "absolute z-10",
-                  faceDown ? "bottom-1 right-1" : "top-1 right-1",
-                )}
-                animate={{ rotate: counterRotate }}
-                transition={motionConfig.transition}
-              >
-                <CardCountBadge count={overlays.countBadge} />
-              </motion.div>
-            )}
-          </motion.div>
+          {/* Count badge: rides with the card face, counter-rotated so its
+              label stays horizontal regardless of card rotation. Stacked-zone
+              cards (life, deck, trash) don't rest, so pinning to a card-local
+              corner is fine here. */}
+          {overlays?.countBadge != null && (
+            <motion.div
+              className={cn(
+                "absolute z-10",
+                faceDown ? "bottom-1 right-1" : "top-1 right-1",
+              )}
+              animate={{ rotate: counterRotate }}
+              transition={motionConfig.transition}
+            >
+              <CardCountBadge count={overlays.countBadge} />
+            </motion.div>
+          )}
         </motion.div>
       </motion.div>
 

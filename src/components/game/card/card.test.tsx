@@ -52,7 +52,6 @@ vi.mock("./perspective-container", () => ({
 }));
 vi.mock("./sizes", () => ({ resolveSize: () => ({ width: 80, height: 112 }) }));
 vi.mock("./state-presets", () => ({
-  idleBreathingConfig: () => null,
   stateToMotionConfig: () => ({
     animate: { rotate: 0 },
     transition: { duration: 0.2 },

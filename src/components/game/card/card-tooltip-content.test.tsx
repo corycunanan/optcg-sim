@@ -584,8 +584,8 @@ describe("CardTooltip surface contract", () => {
     return content.props;
   }
 
-  it("keeps the instant, right-side placement contract", () => {
-    expect(tooltipTree().props.delayDuration).toBe(0);
+  it("keeps the short-delay, right-side placement contract", () => {
+    expect(tooltipTree().props.delayDuration).toBe(150);
     expect(tooltipContentProps().side).toBe("right");
     expect(tooltipContentProps().sideOffset).toBe(8);
   });
