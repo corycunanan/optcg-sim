@@ -27,9 +27,10 @@ import { resolveSize } from "./sizes";
 import { stateToMotionConfig } from "./state-presets";
 import type { CardProps } from "./types";
 
-/** Max pointer-tilt deflection in degrees (OPT-275). Stays inside the
- *  ticket's 10–15° target; further composes with the outer state rotation. */
-const TILT_MAX_DEG = 12;
+/** Max pointer-tilt deflection in degrees (OPT-275). Cut from 12° to 4° on
+ *  2026-11-24: a slight lean toward the cursor, not a swing. Composes with
+ *  the outer state rotation. */
+const TILT_MAX_DEG = 4;
 
 /** Spring for the pointer-driven tilt motion values. Gentle enough that a
  *  fast flick reads as a smooth lean, stiff enough that leaving the card

@@ -10,6 +10,14 @@ import { CardTooltipContent } from "./card/card-tooltip-content";
  * Used by modal card components (ArrangeTopCards, SelectTarget, etc.)
  * where the trigger element needs a ref and event handlers.
  */
+/**
+ * Hover dwell before a card tooltip opens. Long enough that sweeping the
+ * pointer across a hand doesn't flash every card's tooltip, short enough to
+ * still feel immediate. Once one is open, Radix's skip-delay lets the next
+ * card's tooltip open at once.
+ */
+export const CARD_TOOLTIP_DELAY_MS = 150;
+
 export function CardTooltip({
   data,
   cardId,
@@ -28,7 +36,7 @@ export function CardTooltip({
   if (!data) return <>{children}</>;
 
   return (
-    <TooltipRoot delayDuration={0}>
+    <TooltipRoot delayDuration={CARD_TOOLTIP_DELAY_MS}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       {/*
         The content box is only a transparent frame: CardTooltipContent paints
