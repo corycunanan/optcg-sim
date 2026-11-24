@@ -31,18 +31,16 @@ export function CardTooltip({
     <TooltipRoot delayDuration={0}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       {/*
-        Tier-5 information surface (docs/design/MATERIAL-LANGUAGE.md): flat
-        near-opaque dark, square corners, no glow, and one neutral 1px
-        perimeter lit top-left → bottom-right. The board keeps its own token
-        context, so the surface and edge resolve through `gb-*` primitives.
-        The 1px border width comes from the shared tooltip primitive; these
-        overrides land through tailwind-merge rather than editing it.
+        The content box is only a transparent frame: CardTooltipContent paints
+        the Tier-5 information surface itself (docs/design/MATERIAL-LANGUAGE.md)
+        so the type/ID/color badges above it and the DON!! badge below it can
+        sit outside the surface. The primitive's padding, border, fill and edge
+        are reset here through tailwind-merge rather than by editing it.
       */}
       <TooltipContent
         side="right"
         sideOffset={8}
-        data-tier5-surface
-        className="bg-gb-surface-info gb-edge-info text-gb-text min-w-[220px] max-w-[320px] rounded-none p-3 shadow-none"
+        className="w-[352px] max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
       >
         <CardTooltipContent
           data={data}

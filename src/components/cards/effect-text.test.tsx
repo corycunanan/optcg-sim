@@ -115,14 +115,16 @@ describe("EffectText", () => {
     expect(chip.props.className).not.toContain("bg-effect-timing");
   });
 
-  it("renders a trait as a quieter chip with no visible braces", () => {
+  it("renders a trait as a neutral outlined chip with no visible braces", () => {
     const trait = render(EB02_052).root.find(
       (node) => node.props["data-effect-trait"] !== undefined
     );
 
     expect(trait.props.children).toBe("Sky Island");
-    expect(trait.props.className).toContain("bg-surface-2");
-    expect(trait.props.className).not.toContain("bg-effect");
+    expect(trait.props.className).toContain("bg-effect-trait");
+    expect(trait.props.className).toContain("border-effect-trait-edge");
+    expect(trait.props.className).toContain("text-effect-trait-fg");
+    expect(trait.props.className).not.toMatch(/bg-effect-(timing|keyword|counter|modifier|don|trigger)/);
   });
 
   it("leaves no raw notation delimiters in the rendered text", () => {
