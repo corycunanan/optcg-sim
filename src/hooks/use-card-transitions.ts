@@ -10,6 +10,12 @@ import {
   type SpotlightPresentation,
 } from "@/lib/game/spotlight";
 import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
+import {
+  assignPileFlips,
+  zoneFaceDown,
+  type FlightFlip,
+} from "@/lib/game/card-motion";
+import { cardStagger } from "@/lib/motion";
 
 export interface CardTransition {
   id: string;
@@ -45,6 +51,19 @@ export interface CardTransition {
   /** Spotlight cards can be preview- or modal-sized; the animation ghost
    *  must preserve that source footprint before it travels or dissolves. */
   spotlightSourceSize?: "modal" | "preview";
+  /** Side the card shows the viewer where it starts (OPT-1054). Deck, DON!!
+   *  deck and the opponent's hand are face-down; Life follows the event's
+   *  `sourceFace` when present. */
+  sourceFaceDown?: boolean;
+  /** Side the destination zone needs (OPT-1054). */
+  destinationFaceDown?: boolean;
+  /** Set when the card turns over before it travels (OPT-1054): `turn`
+   *  flips in place; `under` sat under a pile's flipping top card and is
+   *  dealt already turned (see `assignPileFlips`). */
+  flip?: FlightFlip;
+  /** For `flip: "under"`, seconds after mount when the top card's flip ends
+   *  and this card swaps to its destination side. */
+  pileFlipAt?: number;
 }
 
 export type ReceivedHands = readonly [
@@ -63,14 +82,22 @@ export function receivedHandsByPlayerIndex(
 }
 
 const MAX_CONCURRENT = 8;
-// Covers the worst case: `MAX_CONCURRENT * STAGGER_MS` of start-time offset +
-// the longest flight path (arc + bouncy landing) before `onAnimationComplete`
-// fires. `onComplete` is the normal cleanup path; this timer is a safety net.
-const AUTO_EXPIRE_MS = 1500;
-/** Per-batch stagger between arrivals (OPT-274). Keeps multi-card draws
- *  (e.g. "draw 2", Perona peek, search-and-draw effects) from landing in a
- *  single instant. Also used for the per-token delay inside a DON attach. */
-const STAGGER_MS = 60;
+// Covers the worst case: `MAX_CONCURRENT * staggerMs` of start-time offset +
+// the flip that precedes a turned-over flight (300ms) + the longest flight
+// (380ms) before the flight completes (OPT-1054: 7 × 90 + 300 + 380 ≈ 1.3s).
+// `onComplete` is the normal cleanup path; this timer is a safety net.
+const AUTO_EXPIRE_MS = 2000;
+/** Per-batch stagger between arrivals (OPT-274, retuned by OPT-1054). Keeps
+ *  multi-card draws (e.g. "draw 2", Perona peek, search-and-draw effects)
+ *  from landing in a single instant: draws and DON!! tokens deal
+ *  `cardStagger.drawMs` apart, moves into a stacked pile `pileMs` apart, any
+ *  other travel `defaultMs` apart. */
+function staggerMs(transition: Pick<CardTransition, "kind" | "toZoneKey">): number {
+  if (transition.kind === "don-attach") return cardStagger.drawMs;
+  if (transition.toZoneKey.endsWith("-hand")) return cardStagger.drawMs;
+  if (/-(deck|trash|life)$/.test(transition.toZoneKey)) return cardStagger.pileMs;
+  return cardStagger.defaultMs;
+}
 
 /** CARD_TRASHED `reason` values that originate from the life zone. The engine
  *  emits these without `from`, so the visual layer infers the source from the
@@ -122,7 +149,7 @@ export function eventToTransitions(
         playerIndex,
         startedAt,
         kind: "don-attach",
-        delay: (i * STAGGER_MS) / 1000,
+        delay: (i * cardStagger.drawMs) / 1000,
         targetInstanceId: targetId,
       });
     }
@@ -206,7 +233,7 @@ function makeFaceDownBurst(
       toZoneKey,
       playerIndex,
       startedAt,
-      delay: (i * STAGGER_MS) / 1000,
+      delay: (i * staggerMs({ toZoneKey })) / 1000,
     });
   }
   return out;
@@ -239,6 +266,16 @@ function trashSourceZone(
   // Legacy count-only cost/effect events predate the explicit `from` field;
   // those overwhelmingly originate in hand. New worker events set `from`.
   return `${prefix}-hand`;
+}
+
+/** A received hand is face-down for this viewer when every card in it is
+ *  redacted; undefined (fall back to the board side) when it is unknown or
+ *  empty. */
+function receivedHandFaceDown(
+  hand: readonly CardInstance[] | undefined,
+): boolean | undefined {
+  if (!hand || hand.length === 0) return undefined;
+  return hand.every((card) => card.cardId === "hidden");
 }
 
 function matchSpotlightCard(
@@ -276,6 +313,8 @@ function eventToTransition(
   let cardId: string | null = null;
   let cardInstanceId: string | null = null;
   let kind: CardTransition["kind"];
+  // Life takes either side; events that say which one set this (OPT-1054).
+  let lifeFaceDown: boolean | undefined;
 
   switch (type) {
     case "CARD_PLAYED": {
@@ -381,6 +420,7 @@ function eventToTransition(
       cardId = p.cardId ?? null;
       const sourceInstanceId = p.cardInstanceId;
       cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
+      if (p.sourceFace) lifeFaceDown = p.sourceFace === "DOWN";
       const resolvedZone =
         sourceInstanceId && zoneRegistry
           ? zoneRegistry.getCardZone(sourceInstanceId)
@@ -431,6 +471,7 @@ function eventToTransition(
     from = spotlightCardZoneKey(spotlight!.id, spotlightCard);
   }
 
+  const handFaceDown = receivedHandFaceDown(receivedHands?.[playerIndex]);
   return {
     id: nextId(),
     cardId,
@@ -440,6 +481,8 @@ function eventToTransition(
     playerIndex,
     startedAt: Date.now(),
     kind,
+    sourceFaceDown: zoneFaceDown(from, { handFaceDown, lifeFaceDown }),
+    destinationFaceDown: zoneFaceDown(to, { handFaceDown, lifeFaceDown }),
     playedRested: event.type === "CARD_PLAYED" ? event.payload.playedRested : undefined,
     waitForSpotlightId: spotlightCard ? spotlight!.id : undefined,
     spotlightSourceSize: spotlightCard
@@ -454,7 +497,7 @@ function eventToTransition(
  * Apply a per-index stagger to a batch of transitions so multi-card arrivals
  * fan out sequentially instead of landing in a single instant. The first
  * travel transition keeps its original delay; each subsequent travel sibling
- * gets an extra `STAGGER_MS` delay. Transform siblings resolve together so a
+ * gets an extra `staggerMs` delay. Transform siblings resolve together so a
  * simultaneous destruction does not become a misleading sequence.
  *
  * Pure helper — exported for unit tests.
@@ -467,7 +510,7 @@ export function applyBatchStagger(batch: CardTransition[]): CardTransition[] {
     delay:
       t.kind === "transform"
         ? t.delay
-        : (t.delay ?? 0) + (travelIndex++ * STAGGER_MS) / 1000,
+        : (t.delay ?? 0) + (travelIndex++ * staggerMs(t)) / 1000,
   }));
 }
 
@@ -593,7 +636,11 @@ export function useCardTransitions(
     // `eventToTransitions`; others stagger by their position in the batch so
     // multi-card draws fan out sequentially. The stagger rides on top of any
     // existing delay (e.g. DON-attach tokens inside a bigger batch).
-    const staggered = applyBatchStagger(presentableTransitions);
+    // OPT-1054: cards whose destination needs the other side turn over
+    // before they travel; only the top card of a pile flips.
+    const staggered = assignPileFlips(
+      applyBatchStagger(presentableTransitions),
+    );
 
     queueMicrotask(() => {
       setTransitions((prev) => {
