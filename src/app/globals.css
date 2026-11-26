@@ -473,6 +473,21 @@
     rgba(255, 255, 255, 0.22),
     rgba(255, 255, 255, 0.1)
   );
+  /* The shared card flip (OPT-1054, INTERACTION-GRAMMAR MO-3): a face
+     darkens as it turns edge-on and a light gloss sweeps across it. The
+     component drives each layer's opacity from the flip angle; these are the
+     full-strength fills. */
+  --gb-card-flip-shade: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.55),
+    rgba(0, 0, 0, 0.15)
+  );
+  --gb-card-flip-gloss: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 65%
+  );
 
   /* ── shadcn/ui compatibility aliases ──
      Maps our existing tokens to shadcn's expected variable names.
@@ -821,6 +836,14 @@ body {
 @utility gb-edge-info {
   border-image-source: var(--gb-edge-info);
   border-image-slice: 1;
+}
+
+@utility gb-card-flip-shade {
+  background-image: var(--gb-card-flip-shade);
+}
+
+@utility gb-card-flip-gloss {
+  background-image: var(--gb-card-flip-gloss);
 }
 
 /* ─── Shape Language — Chamfered Frames ─────────────────────── */

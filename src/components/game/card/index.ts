@@ -14,6 +14,7 @@ export {
 } from "./state-presets";
 export type {
   CardDataProp,
+  CardFlipFrom,
   CardInteraction,
   CardOverlays,
   CardProps,

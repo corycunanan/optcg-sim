@@ -114,6 +114,8 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
     "src/components/game/board-layout/card-animation-layer.tsx": [
       "pointerEvents",
     ],
+    // Flip shade/gloss strength follows the live flip angle (OPT-1054).
+    "src/components/game/card/card-faces.tsx": ["opacity"],
     "src/components/game/board-layout/don-zone.tsx": ["cursor"],
     "src/components/game/board-layout/hand-layer.tsx": [
       "cursor",

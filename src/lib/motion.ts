@@ -83,10 +83,27 @@ const board = {
       scale: 0.96,
       transition: { duration: 0.12, ease: "easeOut" as const },
     },
-    /** Face-up ↔ face-down flip (OPT-276). ~300ms spring so the card lands
-     *  before a follow-up state change overlays its own transition. Reduced
-     *  motion fallback is instant — see `flipTransition` in state-presets. */
-    flip: { type: "spring" as const, stiffness: 260, damping: 22 },
+    /** The shared card flip (OPT-1054): every event that turns a card over
+     *  uses this one 300ms ease-in-out tween on `rotateY`. The pose that rides
+     *  on it (lift, grow, tilt, edge shade, gloss) is `flipPose`. Reduced
+     *  motion fallback is an instant face swap — see `flipTransition` in
+     *  state-presets. */
+    flip: {
+      duration: 0.3,
+      ease: [0.45, 0, 0.55, 1] as [number, number, number, number],
+    },
+    /** Pose of a card while it flips (OPT-1054), scaled by how edge-on the
+     *  card is (`|sin(rotateY)|`, which peaks at the flip's midpoint): it
+     *  lifts `liftPx`, grows by `scaleBoost`, tilts `tiltDeg`, its face
+     *  darkens toward `shadeMax` opacity and a light gloss sweep rises toward
+     *  `glossMax`. All return to zero when the card lies flat. */
+    flipPose: {
+      liftPx: 8,
+      scaleBoost: 0.1,
+      tiltDeg: 3,
+      shadeMax: 0.75,
+      glossMax: 0.8,
+    },
     /** Attacker ring pulse (OPT-273). Sustained loop on the highlight ring
      *  while a card is the designated attacker — opacity + scale breathe
      *  together so the ring reads as a pulse rather than a blinking stroke. */
@@ -289,12 +306,46 @@ const board = {
      *  straight line, ~220ms. The arrival pop lives on the destination card
      *  (`cardEntry` spring on mount) so the flight itself stays snappy. */
     zoneMove: { duration: 0.22, ease: "easeOut" as const },
+    /** Card travelling between zones (OPT-1054). A shallow arc: the path
+     *  bulges toward screen-up by `arcRatio` of the distance at its midpoint,
+     *  capped at `arcMaxPx`; the card leans up to `leanMaxDeg` toward its
+     *  horizontal travel direction and grows by `peakScale` at the arc peak
+     *  (both a `sin(πp)` bump on the eased progress). Duration scales with
+     *  distance: `baseMs + msPerPx × distance`, clamped to
+     *  [`minMs`, `maxMs`]. The ease decelerates into the landing with no
+     *  overshoot. Distances are design px (1920-wide canvas). The arrival pop
+     *  lives on the destination card (`cardEntry` spring on mount). */
+    travel: {
+      ease: [0.2, 0.8, 0.2, 1] as [number, number, number, number],
+      baseMs: 180,
+      msPerPx: 0.12,
+      minMs: 220,
+      maxMs: 380,
+      arcRatio: 0.06,
+      arcMaxPx: 48,
+      leanMaxDeg: 5,
+      peakScale: 0.035,
+    },
+    /** Hand cards sliding to their new places when the hand gains or loses
+     *  a card (OPT-274; shared by every hand branch since OPT-1054). Arriving
+     *  cards re-read their placeholder slot every frame, so they land flush
+     *  while the hand settles. */
+    handReflow: { type: "spring" as const, stiffness: 320, damping: 28 },
+    /** Start-time offsets between siblings of one batch (OPT-1054). Draws
+     *  (and DON!! tokens) deal `drawMs` apart; moves into a stacked pile
+     *  (deck, trash, Life) `pileMs` apart; any other travel keeps the
+     *  original `defaultMs` (OPT-274). */
+    stagger: {
+      drawMs: 90,
+      pileMs: 70,
+      defaultMs: 60,
+    },
     /** Card entering a zone (scale in) */
     zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
-    /** DON token flight from DON pool onto a target card (OPT-274). Matches
-     *  `zoneMove` timing so multi-flight batches read as a coherent set. */
+    /** DON token flight from DON pool onto a target card (OPT-274). A short
+     *  straight tween so multi-token batches read as a coherent set. */
     donAttach: { duration: 0.22, ease: "easeOut" as const },
   },
   pile: {
@@ -337,7 +388,7 @@ const board = {
       },
     },
     /** Debounce window for folding staggered siblings into one +N receipt.
-     *  It is slightly longer than the 60ms flight stagger. */
+     *  It is slightly longer than the 70ms pile-move stagger. */
     aggregateWindowMs: 80,
   },
   stateChange: {
@@ -364,6 +415,7 @@ export const cardHover = board.card.hover;
 export const cardTap = board.card.tap;
 export const cardTapReduced = board.card.tapReduced;
 export const cardFlip = board.card.flip;
+export const cardFlipPose = board.card.flipPose;
 export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
@@ -384,6 +436,9 @@ export const cardFizzleReduced = board.card.fizzleReduced;
 export const cardEntry = board.card.entry;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
+export const cardTravel = board.flight.travel;
+export const cardStagger = board.flight.stagger;
+export const handReflow = board.flight.handReflow;
 export const pilePop = board.pile.pop;
 export const pileDelta = board.pile.delta;
 export const pileDeltaReduced = board.pile.deltaReduced;

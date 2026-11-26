@@ -99,6 +99,12 @@ export interface CardProps {
   size?: CardSize;
   /** Flip to the back face (animated via 3D rotateY). */
   faceDown?: boolean;
+  /**
+   * Mount on one side and turn to `faceDown` later (OPT-1054). Flight ghosts
+   * use it to flip a card where it stands before it travels. Without it the
+   * card mounts on `faceDown` and flips only when the prop changes.
+   */
+  flipFrom?: CardFlipFrom;
   sleeveUrl?: string | null;
   /**
    * Direct image URL override for the front face — used by DON tokens
@@ -127,3 +133,14 @@ export type ResolvedCardData = {
   cardId: string | undefined;
   data: CardData | null;
 };
+
+/** Starting side and timing for a delayed flip (see `CardProps.flipFrom`). */
+export interface CardFlipFrom {
+  /** Side the card shows when it mounts. */
+  faceDown: boolean;
+  /** Seconds after mount before the card turns to `CardProps.faceDown`. */
+  delay?: number;
+  /** Swap sides instantly instead of playing the flip (a card dealt from
+   *  under a flipping pile top). */
+  instant?: boolean;
+}

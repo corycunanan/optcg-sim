@@ -31,6 +31,7 @@ vi.mock("motion/react", async () => {
 
   return {
     AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+    animate: () => ({ stop: vi.fn() }),
     motion: { div: MotionDiv },
     useMotionValue: (initial: number) => ({
       get: () => initial,
@@ -38,6 +39,7 @@ vi.mock("motion/react", async () => {
     }),
     useReducedMotion: () => true,
     useSpring: <Value,>(value: Value) => value,
+    useTransform: () => ({ get: () => 0 }),
   };
 });
 vi.mock("@/contexts/active-effects-context", () => ({
