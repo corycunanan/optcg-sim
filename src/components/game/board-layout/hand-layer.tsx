@@ -280,27 +280,44 @@ export const HandLayer = React.memo(function HandLayer({
   const [awaitingIds, setAwaitingIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
+  const [graceTimers] = useState(
+    () => new Set<ReturnType<typeof setTimeout>>()
+  );
   useEffect(() => {
     setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
     if (freshlyAdded.size === 0) return;
     const ids = [...freshlyAdded];
     setAwaitingIds((prev) => new Set([...prev, ...ids]));
     // Not cleared on re-run: `freshlyAdded` empties on the very next render.
-    setTimeout(() => {
+    // Pending timers are cleared on unmount (below).
+    const timer = setTimeout(() => {
+      graceTimers.delete(timer);
       setAwaitingIds((prev) => {
         const next = new Set(prev);
         for (const id of ids) next.delete(id);
         return next;
       });
     }, ARRIVAL_GRACE_MS);
-  }, [cardIds, freshlyAdded]);
+    graceTimers.add(timer);
+  }, [cardIds, freshlyAdded, graceTimers]);
+  useEffect(
+    () => () => {
+      for (const timer of graceTimers) clearTimeout(timer);
+      graceTimers.clear();
+    },
+    [graceTimers]
+  );
 
   // OPT-1054: an arriving card's slot stays closed (zero width) until its
   // flight departs, so the hand re-fans alongside the flight instead of
   // opening a gap while the card is still flipping on the deck. A card on its
-  // first render is held too, until its transition registers. `openIds` holds
-  // the arrivals whose departure time has passed.
-  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
+  // first render is held too, until its transition registers. `openIds` maps
+  // each arrival whose departure time has passed to that departure, so a card
+  // that leaves and comes back (bounce, then redraw) is held again for its
+  // new flight instead of reusing the old opening.
+  const [openIds, setOpenIds] = useState<ReadonlyMap<string, number>>(
+    () => new Map()
+  );
   useEffect(() => {
     if (!departures || departures.size === 0) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -310,11 +327,14 @@ export const HandLayer = React.memo(function HandLayer({
       timers.push(
         setTimeout(() => {
           setOpenIds((prev) => {
-            if (prev.has(id)) return prev;
-            const next = new Set(
-              [...prev].filter((openId) => departures.has(openId))
+            if (prev.get(id) === departAt) return prev;
+            // Drop openings whose flight has ended or been replaced.
+            const next = new Map(
+              [...prev].filter(
+                ([openId, openedFor]) => departures.get(openId) === openedFor
+              )
             );
-            next.add(id);
+            next.set(id, departAt);
             return next;
           });
         }, wait)
@@ -327,7 +347,8 @@ export const HandLayer = React.memo(function HandLayer({
     if (
       freshlyAdded.has(id) ||
       (awaitingIds.has(id) && departures?.has(id) !== true) ||
-      (departures?.has(id) === true && !openIds.has(id))
+      (departures?.has(id) === true &&
+        openIds.get(id) !== departures.get(id))
     ) {
       heldIds.add(id);
     }
@@ -350,18 +371,25 @@ export const HandLayer = React.memo(function HandLayer({
   const [slotRefs] = useState(
     () => new Map<string, (node: HTMLDivElement | null) => void>()
   );
+  useEffect(() => {
+    if (!zoneKey) return;
+    const live = new Set(cardIds.map((id) => handSlotZoneKey(zoneKey, id)));
+    for (const key of slotRefs.keys()) {
+      if (!live.has(key)) slotRefs.delete(key);
+    }
+  }, [cardIds, zoneKey, slotRefs]);
   const slotRef = (instanceId: string) => {
     if (!zoneKey) return undefined;
     const key = handSlotZoneKey(zoneKey, instanceId);
     let ref = slotRefs.get(key);
     if (!ref) {
+      // The callback stays cached for as long as the card is in the hand:
+      // deleting it on detach would hand a remounted slot a new callback
+      // every render, churning unregister/register (and a forced measure).
+      // Entries for cards that left the hand are pruned below.
       ref = (node: HTMLDivElement | null) => {
-        if (node) {
-          zonePos.register(key, node);
-        } else {
-          zonePos.unregister(key);
-          slotRefs.delete(key);
-        }
+        if (node) zonePos.register(key, node);
+        else zonePos.unregister(key);
       };
       slotRefs.set(key, ref);
     }
