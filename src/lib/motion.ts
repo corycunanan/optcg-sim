@@ -395,6 +395,22 @@ const board = {
     /** Activating (refresh): slight bounce, feels refreshing */
     activate: { type: "spring" as const, stiffness: 300, damping: 18 },
   },
+  /** Opening-hand redraw in the Mulligan modal (OPT-1060), per the Card
+   *  Motion Lab "Mulligan" scene: the hand flips face-down left to right
+   *  `flipStaggerMs` apart (the shared `flip`), flies into the deck
+   *  `returnStaggerMs` apart (the shared travel arc), the deck shuffles for
+   *  `shuffleMs`, then the top card flips and five cards are dealt face-up
+   *  `dealStaggerMs` apart. The modal holds `holdMs` on the new hand before
+   *  it moves on, and gives up waiting for the server's new hand after
+   *  `newHandTimeoutMs`. */
+  mulligan: {
+    flipStaggerMs: 40,
+    returnStaggerMs: 50,
+    shuffleMs: 450,
+    dealStaggerMs: 90,
+    holdMs: 600,
+    newHandTimeoutMs: 4000,
+  },
 } as const;
 
 // ─── Combined Export ─────────────────────────────────────────────────
@@ -443,3 +459,4 @@ export const pileDeltaReduced = board.pile.deltaReduced;
 export const pileReceiptAggregateWindowMs = board.pile.aggregateWindowMs;
 export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;
+export const mulliganMotion = board.mulligan;

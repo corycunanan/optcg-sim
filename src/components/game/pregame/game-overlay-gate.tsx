@@ -8,6 +8,7 @@ import type {
   PendingPromptState,
   PromptOptions,
 } from "@shared/game-types";
+import { useMulliganRedraw } from "@/hooks/use-mulligan-redraw";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -33,6 +34,8 @@ interface GameOverlayGateProps {
   };
   myIndex: 0 | 1 | null;
   myHand: CardInstance[];
+  /** The viewer's card sleeve, for the mulligan's face-down cards. */
+  mySleeveUrl?: string | null;
   cardDb: CardDb;
   activePrompt: PromptOptions | null;
   onAction: (action: GameAction) => void;
@@ -54,11 +57,16 @@ export function GameOverlayGate({
   endState,
   myIndex,
   myHand,
+  mySleeveUrl,
   cardDb,
   activePrompt,
   onAction,
   onBackToLobbies,
 }: GameOverlayGateProps) {
+  // Lives here, above the pregame checks, so the redraw animation survives
+  // the server leaving the mulligan phase (OPT-1060).
+  const mulligan = useMulliganRedraw(myHand);
+
   if (viewerRole === "spectator") {
     if (matchClosed) {
       return (
@@ -128,19 +136,23 @@ export function GameOverlayGate({
     );
   }
 
-  if (!pregame) return null;
+  if (!pregame && !mulligan.playback) return null;
 
   return (
     <PregameOverlay
       pregame={pregame}
       myIndex={myIndex}
       myHand={myHand}
+      mySleeveUrl={mySleeveUrl}
       cardDb={cardDb}
       activePrompt={activePrompt}
       promptRespondingPlayer={
         pendingPrompt?.respondingPlayer ?? (activePrompt ? myIndex : null)
       }
       onAction={onAction}
+      mulliganPlayback={mulligan.playback}
+      onMulliganRedraw={mulligan.start}
+      onMulliganPlaybackDone={mulligan.finish}
     />
   );
 }
