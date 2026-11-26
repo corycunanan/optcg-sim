@@ -155,7 +155,6 @@ function renderBlockerEligibility({
             prohibitions={prohibitions}
             activeDragType={null}
             activeDrag={null}
-            refreshWave={false}
             canInteract={false}
             canActivateMain={false}
             canDragCounter={false}
@@ -403,7 +402,6 @@ describe("PlayerField Leader blocker eligibility", () => {
               prohibitions={prohibitions}
               activeDragType={null}
               activeDrag={null}
-              refreshWave={false}
               canInteract={false}
               canActivateMain={false}
               canDragCounter={false}

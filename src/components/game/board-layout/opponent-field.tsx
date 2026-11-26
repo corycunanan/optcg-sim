@@ -42,7 +42,10 @@ interface OpponentFieldProps {
   owner: "me" | "opp";
   cardDb: CardDb;
   activeDragType: string | null;
-  refreshWave: boolean;
+  /** Refresh Phase stand-up delays in seconds, by instance id (OPT-1058). */
+  refreshDelays?: ReadonlyMap<string, number> | null;
+  /** Returning DON!! still in flight to the cost area (OPT-1058). */
+  hiddenDonIds?: ReadonlySet<string> | null;
   onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "me" | "opp" }) => void;
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
@@ -82,7 +85,8 @@ function OpponentFieldComponent({
   owner,
   cardDb,
   activeDragType,
-  refreshWave,
+  refreshDelays,
+  hiddenDonIds,
   onPreviewZone,
   attackerInstanceId,
   defenderInstanceId,
@@ -224,7 +228,7 @@ function OpponentFieldComponent({
               interaction={{
                 tooltipNotice: stageSelection?.disabledReason ?? undefined,
               }}
-              motionDelay={refreshWave ? 0.18 : undefined}
+              motionDelay={refreshDelays?.get(stage.instanceId)}
               className={cn(
                 arrivingInstanceIds?.has(stage.instanceId) && "invisible",
               )}
@@ -259,7 +263,7 @@ function OpponentFieldComponent({
           onTargetToggle={() => onTargetToggle?.(opp.leader.instanceId)}
           zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
-          animationDelay={refreshWave ? 0 : undefined}
+          animationDelay={refreshDelays?.get(opp.leader.instanceId)}
           donCountAdjust={donCountAdjustments?.get(opp.leader.instanceId)}
           entering={arrivals.has(opp.leader.instanceId)}
           arrivalPending={arrivingInstanceIds?.has(opp.leader.instanceId)}
@@ -279,7 +283,8 @@ function OpponentFieldComponent({
         donArtUrl={opp?.donArtUrl}
         arrivingDonIds={arrivingInstanceIds}
         style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
-        animationDelay={refreshWave ? 0.2 : undefined}
+        motionDelayById={refreshDelays}
+        hiddenDonIds={hiddenDonIds}
       />
 
       {/* Zone 2: Character row */}
@@ -303,7 +308,7 @@ function OpponentFieldComponent({
             onTargetToggle={() => onTargetToggle?.(char.instanceId)}
             zoneKey={zoneKey(`char-${i}`)}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
-            animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
+            animationDelay={refreshDelays?.get(char.instanceId)}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
             entering={arrivals.has(char.instanceId)}
             arrivalPending={arrivingInstanceIds?.has(char.instanceId)}

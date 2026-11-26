@@ -35,11 +35,14 @@ export interface CardTransition {
   playerIndex: 0 | 1;
   startedAt: number;
   /** Transform dissolves at its source without a flight path. `don-attach`
-   *  renders a DON token flying from the DON pool onto the destination card.
-   *  `don-move` renders a DON token flying between the DON!! deck and the
-   *  cost area (DON!! Phase placement, DON!! -X returns).
-   *  An omitted kind is a standard travel transition. */
-  kind?: "transform" | "don-attach" | "don-move";
+   *  renders a DON token flying from the DON pool and sliding under the
+   *  destination card. `don-return` is the Refresh Phase reverse (OPT-1058):
+   *  an attached DON!! slides out from under its card to its own cost-area
+   *  slot (`instanceId` is the DON!!) and lands rested. `don-move` renders a
+   *  DON token flying between the DON!! deck and the cost area (DON!! Phase
+   *  placement, DON!! -X returns). An omitted kind is a standard travel
+   *  transition. */
+  kind?: "transform" | "don-attach" | "don-return" | "don-move";
   /** Flight start delay in seconds. Carries the event's beat offset in the
    *  update's playback timeline (OPT-1040) plus any sibling fan-out, so
    *  multi-card draws and multi-DON attachments land one after another. */
@@ -49,8 +52,9 @@ export interface CardTransition {
   donInstanceId?: string;
   /** For `kind: "don-attach"`, the target character's instanceId (used by
    *  consumers to offset the displayed DON count until the token lands).
-   *  Mirrors `instanceId` for character-flight kinds — split out so a
-   *  DON-attach target is distinguishable from a target-zone card. */
+   *  For `kind: "don-return"`, the card the DON!! comes off. Either way it is
+   *  the card the token passes beneath. Split out from `instanceId` so a
+   *  DON!! target is distinguishable from a target-zone card. */
   targetInstanceId?: string;
   /** Number of destination cards represented by this visual. Count-only
    *  transform events use one fizzle plus an aggregated pile receipt. */

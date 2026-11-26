@@ -1,6 +1,7 @@
 import type { Transition, TargetAndTransition } from "motion/react";
 import {
   cardActivate,
+  refreshStandUp,
   cardBlockerHighlight,
   cardFlip,
   cardHover,
@@ -64,7 +65,12 @@ export function stateToMotionConfig(
     case "active":
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
-        transition: withDelay(cardActivate),
+        // A delayed activate is the Refresh Phase wave (OPT-1058): a short
+        // 180ms stand-up with no bounce, so the left-to-right order reads.
+        transition:
+          delay != null
+            ? { ...refreshStandUp.transition, delay }
+            : cardActivate,
         whileHover: reducedMotion ? undefined : hover,
         whileTap: tap,
       };

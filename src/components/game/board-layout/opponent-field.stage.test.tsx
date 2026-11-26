@@ -60,7 +60,6 @@ function stageClass(arrivingInstanceIds?: ReadonlySet<string>) {
       owner="opp"
       cardDb={{}}
       activeDragType={null}
-      refreshWave={false}
       onPreviewZone={() => {}}
       arrivingInstanceIds={arrivingInstanceIds}
     />

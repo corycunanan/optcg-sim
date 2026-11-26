@@ -34,6 +34,7 @@ import { opponentPlayCharacterScenario } from "./movement/opponent-play-characte
 import { opponentPlayThenDrawScenario } from "./movement/opponent-play-then-draw";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
+import { refreshPhaseWaveScenario } from "./movement/refresh-phase-wave";
 import { donPhaseFromDonDeckScenario } from "./movement/don-phase-from-don-deck";
 import { donReturnToDonDeckScenario } from "./movement/don-return-to-don-deck";
 import { playCharacterRestedScenario } from "./playground/play-character-rested";
@@ -60,6 +61,7 @@ export const scenarios: Scenario[] = [
   opponentPlayThenDrawScenario,
   attachOneDonScenario,
   attachThreeDonStaggeredScenario,
+  refreshPhaseWaveScenario,
   redistributeDonScenario,
   donPhaseFromDonDeckScenario,
   donReturnToDonDeckScenario,

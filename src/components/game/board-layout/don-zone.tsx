@@ -403,7 +403,8 @@ export const DonZone = React.memo(function DonZone({
   className,
   enableDrag,
   zoneKey,
-  animationDelay,
+  motionDelayById,
+  hiddenDonIds,
   donArtUrl,
   targetSelectionById,
   onTargetToggle,
@@ -414,7 +415,12 @@ export const DonZone = React.memo(function DonZone({
   className?: string;
   enableDrag?: boolean;
   zoneKey?: string;
-  animationDelay?: number;
+  /** Refresh Phase stand-up transition by DON!! (OPT-1058): a DON!! listed
+   *  here stands up with the short refresh tween. */
+  motionDelayById?: ReadonlyMap<string, number> | null;
+  /** Refresh Phase returns still in flight from under their cards
+   *  (OPT-1058); like `arrivingDonIds`, each stays invisible in its slot. */
+  hiddenDonIds?: ReadonlySet<string> | null;
   donArtUrl?: string | null;
   /** In-place SELECT_TARGET state keyed by instance id (OPT-792). A DON!!
    *  with an entry renders as a selectable target. */
@@ -498,9 +504,11 @@ export const DonZone = React.memo(function DonZone({
           {/* Active DON group */}
           <div className="flex items-center">
             {activeDon.map((don, i) => {
-              const delay = animationDelay ? animationDelay + i * 0.02 : undefined;
+              const delay = motionDelayById?.get(don.instanceId);
               const entering = arrivals.has(don.instanceId) && !reducedMotion;
-              const flying = arrivingDonIds?.has(don.instanceId);
+              const flying =
+                arrivingDonIds?.has(don.instanceId) ||
+                hiddenDonIds?.has(don.instanceId);
               const selection = targetSelectionById?.get(don.instanceId);
               if (selection) {
                 return (
@@ -560,7 +568,9 @@ export const DonZone = React.memo(function DonZone({
             <div className="flex items-center ml-auto">
               {restedDon.map((don, i) => {
                 const entering = arrivals.has(don.instanceId) && !reducedMotion;
-                const flying = arrivingDonIds?.has(don.instanceId);
+                const flying =
+                arrivingDonIds?.has(don.instanceId) ||
+                hiddenDonIds?.has(don.instanceId);
                 const selection = targetSelectionById?.get(don.instanceId);
                 if (selection) {
                   return (
@@ -573,9 +583,7 @@ export const DonZone = React.memo(function DonZone({
                       index={i}
                       step={steps.rested}
                       donArtUrl={donArtUrl}
-                      motionDelay={
-                        animationDelay ? animationDelay + i * 0.02 : undefined
-                      }
+                      motionDelay={motionDelayById?.get(don.instanceId)}
                       entering={entering}
                       flying={flying}
                       entryIndex={entryIndexById.get(don.instanceId) ?? i}
@@ -591,9 +599,7 @@ export const DonZone = React.memo(function DonZone({
                     index={i}
                     step={steps.rested}
                     donArtUrl={donArtUrl}
-                    motionDelay={
-                      animationDelay ? animationDelay + i * 0.02 : undefined
-                    }
+                    motionDelay={motionDelayById?.get(don.instanceId)}
                     entering={entering}
                     flying={flying}
                     entryIndex={entryIndexById.get(don.instanceId) ?? i}
