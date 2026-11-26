@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CardInstance, GameEvent } from "@shared/game-types";
+import type { CardInstance, GameEvent, LifeCard } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import {
   findLatestSpotlight,
@@ -82,6 +82,9 @@ export function receivedHandsByPlayerIndex(
 }
 
 const MAX_CONCURRENT = 8;
+/** Life faces remembered for cards that leave Life (OPT-1054). */
+const MAX_LIFE_FACES = 64;
+type LifeFaces = ReadonlyMap<string, LifeCard["face"]>;
 // Covers the worst case: `MAX_CONCURRENT * staggerMs` of start-time offset +
 // the flip that precedes a turned-over flight (300ms) + the longest flight
 // (380ms) before the flight completes (OPT-1054: 7 × 90 + 300 + 380 ≈ 1.3s).
@@ -118,6 +121,7 @@ export function eventToTransitions(
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  lifeFaces?: LifeFaces,
 ): CardTransition[] {
   const single = eventToTransition(
     event,
@@ -125,6 +129,7 @@ export function eventToTransitions(
     zoneRegistry,
     spotlight,
     receivedHands,
+    lifeFaces,
   );
   if (single) return [single];
 
@@ -304,6 +309,7 @@ function eventToTransition(
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null,
   receivedHands?: ReceivedHands,
+  lifeFaces?: LifeFaces,
 ): CardTransition | null {
   const { type, playerIndex } = event;
   const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
@@ -413,6 +419,9 @@ function eventToTransition(
       cardInstanceId = event.payload.cardInstanceId ?? null;
       from = `${prefix}-life`;
       to = `${prefix}-hand`;
+      // The payload carries no face; the Life zone showed one (OPT-1054).
+      const face = cardInstanceId ? lifeFaces?.get(cardInstanceId) : undefined;
+      if (face) lifeFaceDown = face === "DOWN";
       break;
     }
     case "CARD_RETURNED_TO_DECK": {
@@ -521,8 +530,12 @@ export function useCardTransitions(
   zoneRegistry?: ZonePositionRegistry | null,
   activeSpotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  lifeCards?: readonly LifeCard[],
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
+  // OPT-1054: the side each Life card last showed. Updated after the event
+  // effect, so a card that left Life in this update still reads its face.
+  const lifeFacesRef = useRef<Map<string, LifeCard["face"]>>(new Map());
   // Track the highest timestamp we've processed. Using timestamps (instead of
   // array length) keeps dedup stable when the server sends a reconstructed
   // eventLog with the same length but different content.
@@ -603,6 +616,7 @@ export function useCardTransitions(
         zoneRegistry ?? null,
         batchSpotlight,
         receivedHands,
+        lifeFacesRef.current,
       );
       for (const transition of produced) {
         newTransitions.push(
@@ -638,8 +652,10 @@ export function useCardTransitions(
     // existing delay (e.g. DON-attach tokens inside a bigger batch).
     // OPT-1054: cards whose destination needs the other side turn over
     // before they travel; only the top card of a pile flips.
+    // The concurrency cap applies to the batch before flips are assigned,
+    // so the card that flips is always one that is shown.
     const staggered = assignPileFlips(
-      applyBatchStagger(presentableTransitions),
+      applyBatchStagger(presentableTransitions).slice(-MAX_CONCURRENT),
     );
 
     queueMicrotask(() => {
@@ -656,6 +672,21 @@ export function useCardTransitions(
     activeSpotlight,
     receivedHands,
   ]);
+
+  // Remember Life faces after the event effect has read them (OPT-1054).
+  useEffect(() => {
+    if (!lifeCards) return;
+    const faces = lifeFacesRef.current;
+    for (const card of lifeCards) {
+      faces.delete(card.instanceId);
+      faces.set(card.instanceId, card.face);
+    }
+    while (faces.size > MAX_LIFE_FACES) {
+      const oldest = faces.keys().next().value;
+      if (oldest === undefined) break;
+      faces.delete(oldest);
+    }
+  }, [lifeCards]);
 
   // Auto-expire old transitions
   useEffect(() => {
