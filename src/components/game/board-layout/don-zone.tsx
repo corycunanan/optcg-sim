@@ -139,11 +139,14 @@ function DraggableDonCard({
   motionDelay,
   entering,
   entryIndex,
+  hidden,
 }: {
   don: DonInstance;
   index: number;
   step: number;
   disabled?: boolean;
+  /** A returning DON!! still in flight to this slot (OPT-1058). */
+  hidden?: boolean;
   donArtUrl?: string | null;
   motionDelay?: number;
   /** Plays the entry pop on mount (OPT-121). Set by `DonZone` for tokens
@@ -176,7 +179,10 @@ function DraggableDonCard({
       }}
       // Shrink-wraps the DON token `<Card>`, so the drag focus ring traces that
       // card's outline rather than a chrome corner.
-      className="touch-none rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
+      className={cn(
+        "touch-none rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+        hidden && "invisible",
+      )}
     >
       <Card
         variant="don"
@@ -206,8 +212,10 @@ function SelectableDonCard({
   motionDelay,
   entering,
   entryIndex,
+  hidden,
 }: {
   don: DonInstance;
+  hidden?: boolean;
   selection: TargetCardSelectionState;
   onToggle?: (instanceId: string) => void;
   rested: boolean;
@@ -265,6 +273,7 @@ function SelectableDonCard({
         "relative rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         rested && "flex items-center justify-center shrink-0",
         toggle ? "cursor-pointer" : "cursor-default",
+        hidden && "invisible",
       )}
       style={{
         ...(rested ? { width: DON_CARD_H, height: DON_CARD_W } : {}),
@@ -295,7 +304,8 @@ export const DonZone = React.memo(function DonZone({
   className,
   enableDrag,
   zoneKey,
-  animationDelay,
+  motionDelayById,
+  hiddenDonIds,
   donArtUrl,
   targetSelectionById,
   onTargetToggle,
@@ -305,7 +315,11 @@ export const DonZone = React.memo(function DonZone({
   className?: string;
   enableDrag?: boolean;
   zoneKey?: string;
-  animationDelay?: number;
+  /** Refresh Phase stand-up delays in seconds, by DON!! (OPT-1058). */
+  motionDelayById?: ReadonlyMap<string, number> | null;
+  /** Returning DON!! still in flight to their slots (OPT-1058). They keep
+   *  their place in the fan, invisible, so the token lands in it. */
+  hiddenDonIds?: ReadonlySet<string> | null;
   donArtUrl?: string | null;
   /** In-place SELECT_TARGET state keyed by instance id (OPT-792). A DON!!
    *  with an entry renders as a selectable target. */
@@ -386,7 +400,8 @@ export const DonZone = React.memo(function DonZone({
           {/* Active DON group */}
           <div className="flex items-center">
             {activeDon.map((don, i) => {
-              const delay = animationDelay ? animationDelay + i * 0.02 : undefined;
+              const delay = motionDelayById?.get(don.instanceId);
+              const hidden = !!hiddenDonIds?.has(don.instanceId);
               const entering = arrivals.has(don.instanceId) && !reducedMotion;
               const selection = targetSelectionById?.get(don.instanceId);
               if (selection) {
@@ -401,6 +416,7 @@ export const DonZone = React.memo(function DonZone({
                     step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
+                    hidden={hidden}
                     entering={entering}
                     entryIndex={entryIndexById.get(don.instanceId) ?? i}
                   />
@@ -415,6 +431,7 @@ export const DonZone = React.memo(function DonZone({
                     step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
+                    hidden={hidden}
                     entering={entering}
                     entryIndex={entryIndexById.get(don.instanceId) ?? i}
                   />
@@ -432,6 +449,7 @@ export const DonZone = React.memo(function DonZone({
                       ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
                       : undefined
                   }
+                  className={cn(hidden && "invisible")}
                   style={{
                     marginLeft: i > 0 ? steps.active - DON_CARD_W : 0,
                     zIndex: i,
@@ -453,6 +471,8 @@ export const DonZone = React.memo(function DonZone({
             <div className="flex items-center ml-auto">
               {restedDon.map((don, i) => {
                 const entering = arrivals.has(don.instanceId) && !reducedMotion;
+                const delay = motionDelayById?.get(don.instanceId);
+                const hidden = !!hiddenDonIds?.has(don.instanceId);
                 const selection = targetSelectionById?.get(don.instanceId);
                 if (selection) {
                   return (
@@ -465,9 +485,8 @@ export const DonZone = React.memo(function DonZone({
                       index={i}
                       step={steps.rested}
                       donArtUrl={donArtUrl}
-                      motionDelay={
-                        animationDelay ? animationDelay + i * 0.02 : undefined
-                      }
+                      motionDelay={delay}
+                      hidden={hidden}
                       entering={entering}
                       entryIndex={entryIndexById.get(don.instanceId) ?? i}
                     />
@@ -485,7 +504,10 @@ export const DonZone = React.memo(function DonZone({
                         ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
                         : undefined
                     }
-                    className="flex items-center justify-center shrink-0"
+                    className={cn(
+                      "flex items-center justify-center shrink-0",
+                      hidden && "invisible",
+                    )}
                     style={{
                       width: DON_CARD_H,
                       height: DON_CARD_W,
@@ -497,9 +519,7 @@ export const DonZone = React.memo(function DonZone({
                       variant="don"
                       state="rest"
                       artUrl={donArtUrl || DEFAULT_DON_IMG}
-                      motionDelay={
-                        animationDelay ? animationDelay + i * 0.02 : undefined
-                      }
+                      motionDelay={delay}
                     />
                   </motion.div>
                 );

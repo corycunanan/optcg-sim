@@ -164,6 +164,16 @@ const board = {
     },
     /** Attached-DON badge exit (OPT-284). The count pill stays upright outside
      *  the rotating card layer, then scales down slightly as it fades. */
+    /** DON!! badge count change (OPT-1058): a quick 200ms swell as a token
+     *  slides under (or out from under) the card. */
+    donBadgePop: {
+      scale: [1, 1.18, 1] as number[],
+      transition: {
+        duration: 0.2,
+        ease: "easeOut" as const,
+        times: [0, 0.35, 1] as number[],
+      },
+    },
     donBadgeExit: {
       opacity: 0,
       scale: 0.9,
@@ -345,6 +355,10 @@ const board = {
      *  fixed `durationMs`, with the arc capped lower (`arcMaxPx`, design px)
      *  because tokens are small and travel in sets. */
     donAttach: { durationMs: 260, arcMaxPx: 24 },
+    /** Refresh Phase return (OPT-1058): attached DON!! slide out from under
+     *  their cards to the cost area, `staggerMs` apart, and land rested. No
+     *  lean, so the token's turn to rested reads cleanly. */
+    donReturn: { durationMs: 240, arcMaxPx: 24, staggerMs: 30 },
   },
   pile: {
     /** Destination-pile receipt: one quick top-card pulse after a batch has
@@ -394,6 +408,17 @@ const board = {
     rest: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Activating (refresh): slight bounce, feels refreshing */
     activate: { type: "spring" as const, stiffness: 300, damping: 18 },
+    /** Refresh Phase stand-up (OPT-1058): rested cards and DON!! stand up
+     *  left to right, `staggerMs` apart, each a `duration` rotate with no
+     *  bounce. The whole wave fits in `maxSpreadMs` of stagger, so a full
+     *  cost area does not drag the start of the turn out. `gapMs` separates
+     *  the last returning DON!! landing from the first stand-up. */
+    refreshStandUp: {
+      transition: { duration: 0.18, ease: "easeOut" as const },
+      staggerMs: 60,
+      maxSpreadMs: 540,
+      gapMs: 150,
+    },
   },
 } as const;
 
@@ -420,6 +445,7 @@ export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
 export const cardWinnerPulse = board.card.winnerPulse;
 export const donBadgeExit = board.card.donBadgeExit;
+export const donBadgePop = board.card.donBadgePop;
 export const floatingPowerMod = board.card.floatingPowerMod;
 export const powerModifiedFlash = board.card.powerModifiedFlash;
 export const negatedRing = board.card.negatedRing;
@@ -443,3 +469,5 @@ export const pileDeltaReduced = board.pile.deltaReduced;
 export const pileReceiptAggregateWindowMs = board.pile.aggregateWindowMs;
 export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;
+export const refreshStandUp = board.stateChange.refreshStandUp;
+export const donReturnFlight = board.flight.donReturn;

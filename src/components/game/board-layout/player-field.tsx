@@ -60,7 +60,10 @@ interface PlayerFieldProps {
   prohibitions?: ActiveProhibition[];
   activeDragType: string | null;
   activeDrag: DragPayload | null;
-  refreshWave: boolean;
+  /** Refresh Phase stand-up delays in seconds, by instance id (OPT-1058). */
+  refreshDelays?: ReadonlyMap<string, number> | null;
+  /** Returning DON!! still in flight to the cost area (OPT-1058). */
+  hiddenDonIds?: ReadonlySet<string> | null;
   canInteract: boolean;
   canActivateMain: boolean;
   oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
@@ -103,7 +106,8 @@ function PlayerFieldComponent({
   prohibitions = [],
   activeDragType,
   activeDrag,
-  refreshWave,
+  refreshDelays,
+  hiddenDonIds,
   canInteract,
   canActivateMain,
   oncePerTurnUsed,
@@ -289,7 +293,7 @@ function PlayerFieldComponent({
             zoneKey={zoneKey(`char-${i}`)}
             slotIndex={i}
             boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
-            animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
+            animationDelay={refreshDelays?.get(char.instanceId)}
             redistributeSource={redistributeSourceIds?.has(char.instanceId)}
             donArtUrl={me?.donArtUrl}
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
@@ -310,7 +314,8 @@ function PlayerFieldComponent({
         zoneKey={zoneKey("don")}
         donArtUrl={me?.donArtUrl}
         style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
-        animationDelay={refreshWave ? 0.2 : undefined}
+        motionDelayById={refreshDelays}
+        hiddenDonIds={hiddenDonIds}
       />
 
       {me?.leader ? (
@@ -348,7 +353,7 @@ function PlayerFieldComponent({
           onAction={onAction}
           zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
-          animationDelay={refreshWave ? 0 : undefined}
+          animationDelay={refreshDelays?.get(me.leader.instanceId)}
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
           donArtUrl={me?.donArtUrl}
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
@@ -384,7 +389,7 @@ function PlayerFieldComponent({
           me?.stage ? arrivingInstanceIds?.has(me.stage.instanceId) : false
         }
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
-        animationDelay={refreshWave ? 0.18 : undefined}
+        animationDelay={me?.stage ? refreshDelays?.get(me.stage.instanceId) : undefined}
       />
 
       {/* Zone 3 (right): Deck + Trash */}

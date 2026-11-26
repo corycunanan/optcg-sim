@@ -8,6 +8,7 @@ import {
   MIN_BEAT_GAP_MS,
   MULTI_CARD_STAGGER_MS,
   PULSE_READ_MS,
+  REFRESH_READ_MS,
   siblingStaggerMs,
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
@@ -90,6 +91,27 @@ describe("classifyEventBeat", () => {
         })
       )
     ).toBe("spotlight");
+  });
+});
+
+describe("Refresh Phase beat (OPT-1058)", () => {
+  const refreshEnd = () =>
+    at({
+      type: "PHASE_CHANGED",
+      playerIndex: 0,
+      payload: { from: "REFRESH", to: "DRAW" },
+    });
+
+  it("gives the end of the Refresh Phase its own beat", () => {
+    expect(classifyEventBeat(refreshEnd())).toBe("refresh");
+  });
+
+  it("plays the draw after the refresh wave's readable portion", () => {
+    const refresh = refreshEnd();
+    const draw = drawn();
+    const timeline = buildEventTimeline([refresh, draw]);
+    expect(eventOffsetMs(timeline, refresh)).toBe(0);
+    expect(eventOffsetMs(timeline, draw)).toBe(REFRESH_READ_MS + BEAT_GAP_MS);
   });
 });
 

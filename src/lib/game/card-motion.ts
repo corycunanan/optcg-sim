@@ -249,6 +249,9 @@ export interface FlightGeometry {
   scale?: number;
   /** Arc cap in design px. Defaults to `cardTravel.arcMaxPx`. */
   arcMaxPx?: number;
+  /** Lean toward the horizontal travel direction. Defaults to true. A
+   *  DON!! returning rested turns 90° instead (OPT-1058). */
+  lean?: boolean;
 }
 
 /**
@@ -281,7 +284,10 @@ export function flightPose(
   const normal = arcNormal(dx, dy);
   const scale = geometry.scale && geometry.scale > 0 ? geometry.scale : 1;
   const arc = arcHeight(distance / scale, geometry.arcMaxPx) * scale * bump;
-  const lean = Math.max(-1, Math.min(1, dx / distance)) * cardTravel.leanMaxDeg;
+  const lean =
+    geometry.lean === false
+      ? 0
+      : Math.max(-1, Math.min(1, dx / distance)) * cardTravel.leanMaxDeg;
   return {
     x: x + normal.x * arc,
     y: y + normal.y * arc,

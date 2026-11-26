@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cardActivate,
+  refreshStandUp,
   cardBlockerHighlight,
   cardFlip,
   cardHover,
@@ -91,8 +92,9 @@ describe("stateToMotionConfig", () => {
   });
 
   it("merges motionDelay into the state transition without overwriting the spring", () => {
+    // A delayed activate is the Refresh Phase stand-up wave (OPT-1058).
     const cfg = stateToMotionConfig("active", "field", false, 0.15);
-    expect(cfg.transition).toEqual({ ...cardActivate, delay: 0.15 });
+    expect(cfg.transition).toEqual({ ...refreshStandUp.transition, delay: 0.15 });
     const rest = stateToMotionConfig("rest", "field", false, 0.09);
     expect(rest.transition).toEqual({ ...cardRest, delay: 0.09 });
   });

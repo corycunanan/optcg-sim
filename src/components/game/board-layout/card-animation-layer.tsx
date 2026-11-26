@@ -24,6 +24,7 @@ import {
   cardFizzleReduced,
   cardTransitions,
   cardTravel,
+  donReturnFlight,
 } from "@/lib/motion";
 import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
@@ -50,6 +51,9 @@ interface CardAnimationLayerProps {
    *  portal), so board-card sizes are scaled to match the cards they leave
    *  and land on. Defaults to 1. */
   boardScale?: number;
+  /** Field cards shown rested. A DON!! token hides under the card's real
+   *  footprint, which turns sideways when the card is rested (OPT-1058). */
+  restedInstanceIds?: ReadonlySet<string>;
 }
 
 interface GhostBox {
@@ -62,6 +66,64 @@ interface GhostBox {
 /** Usable when the registered element was measured while laid out. */
 function measured(rect: DOMRect | null): rect is DOMRect {
   return !!rect && rect.width > 0 && rect.height > 0;
+}
+
+/** A field card's visible footprint inside its square slot: a portrait
+ *  board card, turned sideways when the card is rested. */
+export function cardFootprint(
+  slot: { left: number; top: number; width: number; height: number },
+  rested: boolean,
+  boardScale: number
+): GhostBox {
+  const w = (rested ? BOARD_CARD_H : BOARD_CARD_W) * boardScale;
+  const h = (rested ? BOARD_CARD_W : BOARD_CARD_H) * boardScale;
+  return {
+    x: slot.left + (slot.width - w) / 2,
+    y: slot.top + (slot.height - h) / 2,
+    w,
+    h,
+  };
+}
+
+/** The live rect of one DON!! in a cost area (each renders with
+ *  `data-don-instance-id`). */
+function donSlotRect(instanceId: string): DOMRect | null {
+  if (typeof document === "undefined") return null;
+  const node = document.querySelector(
+    `[data-don-instance-id="${CSS.escape(instanceId)}"]`
+  );
+  const rect = node?.getBoundingClientRect() ?? null;
+  return measured(rect) ? rect : null;
+}
+
+/** `clip-path` for a full-viewport layer that cuts out `hole`, so what the
+ *  layer draws passes beneath that box (OPT-1058). */
+export function clipOutside(hole: GhostBox): string {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  // A frame far larger than any viewport, with the hole wound inside it.
+  const outer = "M-10000 -10000H20000V20000H-10000Z";
+  const inner =
+    `M${r(hole.x)} ${r(hole.y)}h${r(hole.w)}v${r(hole.h)}h${r(-hole.w)}Z`;
+  return `path(evenodd, "${outer} ${inner}")`;
+}
+
+/** Draws its children beneath a field card: everything inside `rect` is
+ *  clipped away, so a DON!! token slides under the card's edge. */
+function BeneathCard({
+  rect,
+  children,
+}: {
+  rect: GhostBox;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="pointer-events-none fixed inset-0"
+      style={{ clipPath: clipOutside(rect) }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -83,6 +145,8 @@ function TravelGhost({
   boardScale,
   profile,
   content,
+  endRotate: endRotateOverride,
+  lean = true,
 }: {
   transition: CardTransition;
   from: GhostBox;
@@ -97,9 +161,13 @@ function TravelGhost({
   profile?: { durationMs: number; arcMaxPx: number };
   /** Replaces the travelling card (a DON!! token). */
   content?: React.ReactNode;
+  /** Landing rotation; defaults to the played card's orientation. */
+  endRotate?: number;
+  /** Lean toward the travel direction (off for a token turning rested). */
+  lean?: boolean;
 }) {
   const plan = planFlight(transition);
-  const endRotate = transition.playedRested ? 90 : 0;
+  const endRotate = endRotateOverride ?? (transition.playedRested ? 90 : 0);
   const x = useMotionValue(from.x);
   const y = useMotionValue(from.y);
   const width = useMotionValue(from.w);
@@ -119,7 +187,7 @@ function TravelGhost({
     const pxPerDesign = boardScale > 0 ? boardScale : 1;
     // The ghost layer sits outside the zoomed board: convert to design px.
     const distance = Math.hypot(first.x - from.x, first.y - from.y) / pxPerDesign;
-    const geometry = { scale: pxPerDesign, arcMaxPx: profile?.arcMaxPx };
+    const geometry = { scale: pxPerDesign, arcMaxPx: profile?.arcMaxPx, lean };
     const progress = motionValue(0);
     const apply = (p: number) => {
       const target = resolveTargetRef.current();
@@ -231,6 +299,7 @@ function FlyingCard({
   donArtUrl,
   reducedMotion,
   boardScale,
+  restedInstanceIds,
 }: {
   transition: CardTransition;
   cardDb: CardDb;
@@ -239,10 +308,12 @@ function FlyingCard({
   donArtUrl?: string | null;
   reducedMotion: boolean;
   boardScale: number;
+  restedInstanceIds?: ReadonlySet<string>;
 }) {
   const zonePos = useZonePosition();
   const isTransform = transition.kind === "transform";
-  const isDonAttach = transition.kind === "don-attach";
+  const isDonReturn = transition.kind === "don-return";
+  const isDonAttach = transition.kind === "don-attach" || isDonReturn;
   const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
   // A hand card's own slot is registered by `HandLayer`; a card that just
@@ -272,6 +343,63 @@ function FlyingCard({
   const isFromSpotlight = transition.spotlightSourceSize !== undefined;
   const destinationRect = toRect ?? fromRect;
 
+  if (isDonAttach) {
+    // DON!! tokens fly the shared arc at a fixed pace with a lower cap
+    // (OPT-1054). A given DON!! slides under its card: it is clipped out
+    // wherever it overlaps the card, so it disappears beneath the card's
+    // edge (OPT-1058). A Refresh return slides out from under its card the
+    // same way, to its own slot in the cost area, and lands rested.
+    const cardRect = isDonReturn ? fromRect : destinationRect;
+    const cardRested =
+      !!transition.targetInstanceId &&
+      !!restedInstanceIds?.has(transition.targetInstanceId);
+    const tokenW = DON_TOKEN_W * boardScale;
+    const tokenH = DON_TOKEN_H * boardScale;
+    const centered = (rect: DOMRect): GhostBox => ({
+      x: rect.left + (rect.width - tokenW) / 2,
+      y: rect.top + (rect.height - tokenH) / 2,
+      w: tokenW,
+      h: tokenH,
+    });
+    const resolveTarget = isDonReturn
+      ? () => {
+          // The returning DON!! renders hidden in its cost-area slot until
+          // it lands; aim at that slot (read live, as the area re-fans).
+          const slot = transition.instanceId
+            ? donSlotRect(transition.instanceId)
+            : null;
+          return slot ? centered(slot) : centered(destinationRect);
+        }
+      : () => centered(destinationRect);
+    return (
+      <BeneathCard
+        rect={cardFootprint(cardRect, cardRested, boardScale)}
+      >
+        <TravelGhost
+          transition={transition}
+          from={centered(fromRect)}
+          resolveTarget={resolveTarget}
+          variant="field"
+          cardDb={cardDb}
+          onComplete={onComplete}
+          boardScale={boardScale}
+          profile={isDonReturn ? donReturnFlight : cardTransitions.donAttach}
+          endRotate={isDonReturn ? 90 : 0}
+          lean={!isDonReturn}
+          content={
+            <Card
+              variant="don"
+              state="in-flight"
+              artUrl={donArtUrl ?? undefined}
+              style={FILL_TRANSITION_FRAME}
+            />
+          }
+        />
+      </BeneathCard>
+    );
+  }
+
+
   // Flight footprint depends on kind. DON tokens are smaller than cards and
   // stay DON-sized for the entire flight; card flights size to their
   // source/destination zone.
@@ -288,39 +416,26 @@ function FlyingCard({
     ? CARD_SIZES[transition.spotlightSourceSize]
     : null;
   const fromSlot = measured(fromSlotRect) && fromRect === fromSlotRect;
-  const fromW = isDonAttach
-    ? DON_TOKEN_W
-    : spotlightSource
+  const fromW = spotlightSource
       ? spotlightSource.width
       : fromSlot
         ? fromRect.width
         : (isFromHand ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
-  const fromH = isDonAttach
-    ? DON_TOKEN_H
-    : spotlightSource
+  const fromH = spotlightSource
       ? spotlightSource.height
       : fromSlot
         ? fromRect.height
         : (isFromHand ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
-  const toW = isDonAttach
-    ? DON_TOKEN_W
-    : (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
-  const toH = isDonAttach
-    ? DON_TOKEN_H
-    : (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
+  const toW = (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
+  const toH = (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
-  // DON tokens aim for the target card's center.
-  const toX = destinationRect.left + (destinationRect.width - toW) / 2;
-  const toY = destinationRect.top + (destinationRect.height - toH) / 2;
 
   // Variant tracks the destination footprint — the primitive's size token
   // matches the outer motion.div's animated `toW/toH` so the card settles
   // into the destination zone at exactly the right dimensions.
-  const variant = isDonAttach
-    ? "don"
-    : isFromSpotlight
+  const variant = isFromSpotlight
       ? "modal"
       : isHandBound
         ? "hand"
@@ -328,7 +443,7 @@ function FlyingCard({
 
   const delay = transition.delay ?? 0;
 
-  if (!isTransform && !isDonAttach) {
+  if (!isTransform) {
     const toZoneKey = transition.toZoneKey;
     const instanceId = transition.instanceId;
     // Cards arriving in hand aim at their own placeholder slot, read live so
@@ -354,36 +469,11 @@ function FlyingCard({
         transition={transition}
         from={{ x: fromX, y: fromY, w: fromW, h: fromH }}
         resolveTarget={resolveTarget}
-        variant={variant === "don" ? "field" : variant}
+        variant={variant}
         cardDb={cardDb}
         sleeveUrl={sleeveUrl}
         onComplete={onComplete}
         boardScale={boardScale}
-      />
-    );
-  }
-
-  if (isDonAttach) {
-    // DON!! tokens fly the shared arc at a fixed pace with a lower cap
-    // (OPT-1054), aimed at the target card's center.
-    return (
-      <TravelGhost
-        transition={transition}
-        from={{ x: fromX, y: fromY, w: fromW, h: fromH }}
-        resolveTarget={() => ({ x: toX, y: toY, w: toW, h: toH })}
-        variant="field"
-        cardDb={cardDb}
-        onComplete={onComplete}
-        boardScale={boardScale}
-        profile={cardTransitions.donAttach}
-        content={
-          <Card
-            variant="don"
-            state="in-flight"
-            artUrl={donArtUrl ?? undefined}
-            style={FILL_TRANSITION_FRAME}
-          />
-        }
       />
     );
   }
@@ -449,6 +539,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   sleeveUrls,
   donArtUrls,
   boardScale = 1,
+  restedInstanceIds,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
   const readyTransitions = transitions.filter(
@@ -478,6 +569,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             donArtUrl={donArtUrls?.[t.playerIndex] ?? null}
             reducedMotion={reducedMotion ?? false}
             boardScale={boardScale}
+            restedInstanceIds={restedInstanceIds}
           />
         ))}
       </AnimatePresence>

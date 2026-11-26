@@ -48,12 +48,38 @@ export function applyEvent(
       return mapPlayer(state, event.playerIndex, (p) =>
         addLifeCardToHand(p, event.payload, event.playerIndex),
       );
+    case "PHASE_CHANGED":
+      return event.payload.from === "REFRESH"
+        ? mapPlayer(state, event.playerIndex, refreshPlayer)
+        : state;
     default:
       return state;
   }
 }
 
 // ─── per-event handlers ─────────────────────────────────────────────────
+
+/** Refresh Phase (rules 6-2-3, 6-2-4): attached DON!! return to the cost
+ *  area, then every rested card and DON!! becomes active. */
+function refreshPlayer(p: PartialPlayerState): PartialPlayerState {
+  const returned: DonInstance[] = [];
+  const detach = (card: CardInstance): CardInstance => {
+    returned.push(
+      ...card.attachedDon.map((d) => ({ ...d, attachedTo: null, state: "ACTIVE" as const })),
+    );
+    return { ...card, attachedDon: [], state: "ACTIVE" };
+  };
+  return {
+    ...p,
+    leader: detach(p.leader),
+    characters: p.characters.map((c) => (c ? detach(c) : c)),
+    stage: p.stage ? { ...p.stage, state: "ACTIVE" } : p.stage,
+    donCostArea: [
+      ...p.donCostArea.map((d) => ({ ...d, state: "ACTIVE" as const })),
+      ...returned,
+    ],
+  };
+}
 
 function drawTopOfDeck(p: PartialPlayerState): PartialPlayerState {
   const top = p.deck[0];
