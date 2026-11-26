@@ -42,14 +42,17 @@ vi.mock("./field-card", () => ({
   OpponentFieldCard: ({
     card,
     zoneKey,
+    arrivalPending,
   }: {
     card: CardInstance;
     zoneKey: string;
+    arrivalPending?: boolean;
   }) =>
     React.createElement("div", {
       "data-field": "top",
       "data-instance-id": card.instanceId,
       "data-zone-key": zoneKey,
+      "data-arrival-pending": String(!!arrivalPending),
     }),
 }));
 
@@ -76,12 +79,14 @@ vi.mock("./player-field", () => ({
     canActivateMain,
     canDragCounter,
     inBlockStep,
+    arrivingInstanceIds,
   }: {
     me: PlayerState | null;
     canInteract: boolean;
     canActivateMain: boolean;
     canDragCounter: boolean;
     inBlockStep: boolean;
+    arrivingInstanceIds?: ReadonlySet<string>;
   }) =>
     React.createElement(
       React.Fragment,
@@ -92,6 +97,7 @@ vi.mock("./player-field", () => ({
         "data-can-activate-main": String(canActivateMain),
         "data-can-drag-counter": String(canDragCounter),
         "data-in-block-step": String(inBlockStep),
+        "data-arriving": [...(arrivingInstanceIds ?? [])].sort().join(","),
       }),
       React.createElement("div", {
         "data-life-instance-ids": (me?.life ?? [])
@@ -189,6 +195,24 @@ vi.mock("./board-drag-overlay", () => ({
     React.createElement("div", { "data-testid": "board-drag-overlay" }),
 }));
 vi.mock("./card-animation-layer", () => ({ CardAnimationLayer: () => null }));
+
+// OPT-1054: a test can pin the in-flight transitions; others use the hook.
+const pinnedTransitions = vi.hoisted(() => ({
+  current: null as null | Array<Record<string, unknown>>,
+}));
+vi.mock("@/hooks/use-card-transitions", async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import("@/hooks/use-card-transitions")>();
+  return {
+    ...real,
+    useCardTransitions: (
+      ...args: Parameters<typeof real.useCardTransitions>
+    ) =>
+      pinnedTransitions.current
+        ? { transitions: pinnedTransitions.current, removeTransition: () => {} }
+        : real.useCardTransitions(...args),
+  };
+});
 vi.mock("../spotlight-overlay", () => ({
   SpotlightOverlay: () =>
     React.createElement("div", { "data-testid": "spotlight-overlay" }),
@@ -282,6 +306,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
+  pinnedTransitions.current = null;
   vi.unstubAllGlobals();
 });
 
@@ -621,5 +646,34 @@ describe("BoardLayout Block Step with an in-place target prompt (OPT-897)", () =
     expect(resolved.mid["data-active-prompt"]).toBe("none");
     expect(resolved.mid["data-blocker-mode"]).toBe("true");
     expect(resolved.field["data-in-block-step"]).toBe("true");
+  });
+
+  it("holds both fields' arriving cards hidden until their flights land (OPT-1054)", () => {
+    const flight = (instanceId: string, toZoneKey: string, fromZoneKey: string) => ({
+      id: `ct-${instanceId}`,
+      cardId: "OP01-001",
+      instanceId,
+      fromZoneKey,
+      toZoneKey,
+      playerIndex: 0,
+      startedAt: Date.now(),
+    });
+    pinnedTransitions.current = [
+      flight("player-0-character", "p-char-1", "p-hand"),
+      flight("player-1-character", "o-char-1", "o-hand"),
+    ];
+    renderComposition(0);
+    const bottomField = renderer!.root.findByProps({ "data-testid": "player-field" });
+    expect(bottomField.props["data-arriving"]).toBe(
+      "player-0-character,player-1-character",
+    );
+    const top = renderer!.root.findAllByProps({ "data-field": "top" });
+    const pending = Object.fromEntries(
+      top.map((node) => [node.props["data-instance-id"], node.props["data-arrival-pending"]]),
+    );
+    expect(pending).toEqual({
+      "player-1-character": "true",
+      "player-1-leader": "false",
+    });
   });
 });
