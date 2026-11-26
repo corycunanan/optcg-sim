@@ -37,13 +37,18 @@ export interface CardTransition {
    *  renders a DON token flying from the DON pool and sliding under the
    *  destination card. `don-return` is the Refresh Phase reverse (OPT-1058):
    *  an attached DON!! slides out from under its card to its own cost-area
-   *  slot (`instanceId` is the DON!!) and lands rested. An omitted kind is a
-   *  standard travel transition. */
-  kind?: "transform" | "don-attach" | "don-return";
+   *  slot (`instanceId` is the DON!!) and lands rested. `don-move` renders a
+   *  DON token flying between the DON!! deck and the cost area (DON!! Phase
+   *  placement, DON!! -X returns). An omitted kind is a standard travel
+   *  transition. */
+  kind?: "transform" | "don-attach" | "don-return" | "don-move";
   /** Flight start delay in seconds. Carries the event's beat offset in the
    *  update's playback timeline (OPT-1040) plus any sibling fan-out, so
    *  multi-card draws and multi-DON attachments land one after another. */
   delay?: number;
+  /** For `kind: "don-move"`, the DON!! that travels (OPT-1057). The flight
+   *  leaves from, or lands in, that token's own cost-area slot. */
+  donInstanceId?: string;
   /** For `kind: "don-attach"`, the target character's instanceId (used by
    *  consumers to offset the displayed DON count until the token lands).
    *  For `kind: "don-return"`, the card the DON!! comes off. Either way it is
@@ -104,7 +109,9 @@ const AUTO_EXPIRE_MS = 1500;
  *  tokens and draws deal `drawMs` apart, moves into a stacked pile `pileMs`
  *  apart, any other travel `defaultMs` apart. */
 function staggerMs(transition: Pick<CardTransition, "kind" | "toZoneKey">): number {
-  if (transition.kind === "don-attach") return cardStagger.drawMs;
+  if (transition.kind === "don-attach" || transition.kind === "don-move") {
+    return cardStagger.drawMs;
+  }
   if (transition.toZoneKey.endsWith("-hand")) return cardStagger.drawMs;
   if (/-(deck|trash|life)$/.test(transition.toZoneKey)) return cardStagger.pileMs;
   return cardStagger.defaultMs;
@@ -167,6 +174,55 @@ export function eventToTransitions(
     return out;
   }
 
+  // DON!! deck <-> field (OPT-1057). DON!! Phase placement and DON!!-adding
+  // effects deal tokens off the face-down DON!! deck: the top one flips on
+  // the pile and the ones under it come off already face-up
+  // (`assignPileFlips`). A return to the DON!! deck flips each DON!!
+  // face-down where it is, then flies it into the pile. The Refresh Phase
+  // return (`to: "COST_AREA"`) is not a DON!! deck move and has no flight
+  // here.
+  if (event.type === "DON_PLACED_ON_FIELD") {
+    const { playerIndex } = event;
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
+    const ids = event.payload.donInstanceIds ?? [];
+    const count = Math.max(1, event.payload.count ?? ids.length);
+    return makeDonMoves(
+      Array.from({ length: count }, (_, i) => ({
+        fromZoneKey: `${prefix}-don-deck`,
+        donInstanceId: ids[i],
+      })),
+      `${prefix}-don`,
+      playerIndex,
+      { sourceFaceDown: true, destinationFaceDown: false },
+    );
+  }
+  if (event.type === "DON_DETACHED") {
+    const p = event.payload ?? {};
+    const count = p.count ?? 0;
+    if (p.to === "COST_AREA" || count <= 0) return [];
+    const { playerIndex } = event;
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
+    const ids = p.donInstanceIds ?? [];
+    // Older events carry only a count: they leave from the cost area.
+    const fromCostArea = p.fromCostArea ?? (p.sources ? 0 : count);
+    const sources: { fromZoneKey: string; donInstanceId?: string }[] = [];
+    for (let i = 0; i < fromCostArea; i++) {
+      sources.push({ fromZoneKey: `${prefix}-don`, donInstanceId: ids[i] });
+    }
+    for (const source of p.sources ?? []) {
+      // Attached DON!! leave from under the card they were given to.
+      const host =
+        zoneRegistry?.getCardZone(source.cardInstanceId) ?? `${prefix}-leader`;
+      for (let i = 0; i < source.count; i++) {
+        sources.push({ fromZoneKey: host });
+      }
+    }
+    return makeDonMoves(sources, `${prefix}-don-deck`, playerIndex, {
+      sourceFaceDown: false,
+      destinationFaceDown: true,
+    });
+  }
+
   // LIFE_CARD_TO_DECK: face-down life cards travel to the bottom of the
   // owner's deck. Mirror the count-N expansion so it reads like a small
   // sequence rather than a single ghost.
@@ -206,6 +262,31 @@ export function eventToTransitions(
   }
 
   return [];
+}
+
+/** DON!! token flights between the DON!! deck and the field (OPT-1057),
+ *  dealt one `drawMs` stagger apart. A DON!! with a known id leaves from (or
+ *  lands in) its own cost-area slot. */
+function makeDonMoves(
+  sources: readonly { fromZoneKey: string; donInstanceId?: string }[],
+  toZoneKey: string,
+  playerIndex: 0 | 1,
+  sides: { sourceFaceDown: boolean; destinationFaceDown: boolean },
+): CardTransition[] {
+  const startedAt = Date.now();
+  return sources.map((source, i) => ({
+    id: nextId(),
+    cardId: null,
+    instanceId: null,
+    fromZoneKey: source.fromZoneKey,
+    toZoneKey,
+    playerIndex,
+    startedAt,
+    kind: "don-move" as const,
+    delay: (i * cardStagger.drawMs) / 1000,
+    ...(source.donInstanceId ? { donInstanceId: source.donInstanceId } : {}),
+    ...sides,
+  }));
 }
 
 /** Helper for count-N face-down flights between two static zones. Each
@@ -446,11 +527,6 @@ function eventToTransition(
       from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-deck`;
       break;
-    }
-    case "DON_PLACED_ON_FIELD": {
-      // No flight — DON arrival is handled by `DonZone` via a `useFieldArrivals`
-      // entry pop (no logical board source for DON tokens to fly from).
-      return null;
     }
     default:
       return null;

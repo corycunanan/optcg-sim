@@ -103,8 +103,14 @@ function check(
     "PHASE_CHANGED",
   ]);
   expect(
-    events.filter((e) => e.type === "DON_PLACED_ON_FIELD").map((e) => e.payload)
-  ).toEqual([{ count: placed }]);
+    events
+      .filter((e) => e.type === "DON_PLACED_ON_FIELD")
+      .map((e) => ({
+        count: e.payload.count,
+        // OPT-1057: the placed DON!! are named, top of the DON!! deck first.
+        named: (e.payload as { donInstanceIds?: string[] }).donInstanceIds?.length,
+      }))
+  ).toEqual([{ count: placed, named: placed }]);
   expect(
     events
       .filter((e) => e.type === "DON_GIVEN_TO_CARD")

@@ -54,8 +54,11 @@ const earlier: GameEvent = {
 const registry: ZonePositionRegistry = {
   register: () => {},
   unregister: () => {},
+  // Field slots only: DON!! slots are unmeasured, so they stand up last.
   getRect: (zoneKey) =>
-    ({ left: zoneKey === "p-leader" ? 400 : 100, width: 112, top: 0, height: 112 }) as DOMRect,
+    zoneKey.includes("/")
+      ? null
+      : ({ left: zoneKey === "p-leader" ? 400 : 100, width: 112, top: 0, height: 112 } as DOMRect),
   registerCard: () => {},
   unregisterCard: () => {},
   getCardZone: (id) => (id === "L" ? "p-leader" : id === "c0" ? "p-char-0" : null),

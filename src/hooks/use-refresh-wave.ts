@@ -6,7 +6,10 @@ import type { GameEvent, PlayerState } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import { refreshStandUp } from "@/lib/motion";
 import type { CardTransition } from "@/hooks/use-card-transitions";
-import { boardZoneKey } from "@/components/game/board-layout/board-geometry";
+import {
+  boardZoneKey,
+  donSlotZoneKey,
+} from "@/components/game/board-layout/board-geometry";
 import {
   buildEventTimeline,
   eventOffsetMs,
@@ -59,15 +62,6 @@ export interface RefreshWaveView {
 }
 
 let waveCounter = 0;
-
-function donSlotX(instanceId: string): number | null {
-  if (typeof document === "undefined") return null;
-  const node = document.querySelector(
-    `[data-don-instance-id="${CSS.escape(instanceId)}"]`
-  );
-  const rect = node?.getBoundingClientRect();
-  return rect && rect.width > 0 ? rect.left + rect.width / 2 : null;
-}
 
 /**
  * OPT-1058: replays the Refresh Phase on the board. When an update ends a
@@ -183,7 +177,8 @@ export function useRefreshWave(
         const zoneKey = zoneRegistry?.getCardZone(id);
         const rect = zoneKey ? zoneRegistry?.getRect(zoneKey) : null;
         if (rect) return rect.left + rect.width / 2;
-        return donSlotX(id);
+        const slot = zoneRegistry?.getRect(donSlotZoneKey(donZoneKey, id));
+        return slot ? slot.left + slot.width / 2 : null;
       };
       const order = [...standUpDelays(diff.standing, xOf, plan.standStaggerMs)];
       const first = new Set(order.filter(([, delay]) => delay === 0).map(([id]) => id));

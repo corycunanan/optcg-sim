@@ -275,6 +275,16 @@ function attachDonToCard(
  * then immediately set all cost area DON!! (and rested cards) active.
  * Executed as two discrete steps so effects can fire between them.
  */
+/** How many DON!! each card holds, Leader first, then Characters in slot
+ *  order; cards with none are left out (OPT-1057 DON_DETACHED `sources`). */
+export function attachedDonCounts(
+  player: PlayerState,
+): { cardInstanceId: string; count: number }[] {
+  return [player.leader, ...player.characters]
+    .filter((c): c is CardInstance => c !== null && c.attachedDon.length > 0)
+    .map((c) => ({ cardInstanceId: c.instanceId, count: c.attachedDon.length }));
+}
+
 export function returnAttachedDonToCostArea(
   state: GameState,
   playerIndex: 0 | 1,

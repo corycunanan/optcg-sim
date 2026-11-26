@@ -455,6 +455,21 @@ const board = {
       gapMs: 150,
     },
   },
+  /** Opening-hand redraw in the Mulligan modal (OPT-1060), per the Card
+   *  Motion Lab "Mulligan" scene: the hand flips face-down left to right
+   *  `flipStaggerMs` apart (the shared `flip`), flies into the deck
+   *  `returnStaggerMs` apart (the shared travel arc), the deck riffles
+   *  (`pile.riffle`, OPT-1055), then the top card flips and five cards are dealt face-up
+   *  `dealStaggerMs` apart. The modal holds `holdMs` on the new hand before
+   *  it moves on, and gives up waiting for the server's new hand after
+   *  `newHandTimeoutMs`. */
+  mulligan: {
+    flipStaggerMs: 40,
+    returnStaggerMs: 50,
+    dealStaggerMs: 90,
+    holdMs: 600,
+    newHandTimeoutMs: 4000,
+  },
 } as const;
 
 // ─── Combined Export ─────────────────────────────────────────────────
@@ -507,3 +522,4 @@ export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;
 export const refreshStandUp = board.stateChange.refreshStandUp;
 export const donReturnFlight = board.flight.donReturn;
+export const mulliganMotion = board.mulligan;

@@ -11,14 +11,13 @@ import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { cardEntry } from "@/lib/motion";
 import { Card } from "../card";
 import { getBoardZoneLabel } from "./accessibility";
-import { type ActiveDonDrag } from "./constants";
-import { stgDonWidth } from "./board-geometry";
+import { DEFAULT_DON_IMG, type ActiveDonDrag } from "./constants";
+import { donSlotZoneKey, stgDonWidth } from "./board-geometry";
 
 const DON_CARD_W = 50;
 const DON_CARD_H = 70;
 const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
-const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
 export const DON_ENTRY_STAGGER_SECONDS = 0.05;
 
 // ─── Prompt-time fan-out (OPT-792) ───────────────────────────────────────────
@@ -114,6 +113,52 @@ function entryTransition(index: number) {
   return { ...cardEntry, delay: index * DON_ENTRY_STAGGER_SECONDS };
 }
 
+/** Mount motion for one token. A token whose DON!! is still flying in from
+ *  the DON!! deck (OPT-1057) stays invisible in its slot until the flight
+ *  lands, then shows under the fading ghost; it skips the entry pop, which
+ *  only plays for DON!! that arrive without a flight. */
+function tokenMotion({
+  entering,
+  flying,
+  entryIndex,
+  opacity = 1,
+}: {
+  entering?: boolean;
+  flying?: boolean;
+  entryIndex: number;
+  opacity?: number;
+}) {
+  if (flying) {
+    return {
+      initial: false as const,
+      animate: { ...ENTRY_ANIMATE, opacity: 0 },
+      transition: undefined,
+    };
+  }
+  return {
+    initial: entering ? ENTRY_INITIAL : (false as const),
+    animate: { ...ENTRY_ANIMATE, opacity },
+    transition: entering ? entryTransition(entryIndex) : undefined,
+  };
+}
+
+/** Registers one token's slot (`<cost zone>/<DON!! id>`) so DON!! flights
+ *  land in, and leave from, the token's real place (OPT-1057). The registry
+ *  keeps the last rect after unmount, so a returned DON!! departs from where
+ *  it sat. */
+function useDonSlotRef(zoneKey: string | undefined, instanceId: string) {
+  const zonePos = useZonePosition();
+  return useCallback(
+    (node: HTMLElement | null) => {
+      if (!zoneKey) return;
+      const key = donSlotZoneKey(zoneKey, instanceId);
+      if (node) zonePos.register(key, node);
+      else zonePos.unregister(key);
+    },
+    [zoneKey, instanceId, zonePos],
+  );
+}
+
 export const DonCard = React.memo(function DonCard({
   rested,
   donArtUrl,
@@ -138,17 +183,19 @@ function DraggableDonCard({
   donArtUrl,
   motionDelay,
   entering,
+  flying,
   entryIndex,
-  hidden,
+  zoneKey,
 }: {
   don: DonInstance;
   index: number;
   step: number;
   disabled?: boolean;
-  /** A returning DON!! still in flight to this slot (OPT-1058). */
-  hidden?: boolean;
   donArtUrl?: string | null;
   motionDelay?: number;
+  /** True while this DON!! is flying in from the DON!! deck (OPT-1057). */
+  flying?: boolean;
+  zoneKey?: string;
   /** Plays the entry pop on mount (OPT-121). Set by `DonZone` for tokens
    *  that weren't in the previous render — typically the freshly-added DON
    *  at turn start. */
@@ -160,18 +207,24 @@ function DraggableDonCard({
     data: { type: "active-don", don } satisfies ActiveDonDrag,
     disabled,
   });
+  const slotRef = useDonSlotRef(zoneKey, don.instanceId);
+  const ref = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      slotRef(node);
+    },
+    [setNodeRef, slotRef],
+  );
 
   return (
     <motion.div
-      ref={setNodeRef}
+      ref={ref}
       {...attributes}
       {...listeners}
       role="button"
       aria-label={isDragging ? "Active DON!!, dragging" : "Active DON!!, draggable"}
       data-don-instance-id={don.instanceId}
-      initial={entering ? ENTRY_INITIAL : false}
-      animate={{ ...ENTRY_ANIMATE, opacity: isDragging ? 0.3 : 1 }}
-      transition={entering ? entryTransition(entryIndex) : undefined}
+      {...tokenMotion({ entering, flying, entryIndex, opacity: isDragging ? 0.3 : 1 })}
       style={{
         marginLeft: index > 0 ? step - DON_CARD_W : 0,
         zIndex: index,
@@ -179,14 +232,59 @@ function DraggableDonCard({
       }}
       // Shrink-wraps the DON token `<Card>`, so the drag focus ring traces that
       // card's outline rather than a chrome corner.
-      className={cn(
-        "touch-none rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
-        hidden && "invisible",
-      )}
+      className="touch-none rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
     >
       <Card
         variant="don"
         state={isDragging ? "dragging" : "active"}
+        artUrl={donArtUrl || DEFAULT_DON_IMG}
+        motionDelay={motionDelay}
+      />
+    </motion.div>
+  );
+}
+
+/** A cost-area DON!! with no drag or selection affordance. */
+function PlainDonToken({
+  don,
+  rested,
+  index,
+  step,
+  donArtUrl,
+  motionDelay,
+  entering,
+  flying,
+  entryIndex,
+  zoneKey,
+}: {
+  don: DonInstance;
+  rested: boolean;
+  index: number;
+  step: number;
+  donArtUrl?: string | null;
+  motionDelay?: number;
+  entering?: boolean;
+  flying?: boolean;
+  entryIndex: number;
+  zoneKey?: string;
+}) {
+  const slotRef = useDonSlotRef(zoneKey, don.instanceId);
+  return (
+    <motion.div
+      ref={slotRef}
+      data-don-instance-id={don.instanceId}
+      layout
+      {...tokenMotion({ entering, flying, entryIndex })}
+      className={cn(rested && "flex items-center justify-center shrink-0")}
+      style={{
+        ...(rested ? { width: DON_CARD_H, height: DON_CARD_W } : {}),
+        marginLeft: index > 0 ? step - (rested ? DON_CARD_H : DON_CARD_W) : 0,
+        zIndex: index,
+      }}
+    >
+      <Card
+        variant="don"
+        state={rested ? "rest" : "active"}
         artUrl={donArtUrl || DEFAULT_DON_IMG}
         motionDelay={motionDelay}
       />
@@ -211,11 +309,11 @@ function SelectableDonCard({
   donArtUrl,
   motionDelay,
   entering,
+  flying,
   entryIndex,
-  hidden,
+  zoneKey,
 }: {
   don: DonInstance;
-  hidden?: boolean;
   selection: TargetCardSelectionState;
   onToggle?: (instanceId: string) => void;
   rested: boolean;
@@ -224,9 +322,12 @@ function SelectableDonCard({
   donArtUrl?: string | null;
   motionDelay?: number;
   entering?: boolean;
+  flying?: boolean;
   entryIndex: number;
+  zoneKey?: string;
 }) {
   const descriptionId = useId();
+  const slotRef = useDonSlotRef(zoneKey, don.instanceId);
   const disabledReason = selection.disabledReason;
   const toggle = disabledReason ? undefined : () => onToggle?.(don.instanceId);
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -243,13 +344,12 @@ function SelectableDonCard({
 
   return (
     <motion.div
+      ref={slotRef}
       data-don-instance-id={don.instanceId}
       data-target-selection=""
       data-target-instance-id={don.instanceId}
       layout
-      initial={entering ? ENTRY_INITIAL : false}
-      animate={{ ...ENTRY_ANIMATE, opacity: disabledReason ? 0.35 : 1 }}
-      transition={entering ? entryTransition(entryIndex) : undefined}
+      {...tokenMotion({ entering, flying, entryIndex, opacity: disabledReason ? 0.35 : 1 })}
       onClick={toggle}
       onKeyDown={handleKeyDown}
       role="button"
@@ -273,7 +373,6 @@ function SelectableDonCard({
         "relative rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         rested && "flex items-center justify-center shrink-0",
         toggle ? "cursor-pointer" : "cursor-default",
-        hidden && "invisible",
       )}
       style={{
         ...(rested ? { width: DON_CARD_H, height: DON_CARD_W } : {}),
@@ -309,22 +408,27 @@ export const DonZone = React.memo(function DonZone({
   donArtUrl,
   targetSelectionById,
   onTargetToggle,
+  arrivingDonIds,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
   className?: string;
   enableDrag?: boolean;
   zoneKey?: string;
-  /** Refresh Phase stand-up delays in seconds, by DON!! (OPT-1058). */
+  /** Refresh Phase stand-up transition by DON!! (OPT-1058): a DON!! listed
+   *  here stands up with the short refresh tween. */
   motionDelayById?: ReadonlyMap<string, number> | null;
-  /** Returning DON!! still in flight to their slots (OPT-1058). They keep
-   *  their place in the fan, invisible, so the token lands in it. */
+  /** Refresh Phase returns still in flight from under their cards
+   *  (OPT-1058); like `arrivingDonIds`, each stays invisible in its slot. */
   hiddenDonIds?: ReadonlySet<string> | null;
   donArtUrl?: string | null;
   /** In-place SELECT_TARGET state keyed by instance id (OPT-792). A DON!!
    *  with an entry renders as a selectable target. */
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
+  /** DON!! still flying in from the DON!! deck (OPT-1057); each stays
+   *  invisible in its slot until its flight lands. */
+  arrivingDonIds?: ReadonlySet<string>;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -401,8 +505,10 @@ export const DonZone = React.memo(function DonZone({
           <div className="flex items-center">
             {activeDon.map((don, i) => {
               const delay = motionDelayById?.get(don.instanceId);
-              const hidden = !!hiddenDonIds?.has(don.instanceId);
               const entering = arrivals.has(don.instanceId) && !reducedMotion;
+              const flying =
+                arrivingDonIds?.has(don.instanceId) ||
+                hiddenDonIds?.has(don.instanceId);
               const selection = targetSelectionById?.get(don.instanceId);
               if (selection) {
                 return (
@@ -416,9 +522,10 @@ export const DonZone = React.memo(function DonZone({
                     step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
-                    hidden={hidden}
                     entering={entering}
+                    flying={flying}
                     entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                    zoneKey={zoneKey}
                   />
                 );
               }
@@ -431,37 +538,27 @@ export const DonZone = React.memo(function DonZone({
                     step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
-                    hidden={hidden}
                     entering={entering}
+                    flying={flying}
                     entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                    zoneKey={zoneKey}
                   />
                 );
               }
               return (
-                <motion.div
+                <PlainDonToken
                   key={don.instanceId}
-                  data-don-instance-id={don.instanceId}
-                  layout
-                  initial={entering ? ENTRY_INITIAL : false}
-                  animate={ENTRY_ANIMATE}
-                  transition={
-                    entering
-                      ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
-                      : undefined
-                  }
-                  className={cn(hidden && "invisible")}
-                  style={{
-                    marginLeft: i > 0 ? steps.active - DON_CARD_W : 0,
-                    zIndex: i,
-                  }}
-                >
-                  <Card
-                    variant="don"
-                    state="active"
-                    artUrl={donArtUrl || DEFAULT_DON_IMG}
-                    motionDelay={delay}
-                  />
-                </motion.div>
+                  don={don}
+                  rested={false}
+                  index={i}
+                  step={steps.active}
+                  donArtUrl={donArtUrl}
+                  motionDelay={delay}
+                  entering={entering}
+                  flying={flying}
+                  entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                  zoneKey={zoneKey}
+                />
               );
             })}
           </div>
@@ -471,8 +568,9 @@ export const DonZone = React.memo(function DonZone({
             <div className="flex items-center ml-auto">
               {restedDon.map((don, i) => {
                 const entering = arrivals.has(don.instanceId) && !reducedMotion;
-                const delay = motionDelayById?.get(don.instanceId);
-                const hidden = !!hiddenDonIds?.has(don.instanceId);
+                const flying =
+                arrivingDonIds?.has(don.instanceId) ||
+                hiddenDonIds?.has(don.instanceId);
                 const selection = targetSelectionById?.get(don.instanceId);
                 if (selection) {
                   return (
@@ -485,43 +583,28 @@ export const DonZone = React.memo(function DonZone({
                       index={i}
                       step={steps.rested}
                       donArtUrl={donArtUrl}
-                      motionDelay={delay}
-                      hidden={hidden}
+                      motionDelay={motionDelayById?.get(don.instanceId)}
                       entering={entering}
+                      flying={flying}
                       entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                      zoneKey={zoneKey}
                     />
                   );
                 }
                 return (
-                  <motion.div
+                  <PlainDonToken
                     key={don.instanceId}
-                    data-don-instance-id={don.instanceId}
-                    layout
-                    initial={entering ? ENTRY_INITIAL : false}
-                    animate={ENTRY_ANIMATE}
-                    transition={
-                      entering
-                        ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
-                        : undefined
-                    }
-                    className={cn(
-                      "flex items-center justify-center shrink-0",
-                      hidden && "invisible",
-                    )}
-                    style={{
-                      width: DON_CARD_H,
-                      height: DON_CARD_W,
-                      marginLeft: i > 0 ? steps.rested - DON_CARD_H : 0,
-                      zIndex: i,
-                    }}
-                  >
-                    <Card
-                      variant="don"
-                      state="rest"
-                      artUrl={donArtUrl || DEFAULT_DON_IMG}
-                      motionDelay={delay}
-                    />
-                  </motion.div>
+                    don={don}
+                    rested
+                    index={i}
+                    step={steps.rested}
+                    donArtUrl={donArtUrl}
+                    motionDelay={motionDelayById?.get(don.instanceId)}
+                    entering={entering}
+                    flying={flying}
+                    entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                    zoneKey={zoneKey}
+                  />
                 );
               })}
             </div>

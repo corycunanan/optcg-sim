@@ -71,7 +71,19 @@ const FLIPPING_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
     "CARD_RETURNED_TO_DECK",
   ]);
 
+/** A DON!! move between the DON!! deck and the field (OPT-1057): DON!!
+ *  placement, and a DON_DETACHED return to the DON!! deck. The Refresh
+ *  Phase DON_DETACHED (`to: "COST_AREA"`, no count) is not one. Every such
+ *  move flips: the DON!! deck is face-down and the field face-up. */
+export function isDonDeckMove(event: GameEvent): boolean {
+  if (event.type === "DON_PLACED_ON_FIELD") return true;
+  if (event.type !== "DON_DETACHED") return false;
+  const payload = event.payload ?? {};
+  return payload.to !== "COST_AREA" && (payload.count ?? 0) > 0;
+}
+
 function mayFlip(event: GameEvent): boolean {
+  if (isDonDeckMove(event)) return true;
   if (!FLIPPING_TRAVEL_EVENTS.has(event.type)) return false;
   const cardId = (event.payload as { cardId?: string | null }).cardId;
   return !!cardId && cardId !== "hidden";
@@ -88,6 +100,8 @@ export function siblingStaggerMs(type: GameEventType): number {
     case "CARD_RETURNED_TO_HAND":
     case "CARD_ADDED_TO_HAND_FROM_LIFE":
     case "DON_GIVEN_TO_CARD":
+    case "DON_PLACED_ON_FIELD":
+    case "DON_DETACHED":
       return cardStagger.drawMs;
     case "CARD_RETURNED_TO_DECK":
     case "LIFE_CARD_TO_DECK":
@@ -142,7 +156,11 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
   if (eventToSpotlight(event)) return "spotlight";
   if (isRefreshPhaseEnd(event)) return "refresh";
   if (event.type === "EVENT_ACTIVATED_FROM_HAND") return "transform";
-  if (TRAVEL_EVENTS.has(event.type) || COUNTED_TRAVEL_EVENTS.has(event.type)) {
+  if (
+    TRAVEL_EVENTS.has(event.type) ||
+    COUNTED_TRAVEL_EVENTS.has(event.type) ||
+    isDonDeckMove(event)
+  ) {
     return "travel";
   }
   if (TRANSFORM_EVENTS.has(event.type)) return "transform";
@@ -155,6 +173,9 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
 function countedFanOut(event: GameEvent): number {
   if (event.type === "DON_GIVEN_TO_CARD" || event.type === "LIFE_CARD_TO_DECK") {
     return Math.max(1, event.payload.count ?? 1);
+  }
+  if (isDonDeckMove(event)) {
+    return Math.max(1, (event.payload as { count?: number }).count ?? 1);
   }
   return 1;
 }

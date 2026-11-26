@@ -7,6 +7,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import type { GameAction, GameState } from "../types.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 type Scenario = { name: string; cases: { index: number; stored: Record<string, unknown>; replies: GameAction[] }[]; expected: unknown };
 const corpus = JSON.parse(gunzipSync(readFileSync(resolve(__dirname, "fixtures/opt-968-final-writer-corpus.json.gz"))).toString()) as { scenarios: Scenario[] };
 const config = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
@@ -35,6 +36,6 @@ for (const scenario of corpus.scenarios) for (const start of scenario.cases) for
       loaded = (await new repository.SessionRepository(next, config).load())!;
     }
     expect(loaded.state.schemaVersion).toBe(6);
-    expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(scenario.expected);
+    expect(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state))))).toEqual(scenario.expected);
   });
 }

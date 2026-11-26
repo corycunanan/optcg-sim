@@ -1,5 +1,6 @@
 import { writerSessionEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 /** Actual isolated writer captures; synthetic reachability, never production evidence. */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -73,10 +74,10 @@ describe.each(files)("native7 future producers %s", (file) => {
           const stored = await save(rt, next, loaded.cardDb);
           const frozen = writerSessionEnvelope(step.stored);
           expect(
-            withoutAssertedDeckShuffled(
+            withoutAssertedDonMoveDetail(withoutAssertedDeckShuffled(
               withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored)),
               frozen
-            ),
+            )),
             `${file} ${context} start${start} after ${step.action.type}`
           ).toEqual(frozen);
           loaded = (await memory(rt, stored).repo.load())!;
@@ -104,7 +105,7 @@ it("preserves the original reported second meaningful choice from its saved firs
   expect(next.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
   expect(next.players[0].hand).toHaveLength(0);
   expect(
-    withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb))
+    withoutAssertedDonMoveDetail(withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb)))
   ).toEqual(writerSessionEnvelope(corpus.steps[1].stored));
 });
 

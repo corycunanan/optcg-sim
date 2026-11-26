@@ -58,6 +58,7 @@ export const Card = React.memo(function Card({
   faceDown,
   flipFrom,
   sleeveUrl,
+  donBack,
   artUrl,
   interaction,
   overlays,
@@ -247,7 +248,11 @@ export const Card = React.memo(function Card({
               fallbackLabel={overlays?.label}
               imageUrlOverride={artUrl}
             />
-            <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
+            <CardBack
+              sleeveUrl={sleeveUrl}
+              label={overlays?.label}
+              donBack={donBack ?? variant === "don"}
+            />
           </CardFaces>
 
           {/* Highlight ring follows the card outline, so it sits inside the
