@@ -170,12 +170,15 @@ export function useDeckLook(
         now - closedSince < DECK_LOOK_CLOSE_GRACE_MS;
       if (!live) continue;
       let out = 0;
+      // A card whose move the update already carries has left the deck in
+      // the board state (or its flight back is counted as an arrival).
+      const leaving = new Set([...look.departures.values()].flat());
       const slots = look.cardIds.map((cardId, index) => {
         const zoneKey = lookSlotZoneKey(prefix, look, index);
         const arriving = transitions.some((t) => t.toZoneKey === zoneKey);
         const startsAt = departAt.get(zoneKey);
         const departed = startsAt !== undefined && now >= startsAt;
-        if (!departed) out += 1;
+        if (!departed && !leaving.has(index)) out += 1;
         const reveal = [...look.reveals.values()].find((r) => r.slot === index);
         return {
           index,
