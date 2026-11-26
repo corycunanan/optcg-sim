@@ -268,6 +268,11 @@ describe("OPT-366 pregame flow", () => {
       expect(handAfter).not.toEqual(handBefore);
       const event = s.eventLog.find((e) => e.type === "MULLIGAN_DECISION");
       expect(event).toBeDefined();
+      // OPT-1055: the reshuffle is announced before the decision.
+      const types = s.eventLog.map((e) => e.type);
+      expect(types.indexOf("DECK_SHUFFLED")).toBeGreaterThanOrEqual(0);
+      expect(types.indexOf("DECK_SHUFFLED")).toBeLessThan(types.indexOf("MULLIGAN_DECISION"));
+      expect(s.eventLog.find((e) => e.type === "DECK_SHUFFLED")?.playerIndex).toBe(0);
       if (event && event.type === "MULLIGAN_DECISION") {
         expect(event.payload.redrew).toBe(true);
       }

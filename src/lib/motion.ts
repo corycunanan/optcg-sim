@@ -388,6 +388,41 @@ const board = {
     /** Debounce window for folding staggered siblings into one +N receipt.
      *  It is slightly longer than the 70ms pile-move stagger. */
     aggregateWindowMs: 80,
+    /** OPT-1055 deck shuffle, played in place on a face-down pile (Card
+     *  Motion Lab "Shuffle deck"). Three slices riffle twice and square up,
+     *  then the pile pops. Offsets are fractions of the pile's own size, so
+     *  the same riffle reads the same on the board and in the mulligan. */
+    riffle: {
+      sliceCount: 3,
+      /** One slice's riffle. Slices start `sliceStaggerMs` apart, so the
+       *  whole riffle takes `totalMs`. */
+      sliceMs: 390,
+      sliceStaggerMs: 30,
+      totalMs: 450,
+      /** The pile pop that closes the shuffle (same shape as `pop`). */
+      popMs: 200,
+      ease: [0.45, 0, 0.55, 1] as const,
+      /** Per-slice keyframes, bottom slice first. `x` is % of pile width,
+       *  `y` % of pile height, `rotate` degrees. The two outer slices swing
+       *  out opposite ways twice; the top slice only lifts. */
+      slices: [
+        {
+          x: ["0%", "27%", "-27%", "0%", "27%", "-27%", "0%"],
+          y: ["0%", "-3.5%", "0%", "-3.5%", "0%", "0%", "0%"],
+          rotate: [0, 2.2, -2.2, 0, 2.2, -2.2, 0],
+        },
+        {
+          x: ["0%", "-27%", "27%", "0%", "-27%", "27%", "0%"],
+          y: ["0%", "0%", "-3.5%", "0%", "-3.5%", "0%", "0%"],
+          rotate: [0, -2.2, 2.2, 0, -2.2, 2.2, 0],
+        },
+        {
+          x: ["0%", "0%", "0%", "0%", "0%", "0%", "0%"],
+          y: ["0%", "-2.4%", "-2.4%", "-2.4%", "-2.4%", "0%", "0%"],
+          rotate: [0, 0, 0, 0, 0, 0, 0],
+        },
+      ],
+    },
   },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */
@@ -457,6 +492,7 @@ export const pilePop = board.pile.pop;
 export const pileDelta = board.pile.delta;
 export const pileDeltaReduced = board.pile.deltaReduced;
 export const pileReceiptAggregateWindowMs = board.pile.aggregateWindowMs;
+export const deckRiffle = board.pile.riffle;
 export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;
 export const mulliganMotion = board.mulligan;

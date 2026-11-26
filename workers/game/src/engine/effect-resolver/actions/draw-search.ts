@@ -22,6 +22,7 @@ import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
+import { deckShuffledEvent } from "../../events.js";
 
 export function executeDraw(
   state: GameState,
@@ -273,6 +274,7 @@ export function executeFullDeckSearch(
       const shuffled = shuffleWithEngineContext(state, p.deck, deckRandomStream(controller));
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, deck: shuffled.values };
+      events.push(deckShuffledEvent(controller));
       return { state: { ...shuffled.state, players: newPlayers }, events, succeeded: false };
     }
     return { state, events, succeeded: false };

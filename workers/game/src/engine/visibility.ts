@@ -85,6 +85,7 @@ export const GAME_EVENT_VISIBILITY = {
   PREGAME_FIRST_PLAYER_DECIDED: PUBLIC,
   MULLIGAN_DECISION: PUBLIC,
   PROMPT_AUTO_RESOLVED: PUBLIC,
+  DECK_SHUFFLED: PUBLIC,
 } satisfies Record<GameEventType, EventVisibilityPolicy>;
 
 type PromptVisibilityPolicy = {
