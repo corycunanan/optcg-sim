@@ -111,7 +111,10 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
       "transformPerspective",
     ],
     "src/components/game/board-layout/board-layout.tsx": ["zoom"],
+    // `clipPath` cuts the live card footprint out of a DON!! token's layer so
+    // the token slides beneath the card (OPT-1058): runtime geometry.
     "src/components/game/board-layout/card-animation-layer.tsx": [
+      "clipPath",
       "pointerEvents",
     ],
     // Flip shade/gloss strength follows the live flip angle (OPT-1054).

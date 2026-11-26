@@ -8,7 +8,8 @@ import {
   FLIP_SECONDS,
   flightDurationMs,
 } from "@/lib/game/card-motion";
-import { cardTransitions } from "@/lib/motion";
+import { cardTransitions, donReturnFlight } from "@/lib/motion";
+import { BOARD_CARD_H, BOARD_CARD_W } from "./constants";
 
 // OPT-1054: the travel ghost's clock, live target and design-px geometry.
 
@@ -63,7 +64,11 @@ vi.mock("@/contexts/zone-position-context", () => ({
 vi.mock("../scaled-board", () => ({ getPortalContainer: () => null }));
 vi.mock("../card", () => ({ Card: () => null }));
 
-import { CardAnimationLayer } from "./card-animation-layer";
+import {
+  CardAnimationLayer,
+  cardFootprint,
+  clipOutside,
+} from "./card-animation-layer";
 
 function rect(left: number, top: number, width = 0, height = 0): DOMRect {
   return {
@@ -95,7 +100,11 @@ function transition(partial: Partial<CardTransition> = {}): CardTransition {
 }
 
 let renderer: ReactTestRenderer | null = null;
-function mount(t: CardTransition, boardScale = 1) {
+function mount(
+  t: CardTransition,
+  boardScale = 1,
+  restedInstanceIds?: ReadonlySet<string>,
+) {
   act(() => {
     renderer = create(
       <CardAnimationLayer
@@ -103,18 +112,26 @@ function mount(t: CardTransition, boardScale = 1) {
         cardDb={{} as CardDb}
         onComplete={() => {}}
         boardScale={boardScale}
+        restedInstanceIds={restedInstanceIds}
       />,
     );
   });
 }
 
-type Values = Record<"x" | "y", { get: () => number }>;
+type Values = Record<"x" | "y" | "rotate", { get: () => number }>;
 function ghostPosition() {
   const ghost = renderer!.root.find(
     (node) => node.type === "div" && node.props["data-flight-id"] === "ct-test",
   );
   const style = ghost.props["data-motion-style"] as Values;
-  return { x: style.x.get(), y: style.y.get() };
+  return { x: style.x.get(), y: style.y.get(), rotate: style.rotate.get() };
+}
+function clipLayer() {
+  return renderer!.root.find(
+    (node) =>
+      node.type === "div" &&
+      typeof (node.props.style as { clipPath?: string } | undefined)?.clipPath === "string",
+  );
 }
 
 beforeEach(() => {
@@ -198,5 +215,92 @@ describe("TravelGhost (OPT-1054)", () => {
     act(() => options.onUpdate(0.5));
     const peak = ghostPosition();
     expect(from.y - peak.y).toBeCloseTo(cardTransitions.donAttach.arcMaxPx);
+  });
+});
+
+describe("DON!! beneath the card (OPT-1058)", () => {
+  it("cuts the target card's footprint out of a given DON!!'s layer", () => {
+    rects.set("p-cost", rect(0, 300, 200, 112));
+    rects.set("p-char-1", rect(1000, 300, 112, 112));
+    mount(
+      transition({
+        kind: "don-attach",
+        cardId: null,
+        instanceId: null,
+        fromZoneKey: "p-cost",
+        targetInstanceId: "c1",
+      }),
+    );
+    expect(clipLayer().props.style.clipPath).toBe(
+      clipOutside(cardFootprint(rects.get("p-char-1")!, false, 1)),
+    );
+  });
+
+  it("turns the footprint sideways under a rested card", () => {
+    rects.set("p-cost", rect(0, 300, 200, 112));
+    rects.set("p-char-1", rect(1000, 300, 112, 112));
+    mount(
+      transition({
+        kind: "don-attach",
+        cardId: null,
+        instanceId: null,
+        fromZoneKey: "p-cost",
+        targetInstanceId: "c1",
+      }),
+      1,
+      new Set(["c1"]),
+    );
+    expect(clipLayer().props.style.clipPath).toBe(
+      clipOutside(cardFootprint(rects.get("p-char-1")!, true, 1)),
+    );
+  });
+
+  it("slides a Refresh return out from under its card and lands it rested, with no lean", () => {
+    rects.set("p-leader", rect(1000, 300, 112, 112));
+    rects.set("p-don", rect(0, 300, 200, 112));
+    mount(
+      transition({
+        kind: "don-return",
+        cardId: null,
+        instanceId: "d1",
+        fromZoneKey: "p-leader",
+        toZoneKey: "p-don",
+        targetInstanceId: "L",
+      }),
+    );
+    expect(clipLayer().props.style.clipPath).toBe(
+      clipOutside(cardFootprint(rects.get("p-leader")!, false, 1)),
+    );
+    const { options } = animateCalls[0];
+    expect(options.duration).toBeCloseTo(donReturnFlight.durationMs / 1000);
+    act(() => options.onUpdate(0.5));
+    // Half-way through the turn to rested, with no lean added on top.
+    expect(ghostPosition().rotate).toBeCloseTo(45);
+    act(() => options.onUpdate(1));
+    expect(ghostPosition().rotate).toBe(90);
+  });
+});
+
+describe("cardFootprint", () => {
+  it("is a portrait card centred in its slot, landscape when rested", () => {
+    const slot = { left: 0, top: 0, width: 112, height: 112 };
+    expect(cardFootprint(slot, false, 1)).toEqual({
+      x: (112 - BOARD_CARD_W) / 2,
+      y: 0,
+      w: BOARD_CARD_W,
+      h: BOARD_CARD_H,
+    });
+    expect(cardFootprint(slot, true, 0.5)).toEqual({
+      x: (112 - BOARD_CARD_H * 0.5) / 2,
+      y: (112 - BOARD_CARD_W * 0.5) / 2,
+      w: BOARD_CARD_H * 0.5,
+      h: BOARD_CARD_W * 0.5,
+    });
+  });
+
+  it("winds the hole inside a frame larger than the viewport", () => {
+    expect(clipOutside({ x: 10, y: 20, w: 30, h: 40 })).toBe(
+      'path(evenodd, "M-10000 -10000H20000V20000H-10000Z M10 20h30v40h-30Z")',
+    );
   });
 });

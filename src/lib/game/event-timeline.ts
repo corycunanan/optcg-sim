@@ -35,6 +35,11 @@ export const SPOTLIGHT_DWELL_MS = 1000;
 /** Readable portion of a card glow. The next beat may start while the glow's
  *  tail is still fading out. */
 export const PULSE_READ_MS = 400;
+/** Readable portion of the Refresh Phase wave (OPT-1058): attached DON!!
+ *  slide back and rested cards stand up left to right. The board's own
+ *  schedule (`planRefreshWave`) depends on what is rested, which the timeline
+ *  does not know, so the next beat may start under the wave's tail. */
+export const REFRESH_READ_MS = 400;
 
 /** The longest card flight (OPT-1054 travel spec: 220–380ms by distance). */
 const FLIGHT_MS = cardTravel.maxMs;
@@ -129,7 +134,18 @@ const PULSE_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
 const COUNTED_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
   new Set<GameEventType>(["DON_GIVEN_TO_CARD", "LIFE_CARD_TO_DECK"]);
 
-export type BeatKind = "spotlight" | "travel" | "transform" | "pulse" | "shuffle";
+export type BeatKind =
+  | "spotlight"
+  | "travel"
+  | "transform"
+  | "pulse"
+  | "shuffle"
+  | "refresh";
+
+/** The Refresh Phase ends with REFRESH → DRAW; its wave plays on that beat. */
+export function isRefreshPhaseEnd(event: GameEvent): boolean {
+  return event.type === "PHASE_CHANGED" && event.payload?.from === "REFRESH";
+}
 
 /**
  * What a board consumer sees for one event. `null` means the event has no
@@ -138,6 +154,7 @@ export type BeatKind = "spotlight" | "travel" | "transform" | "pulse" | "shuffle
  */
 export function classifyEventBeat(event: GameEvent): BeatKind | null {
   if (eventToSpotlight(event)) return "spotlight";
+  if (isRefreshPhaseEnd(event)) return "refresh";
   if (event.type === "EVENT_ACTIVATED_FROM_HAND") return "transform";
   if (
     TRAVEL_EVENTS.has(event.type) ||
@@ -175,6 +192,8 @@ function leadMsFor(kind: BeatKind): number {
       return PULSE_READ_MS;
     case "shuffle":
       return deckRiffle.totalMs;
+    case "refresh":
+      return REFRESH_READ_MS;
   }
 }
 

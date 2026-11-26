@@ -107,7 +107,6 @@ function OpponentHarness() {
         owner="opp"
         cardDb={cardDb}
         activeDragType={null}
-        refreshWave={false}
         onPreviewZone={onOpponentPreview}
         winnerPulseIds={winnerPulseIds}
       />
@@ -159,7 +158,6 @@ function PlayerHarness({
           cardDb={cardDb}
           activeDragType={activeDrag?.type ?? null}
           activeDrag={activeDrag}
-          refreshWave={false}
           canInteract={false}
           canActivateMain={false}
           canDragCounter={false}
