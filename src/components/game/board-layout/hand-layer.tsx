@@ -19,6 +19,9 @@ import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 import { useInteractionMode } from "./interaction-mode";
 import { cn } from "@/lib/utils";
 
+/** How long a just-seen card waits for its flight to register (OPT-1054). */
+const ARRIVAL_GRACE_MS = 120;
+
 /**
  * OPT-364: returns instanceIds present in `currentIds` that were not in
  * `seenIds`. Pure so the hide-on-first-render behavior in `HandLayer` can be
@@ -232,6 +235,7 @@ export const HandLayer = React.memo(function HandLayer({
   availableDon,
   zoneKey,
   inFlightInstanceIds,
+  departures,
   sleeveUrl,
 }: {
   cards: CardInstance[];
@@ -245,6 +249,8 @@ export const HandLayer = React.memo(function HandLayer({
   zoneKey?: string;
   /** Set of instanceIds currently in-flight (render as invisible placeholders). */
   inFlightInstanceIds?: Set<string>;
+  /** Epoch ms at which each arriving card leaves its source (OPT-1054). */
+  departures?: ReadonlyMap<string, number>;
   sleeveUrl?: string | null;
 }) {
   const count = cards.length;
@@ -268,9 +274,64 @@ export const HandLayer = React.memo(function HandLayer({
     () => computeFreshlyAdded(seenIds, cardIds),
     [seenIds, cardIds]
   );
+  // OPT-1054: a card leaving `freshlyAdded` keeps its slot closed for a short
+  // grace window, so the render between the seen-ids reconcile and the
+  // transition registering never opens (and paints) the hand's gap early.
+  const [awaitingIds, setAwaitingIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
   useEffect(() => {
     setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
-  }, [cardIds]);
+    if (freshlyAdded.size === 0) return;
+    const ids = [...freshlyAdded];
+    setAwaitingIds((prev) => new Set([...prev, ...ids]));
+    // Not cleared on re-run: `freshlyAdded` empties on the very next render.
+    setTimeout(() => {
+      setAwaitingIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    }, ARRIVAL_GRACE_MS);
+  }, [cardIds, freshlyAdded]);
+
+  // OPT-1054: an arriving card's slot stays closed (zero width) until its
+  // flight departs, so the hand re-fans alongside the flight instead of
+  // opening a gap while the card is still flipping on the deck. A card on its
+  // first render is held too, until its transition registers. `openIds` holds
+  // the arrivals whose departure time has passed.
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    if (!departures || departures.size === 0) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const [id, departAt] of departures) {
+      if (!Number.isFinite(departAt)) continue;
+      const wait = Math.max(0, departAt - Date.now());
+      timers.push(
+        setTimeout(() => {
+          setOpenIds((prev) => {
+            if (prev.has(id)) return prev;
+            const next = new Set(
+              [...prev].filter((openId) => departures.has(openId))
+            );
+            next.add(id);
+            return next;
+          });
+        }, wait)
+      );
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [departures]);
+  const heldIds = new Set<string>();
+  for (const id of cardIds) {
+    if (
+      freshlyAdded.has(id) ||
+      (awaitingIds.has(id) && departures?.has(id) !== true) ||
+      (departures?.has(id) === true && !openIds.has(id))
+    ) {
+      heldIds.add(id);
+    }
+  }
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -310,18 +371,29 @@ export const HandLayer = React.memo(function HandLayer({
   if (count === 0) return null;
 
   const maxWidth = FIELD_W - 60;
-  const totalCardsW = count * HAND_CARD_W;
-  const rawGap = count > 1 ? (maxWidth - totalCardsW) / (count - 1) : 0;
+  // Held slots take no room, so the fan is laid out for the open cards.
+  const openCount = count - heldIds.size;
+  const totalCardsW = openCount * HAND_CARD_W;
+  const rawGap =
+    openCount > 1 ? (maxWidth - totalCardsW) / (openCount - 1) : 0;
   const gap = Math.min(12, rawGap);
+  // Reflow whenever a card is added, removed, or its slot opens.
+  const layoutKey = count * 1000 + heldIds.size;
 
   const renderCard = (card: CardInstance, i: number) => {
-    const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
+    const held = heldIds.has(card.instanceId);
+    const marginStyle = held
+      ? { width: 0, minWidth: 0, marginLeft: 0 }
+      : i > 0
+        ? { marginLeft: gap }
+        : undefined;
     // Hide if the transition system says in-flight, or if the card is
     // appearing for the first time on this layer instance (the transition
     // hasn't been registered yet by `useCardTransitions`).
     const isInFlight =
       (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
-      freshlyAdded.has(card.instanceId);
+      freshlyAdded.has(card.instanceId) ||
+      held;
 
     // The server projection is the sole visibility authority. A real cardId
     // renders face-up on either side; the redaction sentinel degrades to a
@@ -332,9 +404,10 @@ export const HandLayer = React.memo(function HandLayer({
           key={card.instanceId}
           ref={slotRef(card.instanceId)}
           layout={reducedMotion ? false : "position"}
-          layoutDependency={reducedMotion ? undefined : count}
+          layoutDependency={reducedMotion ? undefined : layoutKey}
           transition={handReflow}
           style={marginStyle}
+          className={cn(held && "invisible")}
         >
           <Card
             data={{ card, cardDb }}
@@ -352,7 +425,7 @@ export const HandLayer = React.memo(function HandLayer({
           key={card.instanceId}
           ref={slotRef(card.instanceId)}
           layout={reducedMotion ? false : "position"}
-          layoutDependency={reducedMotion ? undefined : count}
+          layoutDependency={reducedMotion ? undefined : layoutKey}
           transition={handReflow}
           style={marginStyle}
           className={cn(isInFlight && "invisible")}
@@ -393,7 +466,7 @@ export const HandLayer = React.memo(function HandLayer({
         reducedMotion={reducedMotion}
         style={marginStyle}
         enableLayout={!reducedMotion}
-        layoutDep={count}
+        layoutDep={layoutKey}
         slotRef={slotRef(card.instanceId)}
       />
     );

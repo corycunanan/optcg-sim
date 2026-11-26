@@ -6,7 +6,9 @@ import {
   arcNormal,
   assignPileFlips,
   flightDurationMs,
+  fieldArrivingInstanceIds,
   flightPose,
+  handDepartures,
   needsFlip,
   onNextFrame,
   planFlight,
@@ -281,5 +283,63 @@ describe("onNextFrame", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+function arrival(partial: Record<string, unknown> = {}) {
+  return {
+    cardId: "OP01-001",
+    instanceId: "i-1",
+    fromZoneKey: "o-hand",
+    toZoneKey: "o-char-2",
+    startedAt: 10_000,
+    sourceFaceDown: true,
+    destinationFaceDown: false,
+    ...partial,
+  };
+}
+
+describe("fieldArrivingInstanceIds", () => {
+  it("lists travel flights into field slots that have not landed", () => {
+    const ids = fieldArrivingInstanceIds([
+      arrival({ instanceId: "char", toZoneKey: "o-char-2" }),
+      arrival({ instanceId: "stage", toZoneKey: "p-stage" }),
+      arrival({ instanceId: "hand", toZoneKey: "p-hand" }),
+      arrival({ instanceId: "ko", toZoneKey: "p-trash", kind: "transform" }),
+      arrival({ instanceId: null, toZoneKey: "p-char-1" }),
+    ]);
+    expect([...ids].sort()).toEqual(["char", "stage"]);
+  });
+});
+
+describe("handDepartures", () => {
+  it("dates each arrival's departure after its flip hold", () => {
+    const [top, under] = assignPileFlips([
+      arrival({ instanceId: "a", fromZoneKey: "p-deck", toZoneKey: "p-hand", delay: 0 }),
+      arrival({ instanceId: "b", fromZoneKey: "p-deck", toZoneKey: "p-hand", delay: 0.09 }),
+    ]);
+    const departures = handDepartures([top, under], "p-hand");
+    expect(departures.get("a")).toBeCloseTo(10_000 + FLIP_SECONDS * 1000, 6);
+    expect(departures.get("b")).toBeCloseTo(10_000 + 90 + FLIP_SECONDS * 1000, 6);
+  });
+
+  it("departs a same-side card after its stagger only", () => {
+    const departures = handDepartures(
+      [arrival({ fromZoneKey: "p-trash", toZoneKey: "p-hand", sourceFaceDown: false, delay: 0.06 })],
+      "p-hand",
+    );
+    expect(departures.get("i-1")).toBeCloseTo(10_060, 6);
+  });
+
+  it("holds a card queued behind a spotlight indefinitely and ignores other zones", () => {
+    const departures = handDepartures(
+      [
+        arrival({ instanceId: "queued", toZoneKey: "p-hand", waitForSpotlightId: "s1" }),
+        arrival({ instanceId: "elsewhere", toZoneKey: "o-hand" }),
+      ],
+      "p-hand",
+    );
+    expect(departures.get("queued")).toBe(Number.POSITIVE_INFINITY);
+    expect(departures.has("elsewhere")).toBe(false);
   });
 });

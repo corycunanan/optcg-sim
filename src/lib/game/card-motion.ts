@@ -281,3 +281,57 @@ export function onNextFrame(callback: () => void): () => void {
   const id = requestAnimationFrame(() => callback());
   return () => cancelAnimationFrame(id);
 }
+
+// ─── Destination holds ───────────────────────────────────────────────
+
+interface ArrivalCandidate extends FlipCandidate {
+  kind?: string;
+  instanceId: string | null;
+  toZoneKey: string;
+  startedAt: number;
+  /** Queued behind a spotlight: it has not been scheduled to depart yet. */
+  waitForSpotlightId?: string;
+}
+
+/** Field zones a travelling card can land in. */
+const FIELD_ZONE = /^[po]-(char-\d+|leader|stage)$/;
+
+/**
+ * Instance ids whose flight to a field slot has not landed yet (OPT-1054).
+ * The destination card stays hidden until its ghost lands, so a card is never
+ * seen in its slot while it is still flipping at its source or in the air.
+ */
+export function fieldArrivingInstanceIds(
+  transitions: readonly ArrivalCandidate[],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const transition of transitions) {
+    if (transition.kind !== undefined || !transition.instanceId) continue;
+    if (FIELD_ZONE.test(transition.toZoneKey)) ids.add(transition.instanceId);
+  }
+  return ids;
+}
+
+/**
+ * When (epoch ms) each card flying into `handZoneKey` leaves its source
+ * (OPT-1054). The hand keeps an arriving card's slot closed until then, so
+ * it re-fans alongside the flight instead of opening a gap while the card is
+ * still flipping on the deck.
+ */
+export function handDepartures(
+  transitions: readonly ArrivalCandidate[],
+  handZoneKey: string,
+): Map<string, number> {
+  const departures = new Map<string, number>();
+  for (const transition of transitions) {
+    if (transition.kind !== undefined || !transition.instanceId) continue;
+    if (transition.toZoneKey !== handZoneKey) continue;
+    departures.set(
+      transition.instanceId,
+      transition.waitForSpotlightId !== undefined
+        ? Number.POSITIVE_INFINITY
+        : transition.startedAt + planFlight(transition).departAt * 1000,
+    );
+  }
+  return departures;
+}

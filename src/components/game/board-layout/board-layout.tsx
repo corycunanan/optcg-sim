@@ -31,6 +31,7 @@ import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
+import { fieldArrivingInstanceIds } from "@/lib/game/card-motion";
 import { grantsStageCounter } from "@/lib/game/counter-eligibility";
 import { MidZone } from "./mid-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
@@ -333,6 +334,14 @@ function BoardLayoutInner({
     return counts;
   }, [cardAnimations]);
 
+  // Field cards stay hidden in their slot until their flight lands, so a
+  // card is never seen twice while it flips at its source or travels
+  // (OPT-1054).
+  const fieldArrivingIds = useMemo(
+    () => fieldArrivingInstanceIds(cardAnimations),
+    [cardAnimations],
+  );
+
   const mergedDonCountAdjustments = useMemo(() => {
     return mergeDonCountAdjustments(
       redistribution.donCountAdjustments,
@@ -435,7 +444,7 @@ function BoardLayoutInner({
             zoom: boardScale,
           }}
         >
-          <HandLayer cards={topOrderedHand} cardDb={cardDb} zoneKey={boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand")} inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={topPlayer?.sleeveUrl} />
+          <HandLayer cards={topOrderedHand} cardDb={cardDb} zoneKey={boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand")} inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} departures={oppHandAnim.departures} sleeveUrl={topPlayer?.sleeveUrl} />
         </div>
       </div>
 
@@ -473,6 +482,7 @@ function BoardLayoutInner({
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
             donCountAdjustments={mergedDonCountAdjustments}
             pileArrivingCounts={pileArrivingCounts}
+            arrivingInstanceIds={fieldArrivingIds}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
             onTargetToggle={modalRouting.targetSelection.toggle}
           />
@@ -578,6 +588,7 @@ function BoardLayoutInner({
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             lifeScriedPulseNonce={playerLifeScriedPulseNonce}
             pileArrivingCounts={pileArrivingCounts}
+            arrivingInstanceIds={fieldArrivingIds}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
             onTargetToggle={modalRouting.targetSelection.toggle}
           />
@@ -620,6 +631,7 @@ function BoardLayoutInner({
             }
             zoneKey={boardZoneKey(bottomPlayerIndex, bottomPlayerIndex, "hand")}
             inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
+            departures={playerHandAnim.departures}
             sleeveUrl={bottomPlayer?.sleeveUrl}
           />
         </div>

@@ -311,4 +311,78 @@ describe("HandLayer spectator interaction", () => {
       expect.arrayContaining(["p-hand/bottom-hand-1", "p-hand/top-hand-hidden"]),
     );
   });
+
+  it("keeps an arriving card's slot closed until its flight departs (OPT-1054)", () => {
+    vi.useFakeTimers();
+    try {
+      const arriving = makeCard("drawn-1", 0);
+      const departures = new Map([[arriving.instanceId, Date.now() + 300]]);
+      const element = (
+        <InteractionModeProvider value="full">
+          <HandLayer
+            cards={[bottomCard, arriving]}
+            cardDb={{} as CardDb}
+            inFlightInstanceIds={new Set([arriving.instanceId])}
+            departures={departures}
+          />
+        </InteractionModeProvider>
+      );
+      act(() => {
+        renderer = create(element);
+      });
+      // The second card's slot is the only one carrying a margin.
+      const slotStyle = () =>
+        renderer!.root.findAll(
+          (node) =>
+            typeof node.type === "string" &&
+            node.props.style?.marginLeft !== undefined,
+        )[0].props.style;
+
+      // Still flipping on the deck: the slot takes no room.
+      expect(slotStyle()).toMatchObject({ width: 0, minWidth: 0, marginLeft: 0 });
+
+      // The flight departs: the slot opens and the hand re-fans with it.
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(slotStyle()).toEqual({ marginLeft: 12 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("keeps a just-added card's slot closed until its flight can register (OPT-1054)", () => {
+    vi.useFakeTimers();
+    try {
+      const arriving = makeCard("drawn-1", 0);
+      const hand = (cards: CardInstance[]) => (
+        <InteractionModeProvider value="full">
+          <HandLayer cards={cards} cardDb={{} as CardDb} />
+        </InteractionModeProvider>
+      );
+      act(() => {
+        renderer = create(hand([bottomCard]));
+      });
+      // The card arrives; its transition has not registered yet.
+      act(() => {
+        renderer!.update(hand([bottomCard, arriving]));
+      });
+      const slotStyle = () =>
+        renderer!.root.findAll(
+          (node) =>
+            typeof node.type === "string" &&
+            node.props.style?.marginLeft !== undefined,
+        )[0].props.style;
+
+      // Past the seen-ids reconcile, the gap still has not opened.
+      expect(slotStyle()).toMatchObject({ width: 0, minWidth: 0, marginLeft: 0 });
+
+      // No flight claimed it within the grace window: the slot opens.
+      act(() => {
+        vi.advanceTimersByTime(120);
+      });
+      expect(slotStyle()).toEqual({ marginLeft: 12 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
