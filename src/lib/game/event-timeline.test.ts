@@ -239,3 +239,33 @@ describe("buildEventTimeline", () => {
     expect(buildEventTimeline([lifeToHand]).durationMs).toBe(FLIGHT_MS);
   });
 });
+
+describe("DON!! deck moves (OPT-1057)", () => {
+  it("make DON!! placement and DON!! deck returns a flipping travel beat with one step per DON!!", () => {
+    const placed = at({
+      type: "DON_PLACED_ON_FIELD",
+      playerIndex: 0,
+      payload: { count: 2 },
+    });
+    const returned = at({
+      type: "DON_DETACHED",
+      playerIndex: 0,
+      payload: { count: 2, to: "DON_DECK", fromCostArea: 2 },
+    });
+    expect(classifyEventBeat(placed)).toBe("travel");
+    expect(classifyEventBeat(returned)).toBe("travel");
+    expect(siblingStaggerMs("DON_PLACED_ON_FIELD")).toBe(cardStagger.drawMs);
+    const timeline = buildEventTimeline([placed, returned]);
+    expect(eventOffsetMs(timeline, returned)).toBe(
+      TRAVEL_MS + cardStagger.drawMs + BEAT_GAP_MS,
+    );
+  });
+
+  it("leaves the Refresh Phase return without a beat of its own", () => {
+    for (const payload of [{}, { to: "COST_AREA" as const }]) {
+      expect(
+        classifyEventBeat(at({ type: "DON_DETACHED", playerIndex: 0, payload })),
+      ).toBeNull();
+    }
+  });
+});

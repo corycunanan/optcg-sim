@@ -9,6 +9,7 @@ import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
   SIDE_ZONE_GAP,
+  DON_DECK_CLEARANCE,
   FIELD_W,
 } from "./constants";
 import {
@@ -25,6 +26,7 @@ import {
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { DeckPile } from "./deck-pile";
+import { DonDeckPile } from "./don-deck-pile";
 import { LifeZone } from "./life-zone";
 import { OpponentFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
@@ -271,6 +273,7 @@ function OpponentFieldComponent({
         onTargetToggle={onTargetToggle}
         zoneKey={zoneKey("don")}
         donArtUrl={opp?.donArtUrl}
+        arrivingDonIds={arrivingInstanceIds}
         style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.2 : undefined}
       />
@@ -310,6 +313,18 @@ function OpponentFieldComponent({
         );
       })}
 
+      {/* Zone 1 (right), under Life from the opponent's seat: DON!! deck */}
+      <DonDeckPile
+        count={opp?.donDeck.length ?? 0}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("don-deck"))}
+        zoneKey={zoneKey("don-deck")}
+        style={{
+          position: "absolute",
+          left: FIELD_W - SQUARE + sideCardOffsetX,
+          top: oppCharTop,
+        }}
+      />
+
       {/* Zone 1 (right): Life */}
       <LifeZone
         life={opp?.life ?? []}
@@ -321,6 +336,7 @@ function OpponentFieldComponent({
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
         onInspect={opp ? handlePreviewLife : undefined}
+        maxStackSpread={DON_DECK_CLEARANCE}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

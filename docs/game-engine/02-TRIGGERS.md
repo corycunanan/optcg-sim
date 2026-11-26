@@ -243,7 +243,7 @@ Example — EB01-047 Laboon:
 
 Fires when DON!! cards leave the field and return to the DON!! deck. Supports quantity thresholds and cause filters.
 
-OPT-881: it matches `DON_DETACHED` events with a positive `count`. Every DON!!-deck return carries one: field returns, including scheduled and `until_count` returns (OP08-074 Black Maria), `FORCE_OPPONENT_DON_RETURN`, `RETURN_DON_TO_DECK` with `amount`, and DON!! −N costs. The Refresh Phase `DON_DETACHED` (rule 6-2-3: attached DON!! return to the cost area, not the deck) carries no `count` and never matches.
+OPT-881: it matches `DON_DETACHED` events with a positive `count`. Every DON!!-deck return carries one: field returns, including scheduled and `until_count` returns (OP08-074 Black Maria), `FORCE_OPPONENT_DON_RETURN`, `RETURN_DON_TO_DECK` with `amount`, and DON!! −N costs. The Refresh Phase `DON_DETACHED` (rule 6-2-3: attached DON!! return to the cost area, not the deck) carries no `count` and never matches. OPT-1057 adds `to` (`DON_DECK` or `COST_AREA`) plus `fromCostArea`, `sources` and `donInstanceIds` for the board's DON!! flights; the Refresh event says `to: "COST_AREA"` and still carries no `count`, and the matcher also rejects `to: "COST_AREA"`.
 
 ```typescript
 {

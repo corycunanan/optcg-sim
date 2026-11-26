@@ -28,6 +28,7 @@ export const LifeZone = React.memo(function LifeZone({
   damagePulseNonce,
   scryPulseNonce,
   onInspect,
+  maxStackSpread,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
@@ -39,6 +40,10 @@ export const LifeZone = React.memo(function LifeZone({
   damagePulseNonce?: number;
   scryPulseNonce?: number;
   onInspect?: () => void;
+  /** Most the cards under the top one may peek out below it, in board px.
+   *  The DON!! deck sits right under Life (OPT-1057), so the stack tightens
+   *  to stay clear of it. */
+  maxStackSpread?: number;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -54,6 +59,10 @@ export const LifeZone = React.memo(function LifeZone({
   const visibleLife = arrivingCount > 0 ? life.slice(arrivingCount) : life;
   const count = visibleLife.length;
   const topCard = visibleLife[0];
+  const stackOffset =
+    maxStackSpread !== undefined && count > 1
+      ? Math.min(LIFE_STACK_OFFSET, maxStackSpread / (count - 1))
+      : LIFE_STACK_OFFSET;
   const triggerFeedbackActive = triggerPulse && !reducedMotion;
   const damageFeedbackActive =
     damagePulseNonce !== undefined && !reducedMotion;
@@ -176,7 +185,7 @@ export const LifeZone = React.memo(function LifeZone({
             style={{
               position: "absolute",
               left: 0,
-              top: stackIndex * LIFE_STACK_OFFSET,
+              top: stackIndex * stackOffset,
               zIndex: count - stackIndex,
             }}
           >
