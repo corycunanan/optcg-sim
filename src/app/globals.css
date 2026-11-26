@@ -371,11 +371,21 @@
   --effect-keyword-fg: var(--effect-notation-fg);
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
   --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn] */
-  --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
+  /* [DON!! xN]: black, matching the printed DON!! card and the board's
+     attached-DON badge. The white keyline is what separates it from a dark
+     surface, the same way it does for every other family. */
+  --effect-don: oklch(0% 0 0);
   --effect-trigger: oklch(86% 0.16 90); /* [Trigger] */
   --effect-trigger-fg: oklch(22% 0.04 245);
   --effect-notation-fg: #ffffff;
   --effect-notation-edge: rgba(255, 255, 255, 0.9);
+  /* {Trait} chips, inline in effect text and as badges in the card tooltip
+     header. A hairline edge and white lettering on a fill one clear step above
+     the surface it sits on; the board's card tooltip re-points the fill at
+     --gb-surface-chip through [data-card-tooltip] below. */
+  --effect-trait: var(--surface-2);
+  --effect-trait-fg: var(--effect-notation-fg);
+  --effect-trait-edge: var(--border-step-default);
 
   /* Keyword-chip hexagon geometry (see the effect-hex-* utilities below).
      The chip box is a fixed 18px: a 16px `leading-4` line plus one hairline
@@ -452,6 +462,12 @@
      neutral hairline lit top-left → bottom-right for the single implied light
      source; square corners let border-image paint it without a radius conflict. */
   --gb-surface-info: oklch(8% 0.005 245);
+  /* Raised fills inside the board's card tooltip: trait and attribute chips sit
+     on --gb-surface-chip, and a nested section (the [Trigger] effect) on the
+     slightly lighter --gb-surface-nested. Both stay neutral so the colored
+     effect chips remain the loudest marks. */
+  --gb-surface-chip: oklch(22% 0.005 245);
+  --gb-surface-nested: oklch(26% 0.005 245);
   --gb-edge-info: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.22),
@@ -588,6 +604,9 @@
   --color-effect-keyword-fg: var(--effect-keyword-fg);
   --color-effect-trigger-fg: var(--effect-trigger-fg);
   --color-effect-notation-fg: var(--effect-notation-fg);
+  --color-effect-trait: var(--effect-trait);
+  --color-effect-trait-fg: var(--effect-trait-fg);
+  --color-effect-trait-edge: var(--effect-trait-edge);
   --color-effect-notation-edge: var(--effect-notation-edge);
 
   /* Shadows */
@@ -599,6 +618,8 @@
   --color-gb-bg: var(--gb-bg);
   --color-gb-surface: var(--gb-surface);
   --color-gb-surface-info: var(--gb-surface-info);
+  --color-gb-surface-chip: var(--gb-surface-chip);
+  --color-gb-surface-nested: var(--gb-surface-nested);
   --color-gb-surface-raised: var(--gb-surface-raised);
   --color-gb-surface-inset: var(--gb-surface-inset);
   --color-gb-border: var(--gb-border);
@@ -791,6 +812,12 @@ body {
 /* Board-side twin of `edge-info`, resolved through the game board's own token
    context. Pair with `bg-gb-surface-info rounded-none shadow-none` at the call
    site; the 1px border width comes from the tooltip primitive's base class. */
+/* The board's card tooltip keeps the shared {Trait} chip but sits it on the
+   board's neutral chip fill rather than the app's raised navy. */
+[data-card-tooltip] {
+  --effect-trait: var(--gb-surface-chip);
+}
+
 @utility gb-edge-info {
   border-image-source: var(--gb-edge-info);
   border-image-slice: 1;

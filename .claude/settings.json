@@ -3,7 +3,8 @@
     "allow": [
       "Bash(gh pr merge:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh pr checks:*)"
+      "Bash(gh pr checks:*)",
+      "Artifact"
     ]
   },
   "hooks": {

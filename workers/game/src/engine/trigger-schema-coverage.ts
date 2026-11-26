@@ -44,6 +44,13 @@ function isDirectTriggerBlock(
   );
 }
 
+/**
+ * Trigger cards whose [Trigger] needs engine work before it can be authored.
+ * Each entry names its ticket and must be removed when the ticket lands; this
+ * is not a general escape hatch for unauthored cards.
+ */
+export const DEFERRED_TRIGGER_SCHEMAS: ReadonlyMap<string, string> = new Map<string, string>([]);
+
 export function findMissingTriggerSchemas(
   manifest: Readonly<CardTextManifest>,
   schemas: Readonly<Record<string, EffectSchema>>
@@ -51,6 +58,7 @@ export function findMissingTriggerSchemas(
   return Object.entries(manifest)
     .filter(([, facts]) => facts.hasTriggerText)
     .map(([cardId]) => cardId)
+    .filter((cardId) => !DEFERRED_TRIGGER_SCHEMAS.has(cardId))
     .filter((cardId) => {
       const schema = schemas[cardId];
       return !schema?.effects.some(isDirectTriggerBlock);
@@ -68,6 +76,7 @@ export function findDerivedTriggersWithoutSchemaBlocks(
   ]);
 
   return [...cardIds]
+    .filter((cardId) => !DEFERRED_TRIGGER_SCHEMAS.has(cardId))
     .filter((cardId) => {
       const facts = manifest[cardId] ?? {
         category: "Character",

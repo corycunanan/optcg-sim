@@ -10,12 +10,9 @@ import {
   DialogContent,
   DialogTitle,
   TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-  TooltipContent,
 } from "@/components/ui";
 import { VisuallyHidden } from "radix-ui";
-import { CardTooltipContent } from "./card/card-tooltip-content";
+import { CardTooltip } from "./use-card-tooltip";
 
 interface GameDeckPreviewModalProps {
   deckList: DeckListEntry[];
@@ -125,18 +122,28 @@ export function GameDeckPreviewModal({
               {groups.map((group) => {
                 const data = cardDb[group.cardId];
                 return (
-                  <TooltipRoot key={group.cardId}>
-                    <TooltipTrigger asChild>
+                  <CardTooltip
+                    key={group.cardId}
+                    data={data ?? null}
+                    cardId={group.cardId}
+                  >
+                    {/* A real button so the trigger receives Radix's ref and
+                        pointer/focus handlers (CardFanStack does not forward
+                        them), and so keyboard users can open the tooltip. */}
+                    <button
+                      type="button"
+                      aria-label={`${group.name} ×${group.count}`}
+                      className="focus-visible:ring-gb-signal-eligible flex rounded-md focus-visible:ring-2 focus-visible:outline-none"
+                    >
                       <CardFanStack
                         cardId={group.cardId}
                         count={group.count}
-                        className="cursor-pointer"
                         renderCard={(i) => (
                           <div className={cn("w-card-thumb rounded-card overflow-hidden border border-gb-border-strong shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150")}>
                             {data?.imageUrl ? (
                               <img
                                 src={data.imageUrl}
-                                alt={data.name}
+                                alt=""
                                 className={cn(
                                   "h-full w-full object-cover",
                                   group.count > 1 && i > 0 && "brightness-90",
@@ -153,27 +160,8 @@ export function GameDeckPreviewModal({
                           </div>
                         )}
                       />
-                    </TooltipTrigger>
-                    {/*
-                      Same Tier-5 information surface as the board tooltip
-                      (see use-card-tooltip.tsx): flat opaque dark on the
-                      board's own tokens, square corners, no glow, one neutral
-                      perimeter lit top-left → bottom-right.
-                    */}
-                    <TooltipContent
-                      side="top"
-                      sideOffset={8}
-                      data-tier5-surface
-                      className="bg-gb-surface-info gb-edge-info text-gb-text w-72 rounded-none p-3 shadow-none"
-                    >
-                      {data && (
-                        <CardTooltipContent
-                          data={data}
-                          cardId={group.cardId}
-                        />
-                      )}
-                    </TooltipContent>
-                  </TooltipRoot>
+                    </button>
+                  </CardTooltip>
                 );
               })}
             </div>

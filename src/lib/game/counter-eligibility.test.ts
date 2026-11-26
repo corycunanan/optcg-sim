@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CardData } from "@shared/game-types";
-import { isCounterEligibleCard, isCounterEvent } from "./counter-eligibility";
+import type { CardData, CardInstance } from "@shared/game-types";
+import { grantsStageCounter, isCounterEligibleCard, isCounterEvent } from "./counter-eligibility";
 
 function card(
   type: CardData["type"],
@@ -55,5 +55,31 @@ describe("isCounterEligibleCard", () => {
     expect(isCounterEligibleCard(card("Leader", null))).toBe(false);
     expect(isCounterEligibleCard(card("Stage", null))).toBe(false);
     expect(isCounterEligibleCard(undefined)).toBe(false);
+  });
+});
+
+describe("OPT-1046 Stage counters", () => {
+  const franky: CardData = {
+    ...card("Leader", null),
+    id: "OP18-021",
+    effectSchema: {
+      effects: [{ id: "stage_counter", category: "rule_modification", rule: { rule_type: "COUNTER_GRANT", value: 3000, filter: { card_type: "STAGE" } } }],
+    },
+  };
+  const other: CardData = { ...card("Leader", null), id: "OTHER" };
+  const instance = (cardId: string): CardInstance => ({
+    instanceId: `${cardId}-i`, cardId, zone: "LEADER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: 0, owner: 0,
+  });
+
+  it("detects a field card that grants Stage cards a Counter", () => {
+    const db = { [franky.id]: franky, [other.id]: other };
+    expect(grantsStageCounter({ leader: instance(franky.id), characters: [], stage: null }, db)).toBe(true);
+    expect(grantsStageCounter({ leader: instance(other.id), characters: [], stage: null }, db)).toBe(false);
+    expect(grantsStageCounter(null, db)).toBe(false);
+  });
+
+  it("offers a Stage only while a Stage Counter is granted", () => {
+    expect(isCounterEligibleCard(card("Stage", null), { stageCounterGranted: true })).toBe(true);
+    expect(isCounterEligibleCard(card("Stage", null), { stageCounterGranted: false })).toBe(false);
   });
 });

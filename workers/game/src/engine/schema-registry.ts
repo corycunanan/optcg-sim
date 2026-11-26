@@ -566,6 +566,20 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     errors.push(`${prefix}: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE requires a non-empty 'card_name'`);
   }
 
+  // OPT-1047: `all` takes the whole Life area — Life costs only, with no
+  // amount and no TOP_OR_BOTTOM choice (every card moves).
+  const all = (cost as { all?: unknown }).all;
+  if (all !== undefined) {
+    if (cost.type !== "LIFE_TO_HAND" && cost.type !== "TRASH_FROM_LIFE") {
+      errors.push(`${prefix}: cost type '${cost.type}' does not accept 'all'`);
+    } else if (all !== true) {
+      errors.push(`${prefix}: 'all' must be true`);
+    } else {
+      if ((cost as { amount?: unknown }).amount !== undefined) errors.push(`${prefix}: an 'all' Life cost takes no 'amount'`);
+      if ((cost as { position?: unknown }).position === "TOP_OR_BOTTOM") errors.push(`${prefix}: an 'all' Life cost cannot take position TOP_OR_BOTTOM`);
+    }
+  }
+
   // OPT-798 / OPT-828: a cost-level `controller` widens a Character-selection
   // or Stage cost beyond the payer's own field (OPT-866 adds the Stage cost).
   const costController = (cost as { controller?: unknown }).controller;
@@ -1340,7 +1354,8 @@ function validateOptionalActionPlacement(block: EffectBlock, prefix: string): st
  * OPT-913: every REUSE_EFFECT `target_effect` resolves to exactly one OTHER
  * block of the same card, by block id or by trigger keyword (any_of included);
  * see `findReuseTargetBlocks`. An unresolvable or ambiguous target is a silent
- * no-op at runtime, so it fails schema validation instead.
+ * no-op at runtime, so it fails schema validation instead. With `source_ref`
+ * (OPT-1049) the block is on the referenced card and is looked up at runtime.
  */
 function validateReuseEffectTargets(effects: EffectBlock[], prefix: string): string[] {
   const errors: string[] = [];
@@ -1354,8 +1369,14 @@ function validateReuseEffectTargets(effects: EffectBlock[], prefix: string): str
     if (record.type === "REUSE_EFFECT") {
       const params = record.params as Record<string, unknown> | undefined;
       const target = params?.target_effect;
+      const sourceRef = params?.source_ref;
       if (typeof target !== "string" || target.length === 0) {
         errors.push(`${path}.params.target_effect: Must be a non-empty block id or trigger keyword (OPT-913)`);
+      } else if (sourceRef !== undefined) {
+        // OPT-1049: the block belongs to the referenced card, known only at runtime.
+        if (typeof sourceRef !== "string" || sourceRef.length === 0) {
+          errors.push(`${path}.params.source_ref: Must be a non-empty result ref (OPT-1049)`);
+        }
       } else {
         const matches = findReuseTargetBlocks(effects, target);
         if (matches.length !== 1) {

@@ -341,6 +341,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `REST_SELF` | "Rest this card" |
 | `TRASH_SELF` | "Trash this card" (not K.O.) |
 | `PLACE_SELF_TO_DECK` | "Place this card at the bottom of the owner's deck" |
+| `RETURN_SELF_TO_HAND` | "Return this Character to the owner's hand" (not "1 of your Characters": that is `RETURN_OWN_CHARACTER_TO_HAND`) |
 
 ### Hand Costs
 
@@ -363,14 +364,15 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_OWN_CHARACTER_TO_DECK` | "Place Character at deck bottom" — add `controller: "EITHER"` when the text says "place 1 Character … the owner's deck" (either player's; the card goes to its owner's deck) |
 | `ADD_OWN_CHARACTER_TO_LIFE` | "Add your Character to Life" — add `controller: "OPPONENT"` (amount 1) when the text says "place 1 of your opponent's Characters … at the top or bottom of your opponent's Life cards" (the card goes to its owner's Life; `position: "TOP_OR_BOTTOM"` lets the payer choose the end) |
 | `TRASH_OWN_STAGE` | "Trash your Stage" |
+| `KO_OWN_STAGE` | "K.O. 1 of your Stages" (optional `filter`, e.g. `{ cost_max: 5 }`; not `TRASH_OWN_STAGE`, which trashes) |
 
 ### Other Costs
 
 | Type | Card Text |
 |------|-----------|
 | `LEADER_POWER_REDUCTION` | "Your Leader -N power" |
-| `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`); must be the last cost in every payment order (schema lint, OPT-857) |
-| `TRASH_FROM_LIFE` | "Trash N from Life" |
+| `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`); must be the last cost in every payment order (schema lint, OPT-857). "Add all of your Life cards to your hand" is `{ all: true }` (no `amount`; needs at least 1 Life, OPT-1047) |
+| `TRASH_FROM_LIFE` | "Trash N from Life". "Trash all of your Life cards" is `{ all: true }` (no `amount`; needs at least 1 Life, OPT-1047) |
 | `MILL` | "Trash N cards from the top of your deck" before the colon — `{ amount: N }`; unpayable with fewer than N cards in deck |
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
 | `PLACE_STAGE_TO_DECK` | "Place your Stage at deck bottom" (fixed, no prompt) — add `controller: "EITHER"` when the text says "place 1 Stage … the owner's deck" (either player's Stage, chosen by the payer; it goes to its owner's deck; OP06-102/111/114) |
@@ -540,7 +542,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `OPPONENT_ACTION` | "Opponent does X" | `{ action: Action }` |
 | `CHOOSE_VALUE` | "Choose a number" | Player selects a value |
 | `SCHEDULE_ACTION` | "At end of turn, do X" | `{ timing: "END_OF_THIS_TURN", action: {...} }` |
-| `REUSE_EFFECT` | "Activate [Trigger] effect" | `{ target_effect: "COUNTER" \| "MAIN_EVENT" }` |
+| `REUSE_EFFECT` | "Activate [Trigger] effect" | `{ target_effect: "COUNTER" \| "MAIN_EVENT", source_ref?: "<ref>" }` (`source_ref`: a revealed card's block, OPT-1049) |
 | `WIN_GAME` | "You win the game" | — |
 | `EXTRA_TURN` | "Take an extra turn" | — |
 
@@ -994,7 +996,10 @@ Hand-trash watchers preserve `EFFECT` versus activation `COST` provenance. For
 OP12-040 Kuzan, add `effect_source: { controller: "SELF", traits: ["Navy"] }`
 to the filter and read `{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" }`
 for the actual discarded count. Do not use a discarded-card target filter for
-Navy. The OP14 activation-cost interpretation is explicitly flagged in
+Navy. For a named source, such as OP18-080's "by your [Marshall.D.Teach]
+Leader's effect", add `name` and `card_type`:
+`effect_source: { controller: "SELF", card_type: "LEADER", name: "Marshall.D.Teach" }`
+(OPT-1052; aliases and the all-names Leader rule apply). The OP14 activation-cost interpretation is explicitly flagged in
 [the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
 
 ### `*_THIS_WAY` counts: cost or action

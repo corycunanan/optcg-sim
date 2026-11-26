@@ -3,7 +3,11 @@
  * modal title names ("Card Effect: KO Characters").
  */
 import { describe, expect, it } from "vitest";
-import type { Action, EffectBlock } from "../engine/effect-types.js";
+import {
+  getNestedActions,
+  type Action,
+  type EffectBlock,
+} from "../engine/effect-types.js";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import { actionTitle } from "../engine/effect-resolver/target-instruction.js";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
@@ -130,6 +134,17 @@ function authoredBlock(cardId: string, blockId: string): EffectBlock {
   return block;
 }
 
+/** Every action a card's blocks author, including nested option/chain actions. */
+function authoredActions(cardId: string): Action[] {
+  const walk = (action: Action): Action[] => [
+    action,
+    ...getNestedActions(action).flatMap(walk),
+  ];
+  return (getAllAuthoredSchemas()[cardId]?.effects ?? []).flatMap((block) =>
+    (block.actions ?? []).flatMap(walk)
+  );
+}
+
 describe("card-kind aware titles (F1)", () => {
   const ko = (type: string, extra: object = {}) =>
     ({ type: "KO", target: { type, controller: "OPPONENT", ...extra } }) as Action;
@@ -142,6 +157,36 @@ describe("card-kind aware titles (F1)", () => {
     expect(actionTitle(ko("FIELD_CARD"))).toBe("KO");
     expect(actionTitle({ type: "KO" } as Action)).toBe("KO");
   });
+
+  it("OPT-936: Character-only sweep and battle targets title as KO Characters", () => {
+    expect(actionTitle(ko("ALL_OPPONENT_CHARACTERS"))).toBe("KO Characters");
+    expect(actionTitle(ko("ALL_YOUR_CHARACTERS"))).toBe("KO Characters");
+    expect(actionTitle(ko("BATTLE_TARGET"))).toBe("KO Characters");
+  });
+
+  it.each([
+    ["OP06-117", "ALL_OPPONENT_CHARACTERS"],
+    ["ST08-013", "BATTLE_TARGET"],
+  ])("OPT-936: %s KO titles as KO Characters", (cardId, targetType) => {
+    const action = authoredActions(cardId).find((a) => a.type === "KO" && (a as { target?: { type?: string } }).target?.type === targetType);
+    expect(actionTitle(action)).toBe("KO Characters");
+  });
+
+  it("OPT-936: PLAY_CARD on SELF titles as PLAY_SELF does", () => {
+    expect(actionTitle(play("SELF"))).toBe("Play This Card");
+    expect(actionTitle({ type: "PLAY_SELF" } as Action)).toBe("Play This Card");
+  });
+
+  it.each(["OP02-018", "OP03-013", "OP09-052", "OP16-014"])(
+    "OPT-936: %s PLAY_CARD on SELF titles as Play This Card",
+    (cardId) => {
+      const action = authoredActions(cardId).find(
+        (a) => a.type === "PLAY_CARD" && (a as { target?: { type?: string } }).target?.type === "SELF"
+      );
+      expect(action).toBeDefined();
+      expect(actionTitle(action)).toBe("Play This Card");
+    }
+  );
 
   it("names Character, Stage and neutral PLAY_CARD targets", () => {
     expect(actionTitle(play("CHARACTER_CARD"))).toBe("Play Character");

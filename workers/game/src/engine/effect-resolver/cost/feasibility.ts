@@ -151,6 +151,7 @@ const ALL_RESOURCES: readonly PruneResource[] = ["HAND", "DECK", "ACTIVE_DON", "
 const COST_PRODUCES: Record<Cost["type"], readonly PruneResource[]> = {
   // Adds cards to hand.
   RETURN_OWN_CHARACTER_TO_HAND: ["HAND"],
+  RETURN_SELF_TO_HAND: ["HAND"],
   LIFE_TO_HAND: ["HAND"],
   // Adds cards to a deck.
   PLACE_HAND_TO_DECK: ["DECK"],
@@ -184,6 +185,7 @@ const COST_PRODUCES: Record<Cost["type"], readonly PruneResource[]> = {
   REST_SELF: [],
   TRASH_SELF: [],
   TRASH_OWN_STAGE: [],
+  KO_OWN_STAGE: [],
   LEADER_POWER_REDUCTION: [],
   GIVE_OPPONENT_DON: [],
   RETURN_ATTACHED_DON_TO_COST: [],

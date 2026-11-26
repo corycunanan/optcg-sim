@@ -223,6 +223,7 @@ export const HandLayer = React.memo(function HandLayer({
   cardDb,
   enableDrag,
   counterMode,
+  stageCounterGranted,
   availableDon,
   zoneKey,
   inFlightInstanceIds,
@@ -232,6 +233,8 @@ export const HandLayer = React.memo(function HandLayer({
   cardDb: CardDb;
   enableDrag?: boolean;
   counterMode?: boolean;
+  /** OPT-1046: a field card gives Stage cards in hand a Counter. */
+  stageCounterGranted?: boolean;
   /** Active DON during Main. Undefined outside affordability-signaling mode. */
   availableDon?: number;
   zoneKey?: string;
@@ -319,7 +322,7 @@ export const HandLayer = React.memo(function HandLayer({
     }
 
     const eligible = counterMode
-      ? isCounterEligibleCard(cardDb[card.cardId])
+      ? isCounterEligibleCard(cardDb[card.cardId], { stageCounterGranted })
       : true;
     const disabled = !enableDrag || (counterMode && !eligible);
     const affordability =

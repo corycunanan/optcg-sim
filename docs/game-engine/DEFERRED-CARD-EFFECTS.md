@@ -10,7 +10,8 @@ fail-closed schema gate and action-coverage inventory determine playability.
 complete authored schemas and machine-checked execution coverage; their entries
 remain below as historical disposition records.
 
-**Remaining deferred cards: 0.** EB05-010 Nico Robin is fully encoded since
+**Remaining deferred cards: 0.** The OP-18 audit gaps (2026-11-20) are all encoded (OPT-1046 to OPT-1052).
+EB05-010 Nico Robin is fully encoded since
 OPT-1033 (`keywords_not`), EB05-052 Gloriosa since OPT-1032
 (`WOULD_TAKE_DAMAGE` replacement), and ST33-004 Borsalino since OPT-1034
 (`CARD_TRASHED_FROM_HAND_BY_EFFECT`). No playable-format exclusion is active.
@@ -414,6 +415,94 @@ OPT-1034 added the `CARD_TRASHED_FROM_HAND_BY_EFFECT` action reference for `ACTI
 
 ---
 
+## OP-18 Deferred Effects (all encoded) — 2026-11-20
+
+Each card ships with every expressible block authored, or with no schema when
+nothing on it is expressible. The quoted clause is **not encoded and not
+approximated**: in play the card behaves as if that clause were absent. Each
+needs engine vocabulary first; the ticket is named on each entry.
+
+### ~~OP18-020 Stop Fighting!!!~~ — ENCODED
+**Tags:** `ALL_LIFE_COST` · **Ticket:** OPT-1047
+
+> [Counter] You may add all of your Life cards to your hand: If your Leader is [Nefeltari Vivi], give your opponent's Leader and all of their Characters −5000 power during this turn.
+
+OPT-1047 added `all: true` to the `LIFE_TO_HAND` and `TRASH_FROM_LIFE` costs: every Life card moves, and the cost needs at least 1 (FAQ: at 0 Life the −5000 does not happen). The Life-to-hand form keeps the Life replacement and one `CARD_REMOVED_FROM_LIFE` per card. The Vivi check is a post-cost condition.
+
+---
+
+### ~~OP18-021 Franky (Leader)~~ — ENCODED
+**Tags:** `STAGE_SYMBOL_COUNTER` · **Ticket:** OPT-1046
+
+> All Stage cards in your hand have a +3000 Counter.
+
+OPT-1046 lets the Counter Step accept a Stage whose effective counter value is above 0, and the board offers it the same way it offers a Character. The Leader carries a `COUNTER_GRANT` of 3000 with `filter: { card_type: "STAGE" }`, beside its [Activate: Main] Stage play.
+
+---
+
+### ~~OP18-063 Kiwi & Mozu~~ — ENCODED
+**Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
+
+> [On Play] You may K.O. 1 of your Stages with a cost of 5 or less: Add up to 1 DON!! card as rested from your DON!! deck.
+
+OPT-1050 added the `KO_OWN_STAGE` cost: it K.O.s your Stage (filter `cost_max: 5`), honors "cannot be K.O.'d" protections, and publishes the same `CARD_KO` (`cardType: "STAGE"`) an effect K.O. does, marked as a cost movement.
+
+---
+
+### ~~OP18-066 Zambai~~ — ENCODED
+**Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
+
+> [Activate: Main] You may K.O. 1 of your Stages with a cost of 5 or less: This Character gains [Rush] during this turn.
+
+Encoded with `KO_OWN_STAGE` (see OP18-063).
+
+---
+
+### ~~OP18-072 The Franky Family~~ — ENCODED
+**Tags:** `KO_OWN_STAGE_COST` · **Ticket:** OPT-1050
+
+> [Activate: Main] [Once Per Turn] You may K.O. 1 of your Stages with a cost of 5 or less: If this Character was played on this turn, give up to 1 of your opponent's Characters −3000 power during this turn.
+
+Encoded with `KO_OWN_STAGE` and a post-cost `WAS_PLAYED_THIS_TURN` gate, beside [Blocker].
+
+---
+
+### ~~OP18-080 Van Augur~~ — ENCODED
+**Tags:** `EFFECT_SOURCE_NAME_FILTER` · **Ticket:** OPT-1052
+
+> [Your Turn] [Once Per Turn] When a card is trashed from your hand by your [Marshall.D.Teach] Leader's effect, if you have no other [Van Augur], draw 1 card.
+
+OPT-1052 added `name` and `card_type` to the `CARD_TRASHED_FROM_HAND` `effect_source` filter. The name honors aliases and the all-names Leader rule, as target filters do. The watcher uses `turn_restriction: "YOUR_TURN"`, once per turn, and `not CARD_ON_FIELD { name: "Van Augur" } exclude_self`, beside the [On K.O.] draw.
+
+---
+
+### ~~OP18-085 Cerberus~~ — ENCODED
+**Tags:** `SELF_RETURN_COST` · **Ticket:** OPT-1051
+
+> [Activate: Main] You may return this Character to the owner's hand: Up to 1 of your [Saint Shamrock] Characters gains [Rush], [Banish] or [Unblockable] during this turn.
+
+OPT-1051 added the `RETURN_SELF_TO_HAND` cost, fixed to the source Character like `PLACE_SELF_TO_DECK`. OP02-035, OP07-047, OP08-041, P-074 and P-081 moved to it from `RETURN_OWN_CHARACTER_TO_HAND`, which had let any of your Characters pay.
+
+---
+
+### ~~OP18-105 Spandam~~ — ENCODED
+**Tags:** `ACTIVATE_REVEALED_TRIGGER` · **Ticket:** OPT-1049
+
+> [Trigger] If your Leader's type includes "CP", reveal up to 1 card with a type including "CP" other than [Spandam] from your hand. Activate the [Trigger] effect of the revealed card.
+
+OPT-1049 added `source_ref` to `REUSE_EFFECT`: the reused block belongs to the one card in that result ref, here the revealed hand card, which becomes the block's source. The FAQ returns the revealed card to hand and trashes this Spandam. Returning to hand is the default only: a revealed [Trigger] that moves its own card, such as OP17-071 "Play this card", resolves as printed (Cory ruling, 2026-11-21). The OPT-590 exemption in `trigger-schema-coverage.ts` is gone.
+
+---
+
+### ~~OP18-117 Buster Call~~ — ENCODED
+**Tags:** `ALL_LIFE_COST`, `MULTI_ZONE_BATCH_PLAY` · **Tickets:** OPT-1047, OPT-1048
+
+> [Main] You may trash all of your Life cards: If your Leader is [Spandam], trash all Characters and play up to a total of 5 {Vice Admiral} type Character cards with different card names from your deck or trash. Then, shuffle your deck.
+
+The cost is `TRASH_FROM_LIFE` with `all: true` (OPT-1047; FAQ: at 0 Life nothing happens and the card is trashed). OPT-1048 authors the play as one `CHARACTER_CARD` selection with `source_zone: ["DECK", "TRASH"]`, `count: { up_to: 5 }` and `unique_names: true`, so the total and the name check span both zones. "Trash all Characters" is `TRASH_CARD` on both players' Characters before the play, and `SHUFFLE_DECK` follows.
+
+---
+
 ### Low-Confidence Encodings
 
 The current detector reports 51 findings across 50 unique cards. It is
@@ -448,9 +537,10 @@ ST33-004's other detector findings are in
 
 | Category | Current inventory | Open / deferred | Playable exclusions |
 |---|---:|---:|---:|
-| Historical card entries in this document | 39 cards | 0 | 0 |
+| Historical card entries in this document | 48 cards | 0 | 0 |
 | OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
 | Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
 | Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
 | EB-05 / ST-33 partial encodings (2026-11-08) | 0 cards | 0 | 0 |
+| OP-18 partial or unauthored cards (2026-11-20) | 0 cards | 0 | 0 |
 | **Tracked cards still needing disposition** | — | **0** | **0** |

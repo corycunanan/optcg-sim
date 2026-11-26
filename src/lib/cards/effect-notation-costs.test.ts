@@ -133,6 +133,8 @@ const UNPRICED_COLON_PHRASES = [
   "Your opponent chooses one",
   "Draw 1 card, then choose one",
   "Apply each of the following effects based on the number of cards in your trash",
+  // OP18-004 Karoo: a header for power-threshold keywords, not a cost.
+  "Apply each of the following effects based on this Character's power",
   "If the number of DON!! cards on your field is equal to or less than the number on your opponent's field, choose one",
   "If your Leader is [Lucy], choose one",
   "If your Leader is [Uta], choose one",

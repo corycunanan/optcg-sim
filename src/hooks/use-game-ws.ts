@@ -9,6 +9,7 @@ import type {
 } from "@shared/game-types";
 import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
 import { GameServerMessageSchema } from "@/lib/validators/realtime";
+import { withPromptId } from "@/lib/game/prompt-response";
 import { toast } from "sonner";
 
 export interface ActionRejection {
@@ -21,15 +22,6 @@ export interface AcceptedGameUpdate {
   action?: GameAction;
   sequence: number;
 }
-
-const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
-  "ARRANGE_TOP_CARDS",
-  "PLAYER_CHOICE",
-  "REDISTRIBUTE_DON",
-  "REVEAL_TRIGGER",
-  "SELECT_TARGET",
-  "PASS",
-]);
 
 /**
  * A prompt-less `game:state` is a full snapshot, so it normally ends any held
@@ -347,10 +339,7 @@ export function useGameWs(
   const sendAction = useCallback(
     (action: GameAction) => {
       const promptId = activePromptIdRef.current;
-      const identifiedAction =
-        promptId && PROMPT_RESPONSE_TYPES.has(action.type)
-          ? { ...action, promptId }
-          : action;
+      const identifiedAction = withPromptId(action, promptId);
       send({ type: "game:action", action: identifiedAction });
       // Keep the last rejection visible while this attempt is pending. The
       // next accepted state update clears it; another rejection supersedes it.

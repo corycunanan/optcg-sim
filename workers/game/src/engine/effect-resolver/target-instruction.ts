@@ -84,8 +84,11 @@ export const TARGET_ACTION_PRESENTATION: Partial<
   },
   PLAY_CARD: {
     verb: () => "Play",
+    // A PLAY_CARD on SELF plays the source card, so it reads as PLAY_SELF does.
     title: (action) =>
-      cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
+      (action as { target?: Target }).target?.type === "SELF"
+        ? "Play This Card"
+        : cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
   },
   PLAY_SELF: { title: () => "Play This Card" },
   PLAY_FROM_LIFE: {
@@ -228,9 +231,22 @@ function renderSignedTitle(
 
 type CardKind = "CHARACTER" | "STAGE";
 
+/**
+ * Target types that can only ever name Characters (or Stages). BATTLE_TARGET
+ * is the opponent's Character this card battled with (OPT-797), and the
+ * ALL_* types sweep only Characters.
+ */
+const CHARACTER_TARGET_TYPES = new Set([
+  "CHARACTER",
+  "CHARACTER_CARD",
+  "ALL_YOUR_CHARACTERS",
+  "ALL_OPPONENT_CHARACTERS",
+  "BATTLE_TARGET",
+]);
+
 function kindOfTypeName(name: string): CardKind | undefined {
   const upper = name.toUpperCase();
-  if (upper === "CHARACTER" || upper === "CHARACTER_CARD") return "CHARACTER";
+  if (CHARACTER_TARGET_TYPES.has(upper)) return "CHARACTER";
   if (upper === "STAGE" || upper === "STAGE_CARD") return "STAGE";
   return undefined;
 }

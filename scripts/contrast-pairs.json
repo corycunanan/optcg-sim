@@ -373,6 +373,12 @@
       "minimum": 4.5
     },
     {
+      "name": "effect-notation-label/trait",
+      "foreground": "--effect-trait-fg",
+      "background": "--effect-trait",
+      "minimum": 4.5
+    },
+    {
       "name": "effect-notation-keyline/timing",
       "foreground": "--effect-notation-edge",
       "background": "--effect-timing",

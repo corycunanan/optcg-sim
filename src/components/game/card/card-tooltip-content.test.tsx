@@ -453,7 +453,8 @@ describe("CardTooltipContent modified stats", () => {
     });
 
     expect(markup).toContain("Counter");
-    expect(markup).toContain("+2000");
+    expect(markup).toContain(">2,000</span>");
+    expect(markup).not.toContain("+2");
   });
 
   it("shows canonical effective power without a matching client effect", () => {
@@ -543,8 +544,8 @@ describe("CardTooltipContent attached DON detail", () => {
       },
     });
 
-    expect(markup).toContain("Attached DON");
-    expect(markup).toContain(">2</span>");
+    expect(markup).toContain("DON!! ×2");
+    expect(markup).not.toContain("Attached DON");
   });
 
   it("uses the displayed preview count while DON redistribution is pending", () => {
@@ -553,8 +554,7 @@ describe("CardTooltipContent attached DON detail", () => {
       attachedDonCount: 1,
     });
 
-    expect(markup).toContain("Attached DON");
-    expect(markup).toContain(">1</span>");
+    expect(markup).toContain("DON!! ×1");
   });
 });
 
@@ -584,21 +584,30 @@ describe("CardTooltip surface contract", () => {
     return content.props;
   }
 
-  it("keeps the instant, right-side placement contract", () => {
-    expect(tooltipTree().props.delayDuration).toBe(0);
+  it("keeps the short-delay, right-side placement contract", () => {
+    expect(tooltipTree().props.delayDuration).toBe(150);
     expect(tooltipContentProps().side).toBe("right");
     expect(tooltipContentProps().sideOffset).toBe(8);
   });
 
-  it("paints the Tier-5 information surface on board tokens", () => {
-    const props = tooltipContentProps();
-    const className = String(props.className);
+  it("keeps the content frame transparent so badges can sit outside the surface", () => {
+    const className = String(tooltipContentProps().className);
 
-    expect(props["data-tier5-surface"]).toBe(true);
+    expect(className).toContain("bg-transparent");
+    expect(className).toContain("border-0");
+    expect(className).toContain("p-0");
+    expect(className).toContain("shadow-none");
+  });
+
+  it("paints the Tier-5 information surface on board tokens", () => {
+    const markup = renderTooltip();
+    const surface = markup.match(/<div data-tier5-surface="true" class="([^"]*)"/);
+    if (!surface) throw new Error("Tier-5 surface not found");
+    const className = surface[1];
+
     expect(className).toContain("bg-gb-surface-info");
     expect(className).toContain("gb-edge-info");
-    expect(className).toContain("rounded-none");
-    expect(className).toContain("shadow-none");
+    expect(className).not.toContain("rounded");
     // No transparency, no blur, no glow, and no app-side tokens.
     expect(className).not.toContain("backdrop");
     expect(className).not.toContain("/");
@@ -613,5 +622,76 @@ describe("CardTooltip surface contract", () => {
         </CardTooltip>
       )
     ).toBe("<span>trigger</span>");
+  });
+});
+
+describe("CardTooltipContent database-style layout", () => {
+  it("sets type, ID, then one combined color badge above the surface", () => {
+    const markup = renderTooltip({
+      cardData: { ...data, color: ["Red", "Blue"] },
+    });
+    const surfaceAt = markup.indexOf("data-tier5-surface");
+    const typeAt = markup.indexOf(">Character</span>");
+    const idAt = markup.indexOf(">OP01-001</span>");
+    const colorAt = markup.indexOf(">Red/Blue</span>");
+
+    expect(typeAt).toBeGreaterThan(-1);
+    expect(typeAt).toBeLessThan(idAt);
+    expect(idAt).toBeLessThan(colorAt);
+    expect(colorAt).toBeLessThan(surfaceAt);
+    expect(markup.match(/>Red\/Blue<\/span>/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="Red/Blue card color"');
+  });
+
+  it("shows attributes and traits as matching badges under the name", () => {
+    const markup = renderTooltip({
+      cardData: { ...data, attribute: ["Wisdom"], types: ["Alabasta"] },
+    });
+
+    for (const label of ["Wisdom", "Alabasta"]) {
+      const badge = markup.match(
+        new RegExp(`<span[^>]*class="([^"]*)"[^>]*>${label}</span>`)
+      );
+      expect(badge?.[1]).toContain("bg-effect-trait");
+      expect(badge?.[1]).toContain("border-effect-trait-edge");
+    }
+  });
+
+  it("renders effect text through the card database chips", () => {
+    const markup = renderTooltip({
+      cardData: {
+        ...data,
+        effectText: "[On Play] Play up to 1 {Mary Geoise} type Stage card.",
+        effectSchema: null,
+      },
+    });
+
+    expect(markup).toContain('data-effect-notation="timing"');
+    expect(markup).toContain('data-effect-trait="Mary Geoise"');
+    expect(markup).not.toContain("{Mary Geoise}");
+  });
+
+  it("nests the Trigger effect in its own box after the main effects", () => {
+    const markup = renderTooltip({
+      cardData: {
+        ...data,
+        triggerText: "[Trigger] Activate this card's [Main] effect.",
+      },
+    });
+    const box = markup.match(/<div data-trigger-effect="true" class="([^"]*)">(.*?)<\/div>/);
+
+    expect(box?.[1]).toContain("bg-gb-surface-nested");
+    expect(box?.[2]).toContain('data-effect-notation="trigger"');
+    expect(markup.indexOf("Trailing paragraph.")).toBeLessThan(
+      markup.indexOf("data-trigger-effect")
+    );
+  });
+
+  it("leads a modified value with its chevron pair", () => {
+    const markup = renderTooltip({
+      cardInstance: { ...card, effectivePower: 2000, powerDelta: 1000 },
+    });
+
+    expect(markup).toMatch(/data-chevron-pair="up"[^]*?<\/svg><span>2,000<\/span>/);
   });
 });

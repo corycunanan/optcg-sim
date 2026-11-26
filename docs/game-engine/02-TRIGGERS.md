@@ -151,7 +151,7 @@ type CustomEventType =
 interface EventFilter {
   controller?: Controller;
   cause?: EventCause;
-  effect_source?: { controller?: Controller; traits?: string[] };
+  effect_source?: { controller?: Controller; traits?: string[]; name?: string; card_type?: "LEADER" | "CHARACTER" | "STAGE" | "EVENT" }; // name/card_type: OPT-1052
   target_filter?: TargetFilter;
   source_zone?: Zone;
   includes_trigger_keyword?: boolean;
@@ -1022,7 +1022,7 @@ interface ReuseEffectAction {
 }
 ```
 
-The `target_effect` field names the EffectBlock to activate, either by its block `id` or by a trigger keyword the block carries. A keyword nested in an `any_of` compound counts, so `MAIN_EVENT` finds a `[Main]/[Counter]` block (OPT-913). The value must resolve to exactly one other block on the same card; schema validation (`pnpm schema:check`) rejects zero matches, several matches, or the block that contains the `REUSE_EFFECT`. There is no keyword alias: a `[Counter]` Event's block is `COUNTER_EVENT`, never `COUNTER`. The lookup lives in `findReuseTargetBlocks` (`workers/game/src/engine/trigger-keywords.ts`).
+The `target_effect` field names the EffectBlock to activate, either by its block `id` or by a trigger keyword the block carries. A keyword nested in an `any_of` compound counts, so `MAIN_EVENT` finds a `[Main]/[Counter]` block (OPT-913). The value must resolve to exactly one other block on the same card; schema validation (`pnpm schema:check`) rejects zero matches, several matches, or the block that contains the `REUSE_EFFECT`. There is no keyword alias: a `[Counter]` Event's block is `COUNTER_EVENT`, never `COUNTER`. The lookup lives in `findReuseTargetBlocks` (`workers/game/src/engine/trigger-keywords.ts`). The one exception is `params.source_ref` (OPT-1049): the block then belongs to the card in that result ref, such as the hand card OP18-105 Spandam reveals, and is looked up at runtime.
 
 ### Observed Patterns
 

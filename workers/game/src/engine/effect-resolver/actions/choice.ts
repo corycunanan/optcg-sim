@@ -1,3 +1,4 @@
+import { promptAutoResolvedEvent } from "../../auto-resolved.js";
 import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
 import { REPLACED_CARD_REF } from "../../effect-types.js";
 /**
@@ -202,6 +203,22 @@ export function executeChooseValue(
     return { state, events: [], succeeded: false };
   }
 
+  // One legal value is no choice: record it as if chosen, the same result
+  // the resume handler stores (handleChooseValue), and continue in place.
+  if (values.length === 1 && action.result_ref) {
+    return {
+      state,
+      events: [promptAutoResolvedEvent(
+        state,
+        controller,
+        `Chose ${values[0]}, the only legal value`,
+        sourceCardInstanceId,
+      )],
+      succeeded: true,
+      result: { targetInstanceIds: [], count: 1, value: values[0] },
+    };
+  }
+
   const validTargets = values.map((value) => `choose-value:${value}`);
   const pendingPrompt: PendingPromptState = {
     options: {
@@ -274,7 +291,15 @@ export function executeReuseEffect(
   const events: PendingEvent[] = [];
   const params = getActionParams(action, "REUSE_EFFECT");
   const targetEffect = params.target_effect;
-  const card = findCardInstance(state, sourceCardInstanceId);
+  // OPT-1049: with source_ref the reused block belongs to the one card in that
+  // result (OP18-105 Spandam's revealed hand card), which becomes its source.
+  let reusedSourceId = sourceCardInstanceId;
+  if (params.source_ref !== undefined) {
+    const refIds = _resultRefs.get(params.source_ref)?.targetInstanceIds ?? [];
+    if (refIds.length !== 1) return { state, events, succeeded: false };
+    reusedSourceId = refIds[0];
+  }
+  const card = findCardInstance(state, reusedSourceId);
   if (!card) return { state, events, succeeded: false };
 
   const data = cardDb.get(card.cardId);
@@ -288,6 +313,9 @@ export function executeReuseEffect(
   const matches = findReuseTargetBlocks(schema.effects, targetEffect);
   if (matches.length !== 1) return { state, events, succeeded: false };
   const targetBlock = matches[0];
+  // OP18-105 (Cory ruling 2026-11-21): the revealed card goes back to hand by
+  // default, but a reused block that moves it ("Play this card", trash it,
+  // add it to Life) overrides that, so the block resolves as printed.
 
   // OP16-103 Van Augur FAQ: the reused block's turn_restriction still applies —
   // reusing an OPPONENT_TURN-only [On K.O.] during your own turn does nothing.
@@ -303,7 +331,7 @@ export function executeReuseEffect(
     if (restriction === "OPPONENT_TURN" && isOwnersTurn) return { state, events, succeeded: false };
   }
 
-  const resolveResult = services.resolveEffect(state, targetBlock, sourceCardInstanceId, controller, cardDb);
+  const resolveResult = services.resolveEffect(state, targetBlock, reusedSourceId, controller, cardDb);
   return {
     state: resolveResult.state,
     events: [...events, ...resolveResult.events],
@@ -313,3 +341,4 @@ export function executeReuseEffect(
       : {}),
   };
 }
+

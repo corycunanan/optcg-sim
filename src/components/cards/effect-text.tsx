@@ -1,3 +1,4 @@
+import type React from "react";
 import { cn } from "@/lib/utils";
 import {
   parseEffectText,
@@ -31,7 +32,8 @@ import {
  * Spacing between a chip and its neighboring words comes from the source text's
  * own interior spacing (carried through by the parser and preserved by
  * `whitespace-pre-wrap`) plus the chip's internal padding — the chips carry no
- * margins, so nothing shifts when a paragraph rewraps at a different width.
+ * margins (traits aside: see TRAIT_CHIP), so nothing shifts when a paragraph
+ * rewraps at a different width.
  */
 
 /**
@@ -95,16 +97,18 @@ const KEYWORD_CHIP_FILL = cn(
 
 /**
  * Traits are content, not notation — they are the subject of the sentence they
- * sit in — so they keep the paragraph's reading size and take the quietest
- * material in the chip ladder: a soft raised fill, no keyline, secondary text.
- * Their 4px padding — which the rectangular notation chips now share, since
- * OPT-674 brought those down to the same step — is what lets a trait read as
- * one of the sentence's words; the source text already puts a space on either
- * side of it.
+ * sit in — so they keep the paragraph's reading size and stay neutral: a
+ * hairline edge and white lettering on a fill one step above the surface
+ * (`--effect-trait`, which the board's card tooltip re-points at its own
+ * neutral fill). The card tooltip's header badges for traits and attributes
+ * share this material, so a trait reads the same in a sentence and in a
+ * header. 4px of padding keeps the chip reading as one of the sentence's
+ * words, and 4px of margin on each side keeps the edge from sitting flush
+ * against the neighbouring words once the hairline is drawn.
  */
 const TRAIT_CHIP = cn(
   CHIP_BASE,
-  "rounded bg-surface-2 px-1 text-sm font-medium text-content-secondary"
+  "mx-1 rounded border border-effect-trait-edge bg-effect-trait px-1 text-sm font-medium text-effect-trait-fg"
 );
 
 /**
@@ -120,7 +124,7 @@ const TRAIT_CHIP = cn(
  */
 const COST = "font-semibold";
 
-function renderSegments(segments: EffectSegment[]) {
+function renderSegments(segments: EffectSegment[]): React.ReactNode[] {
   return segments.map((segment, index) => {
     if (segment.kind === "text") {
       return <span key={index}>{segment.text}</span>;
@@ -176,6 +180,16 @@ function renderSegments(segments: EffectSegment[]) {
       </span>
     );
   });
+}
+
+/**
+ * One already-parsed line of effect text, rendered with the same chips as
+ * `EffectText`. Surfaces that own their own paragraph structure (the board's
+ * card tooltip greys and annotates each clause separately) render each line
+ * through this so the chips cannot drift from the card database.
+ */
+export function EffectSegments({ segments }: { segments: EffectSegment[] }) {
+  return <>{renderSegments(segments)}</>;
 }
 
 export function EffectText({

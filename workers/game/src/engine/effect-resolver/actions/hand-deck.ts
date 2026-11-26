@@ -470,6 +470,8 @@ export function executeSearchAndPlay(
       restDestination: restDest,
       validTargets,
       maxKeep: getSearchAndPlayPickLimit(sap, validTargets.length),
+      // Unpicked cards rejoin a searched deck or are shuffled: no order kept.
+      ...(searchFullDeck || shuffleAfter ? { restOrderMatters: false } : {}),
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

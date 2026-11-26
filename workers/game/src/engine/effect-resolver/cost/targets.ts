@@ -47,6 +47,14 @@ export function resolveAmount(cost: SimpleCost, fallback = 1): number {
 }
 
 /**
+ * OPT-1047: the Life cards a Life cost moves. An "all" cost moves the whole
+ * Life area, and needs at least 1 card (qa_op18.md OP18-020, OP18-117).
+ */
+export function lifeCostAmount(cost: SimpleCost & { type: "LIFE_TO_HAND" | "TRASH_FROM_LIFE" }, lifeCount: number): number {
+  return cost.all ? Math.max(lifeCount, 1) : resolveAmount(cost);
+}
+
+/**
  * Number of cards the player selects to pay a selection cost. For most costs
  * this is the printed amount; a GIVE_DON cost's amount counts DON!!, while the
  * player selects exactly one recipient (OPT-824).
@@ -193,10 +201,12 @@ const COST_MOVEMENT: Partial<Record<Cost["type"], RemovalAction>> = {
   TRASH_NAMED_CARD_FROM_HAND_OR_STAGE: "TRASH",
   TRASH_SELF: "TRASH",
   PLACE_SELF_TO_DECK: "RETURN_TO_DECK",
+  RETURN_SELF_TO_HAND: "RETURN_TO_HAND",
   PLACE_SELF_AND_TRASH_TO_DECK: "RETURN_TO_DECK",
   PLACE_SELF_AND_HAND_TO_DECK: "RETURN_TO_DECK",
   PLACE_STAGE_TO_DECK: "RETURN_TO_DECK",
   TRASH_OWN_STAGE: "TRASH",
+  KO_OWN_STAGE: "KO",
 };
 
 /**
@@ -220,6 +230,7 @@ export function isFixedCostMovementProhibited(
   switch (cost.type) {
     case "TRASH_SELF":
     case "PLACE_SELF_TO_DECK":
+    case "RETURN_SELF_TO_HAND":
     case "PLACE_SELF_AND_TRASH_TO_DECK":
     case "PLACE_SELF_AND_HAND_TO_DECK":
       fixedId = sourceCardInstanceId;
@@ -231,6 +242,7 @@ export function isFixedCostMovementProhibited(
       fixedId = state.players[controller].stage?.instanceId;
       break;
     case "TRASH_OWN_STAGE":
+    case "KO_OWN_STAGE":
       fixedId = state.players[controller].stage?.instanceId;
       break;
     default:

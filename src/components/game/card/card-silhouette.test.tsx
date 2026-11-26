@@ -75,10 +75,10 @@ describe("board card silhouette (OPT-720)", () => {
       name.includes("rounded-card"),
     );
 
-    // Wrapper + state-rotation + breathing + interaction + front + back +
+    // Wrapper + state-rotation + interaction + front + back +
     // power flash + highlight ring. If a layer is added or removed, this
     // number moves with it — which is the point.
-    expect(silhouette).toHaveLength(8);
+    expect(silhouette).toHaveLength(7);
     expect(classNames.filter((name) => CHROME_RADIUS.test(name))).toEqual([]);
   });
 
@@ -114,6 +114,7 @@ describe("board card silhouette (OPT-720)", () => {
       "eligible",
       "attacker",
       "defender",
+      "defender-selected",
       "counter",
       "winner",
       "redirected",
