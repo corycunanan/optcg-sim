@@ -87,6 +87,9 @@ interface PlayerFieldProps {
   lifeScriedPulseNonce?: number;
   /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
+  /** Field cards whose flight has not landed yet; they stay hidden in their
+   *  slot until it does (OPT-1054). */
+  arrivingInstanceIds?: ReadonlySet<string>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
 }
@@ -126,6 +129,7 @@ function PlayerFieldComponent({
   lifeDamagePulseNonce,
   lifeScriedPulseNonce,
   pileArrivingCounts,
+  arrivingInstanceIds,
   targetSelectionById,
   onTargetToggle,
 }: PlayerFieldProps) {
@@ -291,6 +295,7 @@ function PlayerFieldComponent({
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
             entering={arrivals.has(char.instanceId)}
+            arrivalPending={arrivingInstanceIds?.has(char.instanceId)}
             style={{ position: "absolute", left: pos.left, top: playerCharTop }}
           />
         );
@@ -349,6 +354,7 @@ function PlayerFieldComponent({
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
           donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
           entering={arrivals.has(me.leader.instanceId)}
+          arrivalPending={arrivingInstanceIds?.has(me.leader.instanceId)}
         />
       ) : (
         <EmptySlot
@@ -374,6 +380,9 @@ function PlayerFieldComponent({
         }}
         onAction={onAction}
         zoneKey={zoneKey("stage")}
+        arrivalPending={
+          me?.stage ? arrivingInstanceIds?.has(me.stage.instanceId) : false
+        }
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.18 : undefined}
       />

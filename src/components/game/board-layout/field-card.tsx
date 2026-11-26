@@ -78,6 +78,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   pendingTransferDonIds,
   donCountAdjust,
   entering,
+  arrivalPending,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -128,6 +129,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
    *  (PlayerField) only sets this for instanceIds that weren't in the
    *  previous render, so the effect doesn't fire on page-level rehydrates. */
   entering?: boolean;
+  /** True while this card's flight is still flipping at its source or in
+   *  the air (OPT-1054). The card stays hidden in its slot until the ghost
+   *  lands on it, so it is never seen twice. */
+  arrivalPending?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const descriptionId = useId();
@@ -485,7 +490,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
               tooltipNotice: targetSelection?.disabledReason ?? undefined,
             }}
             motionDelay={animationDelay}
-            className="relative z-[1]"
+            className={cn("relative z-[1]", arrivalPending && "invisible")}
           />
           {canRedistribute && (
             <div
@@ -547,6 +552,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   animationDelay,
   donCountAdjust,
   entering,
+  arrivalPending,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -571,6 +577,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   donCountAdjust?: number;
   /** Entry pop on first render (OPT-274). See PlayerFieldCard. */
   entering?: boolean;
+  /** Hidden until its flight lands (OPT-1054). See PlayerFieldCard. */
+  arrivalPending?: boolean;
 }) {
   const zonePos = useZonePosition();
   const descriptionId = useId();
@@ -717,7 +725,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
           tooltipNotice: targetSelection?.disabledReason ?? undefined,
         }}
         motionDelay={animationDelay}
-        className="relative z-[1]"
+        className={cn("relative z-[1]", arrivalPending && "invisible")}
       />
       {disabledReason && (
         <span id={descriptionId} className="sr-only">
