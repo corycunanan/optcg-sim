@@ -88,6 +88,8 @@ interface PlayerFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
+  /** OPT-1055: restarts the deck riffle when this player's deck shuffles. */
+  deckShuffleNonce?: number;
   /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   /** Field cards whose flight has not landed yet; they stay hidden in their
@@ -132,6 +134,7 @@ function PlayerFieldComponent({
   lifeTriggerPulse,
   lifeDamagePulseNonce,
   lifeScriedPulseNonce,
+  deckShuffleNonce,
   pileArrivingCounts,
   arrivingInstanceIds,
   targetSelectionById,
@@ -399,6 +402,7 @@ function PlayerFieldComponent({
         cardDb={cardDb}
         sleeveUrl={me?.sleeveUrl}
         zoneKey={zoneKey("deck")}
+        shuffleNonce={deckShuffleNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

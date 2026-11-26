@@ -60,6 +60,7 @@ import {
 import { useEffectsNegatedPulse } from "@/hooks/use-effects-negated-pulse";
 import { useAttackRedirectedPulse } from "@/hooks/use-attack-redirected-pulse";
 import { useLifeScriedPulse } from "@/hooks/use-life-scried-pulse";
+import { useDeckShuffledPulse } from "@/hooks/use-deck-shuffled-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type {
   AcceptedGameUpdate,
@@ -312,6 +313,7 @@ function BoardLayoutInner({
   const effectsNegatedPulses = useEffectsNegatedPulse(eventLog);
   const attackRedirectedPulses = useAttackRedirectedPulse(eventLog);
   const lifeScriedPulses = useLifeScriedPulse(eventLog);
+  const deckShuffledPulses = useDeckShuffledPulse(eventLog);
   const fieldPulseProps = useMemo(
     () =>
       reducedMotion
@@ -346,6 +348,8 @@ function BoardLayoutInner({
   const opponentLifeDamagePulseNonce = lifeDamagePulseNonces.get(topPlayerIndex);
   const playerLifeScriedPulseNonce = lifeScriedPulses.get(bottomPlayerIndex);
   const opponentLifeScriedPulseNonce = lifeScriedPulses.get(topPlayerIndex);
+  const playerDeckShuffleNonce = deckShuffledPulses.get(bottomPlayerIndex);
+  const opponentDeckShuffleNonce = deckShuffledPulses.get(topPlayerIndex);
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -515,6 +519,7 @@ function BoardLayoutInner({
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
+            deckShuffleNonce={opponentDeckShuffleNonce}
             donCountAdjustments={mergedDonCountAdjustments}
             pileArrivingCounts={pileArrivingCounts}
             arrivingInstanceIds={fieldArrivingIds}
@@ -623,6 +628,7 @@ function BoardLayoutInner({
             lifeTriggerPulse={playerLifeTriggerPulse}
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             lifeScriedPulseNonce={playerLifeScriedPulseNonce}
+            deckShuffleNonce={playerDeckShuffleNonce}
             pileArrivingCounts={pileArrivingCounts}
             arrivingInstanceIds={fieldArrivingIds}
             targetSelectionById={modalRouting.targetSelection.model?.byId}

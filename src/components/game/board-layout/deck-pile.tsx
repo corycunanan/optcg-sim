@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { CardDb } from "@shared/game-types";
 import { Card } from "../card";
+import { DeckRiffle } from "../deck-riffle";
 import { getBoardZoneLabel } from "./accessibility";
 import { PileReceipt } from "./pile-receipt";
 import { ZoneRef } from "./zone-ref";
@@ -13,6 +14,7 @@ export function DeckPile({
   cardDb,
   sleeveUrl,
   zoneKey,
+  shuffleNonce,
   style,
   onClick,
 }: {
@@ -21,6 +23,8 @@ export function DeckPile({
   cardDb: CardDb;
   sleeveUrl?: string | null;
   zoneKey: string;
+  /** OPT-1055: each new value riffles the pile in place. */
+  shuffleNonce?: number;
   style: CSSProperties;
   onClick?: () => void;
 }) {
@@ -38,16 +42,28 @@ export function DeckPile({
       )}
     >
       <PileReceipt visibleCount={visibleCount}>
-        <Card
-          variant="trash"
-          data={{ cardDb }}
-          faceDown
-          sleeveUrl={sleeveUrl}
-          overlays={{ countBadge: visibleCount, label: "DECK" }}
-          interaction={{ clickable: !!onClick }}
-          onClick={onClick}
-          ariaLabel={`Inspect deck, ${visibleCount} cards`}
-        />
+        <DeckRiffle
+          nonce={shuffleNonce}
+          slice={
+            <Card
+              variant="trash"
+              data={{ cardDb }}
+              faceDown
+              sleeveUrl={sleeveUrl}
+            />
+          }
+        >
+          <Card
+            variant="trash"
+            data={{ cardDb }}
+            faceDown
+            sleeveUrl={sleeveUrl}
+            overlays={{ countBadge: visibleCount, label: "DECK" }}
+            interaction={{ clickable: !!onClick }}
+            onClick={onClick}
+            ariaLabel={`Inspect deck, ${visibleCount} cards`}
+          />
+        </DeckRiffle>
       </PileReceipt>
     </ZoneRef>
   );

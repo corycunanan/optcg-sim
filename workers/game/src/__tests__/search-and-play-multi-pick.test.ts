@@ -197,5 +197,16 @@ describe("SEARCH_AND_PLAY multi-pick", () => {
     expect(deckIds.has("d2")).toBe(true);
     expect(deckIds.has("d3")).toBe(true);
     expect(deckIds.has("d1")).toBe(false);
+    // OPT-1055: the shuffle is announced after the picks moved.
+    expect(events.at(-1)).toEqual({ type: "DECK_SHUFFLED", playerIndex: 0, payload: {} });
+  });
+
+  it("announces no shuffle when the search does not shuffle (OPT-1055)", () => {
+    const state = setup();
+    const events: PendingEvent[] = [];
+    handleArrangeSearchAndPlay(
+      state, arrange(["d1"], ["d2", "d3"]), pausedAction, 0, cardDb, events, ["d1", "d2", "d3"],
+    );
+    expect(events.some((event) => event.type === "DECK_SHUFFLED")).toBe(false);
   });
 });

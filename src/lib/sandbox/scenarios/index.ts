@@ -19,6 +19,7 @@ import {
   waitingRevealSpotlightScenario,
 } from "./effects/public-reveal-spotlight";
 import { peekTopThreeScenario } from "./draws/peek-top-3";
+import { searchThenShuffleScenario } from "./draws/search-then-shuffle";
 import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
 import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
 import { lifeToHandScenario } from "./life/life-to-hand";
@@ -48,6 +49,7 @@ export const scenarios: Scenario[] = [
   drawTwoScenario,
   drawTwoOneUpdateScenario,
   peekTopThreeScenario,
+  searchThenShuffleScenario,
   playCharacterSummonScenario,
   opponentPlayCharacterScenario,
   opponentPlayThenDrawScenario,

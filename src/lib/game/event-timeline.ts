@@ -1,5 +1,5 @@
 import type { GameEvent, GameEventType } from "@shared/game-types";
-import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel, deckRiffle } from "@/lib/motion";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import { eventToSpotlight } from "@/lib/game/spotlight";
 
@@ -125,6 +125,7 @@ export type BeatKind =
   | "travel"
   | "transform"
   | "pulse"
+  | "shuffle"
   | "refresh";
 
 /** The Refresh Phase ends with REFRESH → DRAW; its wave plays on that beat. */
@@ -146,6 +147,8 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
   }
   if (TRANSFORM_EVENTS.has(event.type)) return "transform";
   if (PULSE_EVENTS.has(event.type)) return "pulse";
+  // OPT-1055: the deck riffles in place; later steps wait for it to square up.
+  if (event.type === "DECK_SHUFFLED") return "shuffle";
   return null;
 }
 
@@ -166,6 +169,8 @@ function leadMsFor(kind: BeatKind): number {
       return FIZZLE_MS;
     case "pulse":
       return PULSE_READ_MS;
+    case "shuffle":
+      return deckRiffle.totalMs;
     case "refresh":
       return REFRESH_READ_MS;
   }

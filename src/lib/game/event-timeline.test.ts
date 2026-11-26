@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@shared/game-types";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
-import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel, deckRiffle } from "@/lib/motion";
 import {
   BEAT_GAP_MS,
   MAX_PLAYBACK_MS,
@@ -259,5 +259,26 @@ describe("buildEventTimeline", () => {
     });
     // Life to hand never flips (its source side is unknown).
     expect(buildEventTimeline([lifeToHand]).durationMs).toBe(FLIGHT_MS);
+  });
+
+  it("gives a deck shuffle its own riffle beat (OPT-1055)", () => {
+    const shuffled = (playerIndex: 0 | 1 = 0) =>
+      at({ type: "DECK_SHUFFLED", playerIndex, payload: {} });
+    expect(classifyEventBeat(shuffled())).toBe("shuffle");
+
+    // A search: the pick travels, then the deck riffles, then the next draw.
+    const pick = drawn();
+    const shuffle = shuffled();
+    const after = played();
+    const timeline = buildEventTimeline([pick, shuffle, after]);
+    const shuffleStart = TRAVEL_MS + BEAT_GAP_MS;
+    expect(eventOffsetMs(timeline, shuffle)).toBe(shuffleStart);
+    expect(eventOffsetMs(timeline, after)).toBe(
+      shuffleStart + deckRiffle.totalMs + BEAT_GAP_MS
+    );
+
+    // Each player's deck riffles as its own step.
+    const both = [shuffled(0), shuffled(1)];
+    expect(buildEventTimeline(both).beatCount).toBe(2);
   });
 });

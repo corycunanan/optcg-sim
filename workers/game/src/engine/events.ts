@@ -137,6 +137,15 @@ export function emitEvent<T extends GameEventType>(
 }
 
 /**
+ * OPT-1055: a player's deck was shuffled. Every engine shuffle of a deck
+ * emits one, after the moves that fed the shuffle, so the board can riffle
+ * the pile. `playerIndex` is the deck's owner; it carries no card data.
+ */
+export function deckShuffledEvent(playerIndex: 0 | 1): PendingEvent {
+  return { type: "DECK_SHUFFLED", playerIndex, payload: {} };
+}
+
+/**
  * Emit a PendingEvent (pre-timestamp event from engine internals).
  * Resolves the correlated-types issue when iterating PendingEvent arrays.
  */
