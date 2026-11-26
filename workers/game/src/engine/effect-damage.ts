@@ -74,6 +74,7 @@ export function moveLifeCardToHand(
     payload: {
       cardId: lifeCard.cardId,
       cardInstanceId: moved.fact.newInstanceId,
+      sourceFace: lifeCard.face,
     },
   });
   events.push({

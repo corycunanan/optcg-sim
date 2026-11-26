@@ -3,7 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lifeDamageImpact } from "@/lib/motion";
 import type { LifeCard } from "@shared/game-types";
-import { LifeZone } from "./life-zone";
+import { LifeZone, nextLifeStack } from "./life-zone";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
 
@@ -219,5 +219,61 @@ describe("LifeZone battle feedback", () => {
     expect(classes).not.toContain("ring-gb-accent-amber");
     expect(classes).not.toContain("ring-gb-accent-red");
     expect(classes).not.toContain("ring-gb-accent-blue");
+  });
+});
+
+describe("Life card turns (OPT-1059)", () => {
+  const empty = { faces: "", cardIds: [], epoch: 0, turningDown: new Map() };
+  const down = (i: number): LifeCard => ({
+    instanceId: `hidden-0-life-${i}`,
+    cardId: "hidden",
+    face: "DOWN",
+  });
+  const up = (id: string): LifeCard => ({ instanceId: id, cardId: id, face: "UP" });
+
+  it("keeps the stack keyed while a card turns over in place", () => {
+    const before = nextLifeStack(empty, [down(0), down(1)]);
+    const after = nextLifeStack(before, [up("OP01-001"), down(1)]);
+    expect(after.epoch).toBe(before.epoch);
+    expect(after.faces).toBe("UD");
+  });
+
+  it("re-keys the stack when the count changes, so shifted cards never flip", () => {
+    const before = nextLifeStack(empty, [up("OP01-001"), down(1)]);
+    const after = nextLifeStack(before, [down(0)]);
+    expect(after.epoch).toBe(before.epoch + 1);
+    expect(after.turningDown.size).toBe(0);
+  });
+
+  it("keeps a card's art while it turns face-down", () => {
+    const before = nextLifeStack(empty, [up("OP01-001"), down(1)]);
+    const after = nextLifeStack(before, [down(0), down(1)]);
+    expect([...after.turningDown]).toEqual([[0, "OP01-001"]]);
+  });
+
+  it("renders the turning card face-down with its art until the flip ends", () => {
+    vi.useFakeTimers();
+    try {
+      renderLifeZone({ life: [up("OP01-001"), down(1)] });
+      act(() => {
+        renderer!.update(
+          <LifeZone
+            life={[down(0), down(1)]}
+            cardDb={{}}
+            zoneKey="p-life"
+            style={{ position: "absolute", left: 0, top: 0 }}
+          />,
+        );
+      });
+      const top = () => renderer!.root.findAllByProps({ variant: "life" })[0];
+      expect(top().props.faceDown).toBe(true);
+      expect(top().props.data.cardId).toBe("OP01-001");
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(top().props.data.cardId).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -27,7 +27,9 @@ const TURN: TurnState = {
 const lifeToHand: GameEvent = {
   type: "CARD_ADDED_TO_HAND_FROM_LIFE",
   playerIndex: 0,
-  payload: { cardId: "OP01-001", cardInstanceId: "p0-life-1" },
+  // The Life card was face-down, so it flips at the Life zone before it
+  // travels (OPT-1059).
+  payload: { cardId: "OP01-001", cardInstanceId: "p0-life-1", sourceFace: "DOWN" },
   timestamp: 1,
 };
 

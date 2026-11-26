@@ -595,6 +595,7 @@ export function resumeBattleDamageFrame(
       payload: {
         cardId: lifeCard.cardId,
         cardInstanceId: moved.fact.newInstanceId,
+        sourceFace: lifeCard.face,
       },
     });
   }

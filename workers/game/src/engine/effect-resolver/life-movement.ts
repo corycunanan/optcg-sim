@@ -15,6 +15,8 @@ export function moveLifeToHand(
   const transitions: {
     fact: ZoneTransitionFact;
     addedToHand: boolean;
+    /** The side the card showed in Life before it moved (OPT-1059). */
+    lifeFace: LifeCard["face"];
   }[] = [];
   let replaced = false;
   for (const card of cards) {
@@ -29,7 +31,11 @@ export function moveLifeToHand(
     if (!moved) continue;
     state = moved.state;
     replaced ||= destination !== "HAND";
-    transitions.push({ fact: moved.fact, addedToHand: destination === "HAND" });
+    transitions.push({
+      fact: moved.fact,
+      addedToHand: destination === "HAND",
+      lifeFace: card.face,
+    });
   }
   return { state, transitions, replaced };
 }

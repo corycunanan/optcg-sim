@@ -311,7 +311,19 @@ function payCostsUnreleased(
         nextState = moved.state;
         costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "mill", from: "DECK" } });
+        events.push({
+          type: "CARD_TRASHED",
+          playerIndex: controller,
+          payload: {
+            count: moved.transitions.length,
+            reason: "mill",
+            from: "DECK",
+            cards: moved.transitions.map(({ fact }) => ({
+              instanceId: fact.newInstanceId,
+              cardId: fact.cardId,
+            })),
+          },
+        });
         break;
       }
 

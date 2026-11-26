@@ -323,11 +323,15 @@ export interface GameEventPayloadMap {
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
   CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; preKO_keywords?: string[]; preKO_negated?: true; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
-  CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
+  /** `cards` lists the cards a count-only deck trash (mill) moved, by their
+   *  new trash instance ids, top card first. Trashed cards are public (OPT-1059). */
+  CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string; cards?: Array<{ instanceId: string; cardId: string }> };
   CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
   /** `face` is the Life face the card entered with; a face-down card from the deck is secret to its owner too (OPT-976). */
   CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string; face?: "UP" | "DOWN" };
-  CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
+  /** `sourceFace` is the side the Life card showed before it left, so the
+   *  client can flip it on the way to the hand (OPT-1059). */
+  CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number; sourceFace?: "UP" | "DOWN" };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
   // OPT-246: emitted at BLOCK_STEP → COUNTER_STEP boundary. Marks the

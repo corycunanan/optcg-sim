@@ -50,24 +50,48 @@ const TRAVEL_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
   "CARD_RETURNED_TO_HAND",
   "CARD_ADDED_TO_HAND_FROM_LIFE",
   "CARD_RETURNED_TO_DECK",
+  "CARD_ADDED_TO_LIFE",
 ]);
 
 /** Travel events whose card may turn over before it leaves (OPT-1054): a
  *  public card crossing between a face-down zone (deck, the opponent's
  *  hand) and a face-up one. Whether it does depends on the viewer's side,
  *  which the timeline does not know, so a public card on one of these
- *  holds its beat for the flip. Life to hand never flips (its source side
- *  is unknown), and redacted cards stay sleeved. */
+ *  holds its beat for the flip. Life takes either side, so Life moves are
+ *  listed too (OPT-1059), and redacted cards stay sleeved. */
 const FLIPPING_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
   new Set<GameEventType>([
     "CARD_PLAYED",
     "CARD_DRAWN",
     "CARD_RETURNED_TO_HAND",
     "CARD_RETURNED_TO_DECK",
+    "CARD_ADDED_TO_HAND_FROM_LIFE",
+    "CARD_ADDED_TO_LIFE",
   ]);
 
+/** A deck trash (mill) that names its cards travels face-up from the deck
+ *  (OPT-1059): one travel beat whose top card flips, `cards.length` wide. */
+export function isNamedDeckTrash(event: GameEvent): boolean {
+  if (event.type !== "CARD_TRASHED") return false;
+  const p = event.payload;
+  return (
+    !p.cardId &&
+    !p.cardInstanceId &&
+    !p.newCardInstanceId &&
+    (p.cards?.length ?? 0) > 0 &&
+    (p.from?.toUpperCase() === "DECK" ||
+      (p.from === undefined &&
+        (p.reason === "mill" || p.reason === "search_trash")))
+  );
+}
+
 function mayFlip(event: GameEvent): boolean {
+  if (isNamedDeckTrash(event)) return true;
   if (!FLIPPING_TRAVEL_EVENTS.has(event.type)) return false;
+  // Life to hand flips only when the event names the Life side (OPT-1059).
+  if (event.type === "CARD_ADDED_TO_HAND_FROM_LIFE" && !event.payload.sourceFace) {
+    return false;
+  }
   const cardId = (event.payload as { cardId?: string | null }).cardId;
   return !!cardId && cardId !== "hidden";
 }
@@ -86,6 +110,8 @@ export function siblingStaggerMs(type: GameEventType): number {
       return cardStagger.drawMs;
     case "CARD_RETURNED_TO_DECK":
     case "LIFE_CARD_TO_DECK":
+    case "CARD_ADDED_TO_LIFE":
+    case "CARD_TRASHED":
       return cardStagger.pileMs;
     default:
       return cardStagger.defaultMs;
@@ -109,6 +135,10 @@ const PULSE_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
   "LIFE_SCRIED",
   "POWER_MODIFIED",
   "TRIGGER_ACTIVATED",
+  // OPT-1059: a Life card turning over plays the shared flip in place.
+  "LIFE_CARD_FACE_CHANGED",
+  "LIFE_CARD_TURNED_FACE_UP",
+  "LIFE_CARD_TURNED_FACE_DOWN",
 ]);
 
 /** Events whose fan-out is internal (count tokens from one event). */
@@ -125,7 +155,11 @@ export type BeatKind = "spotlight" | "travel" | "transform" | "pulse";
 export function classifyEventBeat(event: GameEvent): BeatKind | null {
   if (eventToSpotlight(event)) return "spotlight";
   if (event.type === "EVENT_ACTIVATED_FROM_HAND") return "transform";
-  if (TRAVEL_EVENTS.has(event.type) || COUNTED_TRAVEL_EVENTS.has(event.type)) {
+  if (
+    TRAVEL_EVENTS.has(event.type) ||
+    COUNTED_TRAVEL_EVENTS.has(event.type) ||
+    isNamedDeckTrash(event)
+  ) {
     return "travel";
   }
   if (TRANSFORM_EVENTS.has(event.type)) return "transform";
@@ -136,6 +170,9 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
 function countedFanOut(event: GameEvent): number {
   if (event.type === "DON_GIVEN_TO_CARD" || event.type === "LIFE_CARD_TO_DECK") {
     return Math.max(1, event.payload.count ?? 1);
+  }
+  if (event.type === "CARD_TRASHED" && isNamedDeckTrash(event)) {
+    return event.payload.cards?.length ?? 1;
   }
   return 1;
 }

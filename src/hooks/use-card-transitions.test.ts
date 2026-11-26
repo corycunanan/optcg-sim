@@ -725,3 +725,196 @@ describe("eventToTransitions — card sides (OPT-1054)", () => {
     expect(eventToTransitions(ev("DOWN"), 0, lifeRegistry)[0].sourceFaceDown).toBe(true);
   });
 });
+
+describe("eventToTransitions — Life, mill and bounce moves (OPT-1059)", () => {
+  const registry = mkRegistry({
+    getCardZone: (id) =>
+      id === "field-1" ? "p-char-1" : id === "opp-field-1" ? "o-char-4" : null,
+  });
+
+  it("flips a face-down Life card on its way to the owner's hand", () => {
+    const ev = {
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-001", cardInstanceId: "h-9", sourceFace: "DOWN" },
+    } as unknown as GameEvent;
+    const hands = receivedHandsByPlayerIndex([handCard("h-9", "OP01-001", 0)], [], 0);
+    const [t] = eventToTransitions(ev, 0, registry, null, hands);
+    expect(t.fromZoneKey).toBe("p-life");
+    expect(t.sourceFaceDown).toBe(true);
+    expect(t.destinationFaceDown).toBe(false);
+  });
+
+  it("moves a face-up Life card to hand without a flip", () => {
+    const ev = {
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-001", cardInstanceId: "h-9", sourceFace: "UP" },
+    } as unknown as GameEvent;
+    const hands = receivedHandsByPlayerIndex([handCard("h-9", "OP01-001", 0)], [], 0);
+    const [t] = eventToTransitions(ev, 0, registry, null, hands);
+    expect(t.sourceFaceDown).toBe(false);
+    expect(t.destinationFaceDown).toBe(false);
+  });
+
+  it("plans no flip for a Life-to-hand event without a face", () => {
+    const ev = {
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-001", cardInstanceId: "h-9" },
+    } as unknown as GameEvent;
+    const hands = receivedHandsByPlayerIndex([handCard("h-9", "OP01-001", 0)], [], 0);
+    const [t] = eventToTransitions(ev, 0, registry, null, hands);
+    expect(t.sourceFaceDown).toBe(t.destinationFaceDown);
+  });
+
+  it("sends a field card to the top of Life on the side the event names", () => {
+    const ev = (face: "UP" | "DOWN") =>
+      ({
+        type: "CARD_ADDED_TO_LIFE",
+        playerIndex: 0,
+        timestamp: 1,
+        payload: {
+          cardId: "OP01-010",
+          cardInstanceId: "field-1",
+          newCardInstanceId: "life-7",
+          sourceZone: "CHARACTER",
+          face,
+        },
+      }) as unknown as GameEvent;
+    const [down] = eventToTransitions(ev("DOWN"), 0, registry);
+    expect(down).toMatchObject({
+      fromZoneKey: "p-char-1",
+      toZoneKey: "p-life",
+      cardId: "OP01-010",
+      instanceId: "life-7",
+      sourceFaceDown: false,
+      destinationFaceDown: true,
+    });
+    expect(down.kind).toBeUndefined();
+    const [up] = eventToTransitions(ev("UP"), 0, registry);
+    expect(up.destinationFaceDown).toBe(false);
+  });
+
+  it("falls back to the provenance zone when the source card is unknown", () => {
+    const ev = {
+      type: "CARD_ADDED_TO_LIFE",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "hidden",
+        cardInstanceId: "hidden",
+        newCardInstanceId: "hidden",
+        sourceZone: "DECK",
+        face: "DOWN",
+      },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, registry);
+    expect(t.fromZoneKey).toBe("o-deck");
+    expect(t.toZoneKey).toBe("o-life");
+  });
+
+  it("deals a named mill face-up from the deck, 70ms apart", () => {
+    const ev = {
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: {
+        count: 3,
+        reason: "mill",
+        from: "DECK",
+        cards: [
+          { instanceId: "t-1", cardId: "OP01-001" },
+          { instanceId: "t-2", cardId: "OP01-002" },
+          { instanceId: "t-3", cardId: "OP01-003" },
+        ],
+      },
+    } as unknown as GameEvent;
+    const out = eventToTransitions(ev, 0, registry);
+    expect(out).toHaveLength(3);
+    expect(out.map((t) => t.cardId)).toEqual(["OP01-001", "OP01-002", "OP01-003"]);
+    for (const t of out) {
+      expect(t).toMatchObject({
+        fromZoneKey: "p-deck",
+        toZoneKey: "p-trash",
+        sourceFaceDown: true,
+        destinationFaceDown: false,
+      });
+      expect(t.kind).toBeUndefined();
+    }
+    expect(out.map((t) => t.delay)).toEqual([0, 0.07, 0.14]);
+  });
+
+  it("keeps the count-only mill fizzle for events without cards", () => {
+    const ev = {
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { count: 2, reason: "mill", from: "DECK" },
+    } as unknown as GameEvent;
+    const out = eventToTransitions(ev, 0, registry);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ kind: "transform", arrivalCount: 2 });
+  });
+
+  it("flips a bounced Character face-down before it flies to a hidden hand", () => {
+    const ev = {
+      type: "CARD_RETURNED_TO_HAND",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP02-020",
+        cardInstanceId: "opp-field-1",
+        newCardInstanceId: "hidden",
+        sourceZone: "CHARACTER",
+      },
+    } as unknown as GameEvent;
+    const hands = receivedHandsByPlayerIndex(
+      [],
+      [handCard("hidden-1-hand-0", "hidden", 1), handCard("hidden-1-hand-1", "hidden", 1)],
+      0,
+    );
+    const [t] = eventToTransitions(ev, 0, registry, null, hands);
+    expect(t).toMatchObject({
+      fromZoneKey: "o-char-4",
+      toZoneKey: "o-hand",
+      cardId: "OP02-020",
+      sourceFaceDown: false,
+      destinationFaceDown: true,
+    });
+  });
+
+  it("still hides a hand-bound card that left a hidden zone", () => {
+    const ev = {
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { cardId: "OP02-020", cardInstanceId: "x", sourceFace: "UP" },
+    } as unknown as GameEvent;
+    const hands = receivedHandsByPlayerIndex(
+      [],
+      [handCard("hidden-1-hand-0", "hidden", 1), handCard("hidden-1-hand-1", "hidden", 1)],
+      0,
+    );
+    const [t] = eventToTransitions(ev, 0, registry, null, hands);
+    expect(t.cardId).toBeNull();
+  });
+
+  it("uses the provenance zone for a bounce whose source id is unknown", () => {
+    const ev = {
+      type: "CARD_RETURNED_TO_HAND",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP02-020",
+        cardInstanceId: "gone",
+        sourceZone: "STAGE",
+      },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, registry);
+    expect(t.fromZoneKey).toBe("o-stage");
+  });
+});

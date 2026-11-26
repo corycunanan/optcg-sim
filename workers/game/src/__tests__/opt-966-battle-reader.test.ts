@@ -1,3 +1,4 @@
+import { withoutAssertedMotionPayloads } from "./motion-payload-support.js";
 import { currentBattleExpected } from "./opt-1003-battle-expectations.js";
 import battleImmediate from "./fixtures/opt-966-battle-immediate-writer.json";
 import lifeImmediate from "./fixtures/opt-966-life-immediate-writer.json";
@@ -64,7 +65,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
     }
     expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);
-    expect(actual.eventLog).toEqual(currentExpected.eventLog);
+    expect(withoutAssertedMotionPayloads(actual.eventLog)).toEqual(currentExpected.eventLog);
     expect(actual.players).toEqual(currentExpected.players);
     expect(actual.turn).toEqual(currentExpected.turn);
     expect(actual.executionContext).toEqual(currentExpected.executionContext);

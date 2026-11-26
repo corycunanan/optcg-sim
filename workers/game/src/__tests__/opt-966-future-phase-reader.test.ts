@@ -1,3 +1,4 @@
+import { withoutAssertedMotionPayloads } from "./motion-payload-support.js";
 import { chooseFirstObligation, orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
@@ -69,10 +70,10 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       actual = result.state;
     }
       expected = writerEnvelope(candidateExpected<GameState>(`future/${name}/${index}/final`));
-      expect(actual).toEqual(orderedEnvelope(expected, actual));
+      expect(withoutAssertedMotionPayloads(actual)).toEqual(orderedEnvelope(expected, actual));
       expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);
-    expect(actual.eventLog).toEqual(expected.eventLog);
+    expect(withoutAssertedMotionPayloads(actual.eventLog)).toEqual(expected.eventLog);
     expect(actual.players).toEqual(expected.players);
     expect(actual.turn).toEqual(expected.turn);
     expect(actual.executionContext).toEqual(expected.executionContext);

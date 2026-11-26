@@ -23,6 +23,10 @@ import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
 import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
 import { lifeToHandScenario } from "./life/life-to-hand";
 import { lifeToTrashScenario } from "./life/life-to-trash";
+import { addToLifeScenario } from "./life/add-to-life";
+import { lifeTurnFaceUpScenario } from "./life/life-turn-face-up";
+import { millTopThreeScenario } from "./movement/mill-top-3";
+import { bounceToOpponentHandScenario } from "./movement/bounce-to-opponent-hand";
 import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
 import { opponentPlayCharacterScenario } from "./movement/opponent-play-character";
@@ -62,6 +66,10 @@ export const scenarios: Scenario[] = [
   characterKoedByEffectScenario,
   lifeToHandScenario,
   lifeToTrashScenario,
+  addToLifeScenario,
+  lifeTurnFaceUpScenario,
+  millTopThreeScenario,
+  bounceToOpponentHandScenario,
   actionRejectedScenario,
   activateMainMenuScenario,
   publicRevealSpotlightScenario,
