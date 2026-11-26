@@ -782,6 +782,7 @@ const EventPayloadSchemas = {
     detail: z.string(),
     cardId: z.string().optional(),
   }),
+  DECK_SHUFFLED: EmptyPayload,
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {

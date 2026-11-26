@@ -16,6 +16,7 @@ import {
   type ProducerScenario,
 } from "./native7-producer-support.js";
 import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
+import { withoutAssertedDeckShuffled } from "./deck-shuffled-support.js";
 const directory = fileURLToPath(
   new URL("./fixtures/opt-969-native7-producers/", import.meta.url)
 );
@@ -71,10 +72,14 @@ describe.each(files)("native7 future producers %s", (file) => {
           assertDonOffer(loaded.state);
           const next = command(rt, loaded.state, loaded.cardDb, step.action);
           const stored = await save(rt, next, loaded.cardDb);
+          const frozen = writerSessionEnvelope(step.stored);
           expect(
-            withoutAssertedDonMoveDetail(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored))),
+            withoutAssertedDonMoveDetail(withoutAssertedDeckShuffled(
+              withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored)),
+              frozen
+            )),
             `${file} ${context} start${start} after ${step.action.type}`
-          ).toEqual(writerSessionEnvelope(step.stored));
+          ).toEqual(frozen);
           loaded = (await memory(rt, stored).repo.load())!;
         }
         const initial = (await memory(rt, corpus.initial).repo.load())!;

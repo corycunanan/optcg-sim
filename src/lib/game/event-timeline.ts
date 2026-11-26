@@ -1,5 +1,5 @@
 import type { GameEvent, GameEventType } from "@shared/game-types";
-import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel, deckRiffle } from "@/lib/motion";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import { eventToSpotlight } from "@/lib/game/spotlight";
 
@@ -129,7 +129,7 @@ const PULSE_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
 const COUNTED_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
   new Set<GameEventType>(["DON_GIVEN_TO_CARD", "LIFE_CARD_TO_DECK"]);
 
-export type BeatKind = "spotlight" | "travel" | "transform" | "pulse";
+export type BeatKind = "spotlight" | "travel" | "transform" | "pulse" | "shuffle";
 
 /**
  * What a board consumer sees for one event. `null` means the event has no
@@ -148,6 +148,8 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
   }
   if (TRANSFORM_EVENTS.has(event.type)) return "transform";
   if (PULSE_EVENTS.has(event.type)) return "pulse";
+  // OPT-1055: the deck riffles in place; later steps wait for it to square up.
+  if (event.type === "DECK_SHUFFLED") return "shuffle";
   return null;
 }
 
@@ -171,6 +173,8 @@ function leadMsFor(kind: BeatKind): number {
       return FIZZLE_MS;
     case "pulse":
       return PULSE_READ_MS;
+    case "shuffle":
+      return deckRiffle.totalMs;
   }
 }
 

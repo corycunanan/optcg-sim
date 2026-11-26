@@ -442,6 +442,8 @@ export interface GameEventPayloadMap {
    * player-facing words and never carries hidden card identities.
    */
   PROMPT_AUTO_RESOLVED: { detail: string; cardId?: string };
+  /** OPT-1055: `playerIndex`'s deck was shuffled (effect, search, mulligan). */
+  DECK_SHUFFLED: Record<string, never>;
 }
 
 /** Union of all event type strings. */
@@ -500,6 +502,7 @@ export const ALL_GAME_EVENT_TYPES = [
   "PREGAME_FIRST_PLAYER_DECIDED",
   "MULLIGAN_DECISION",
   "PROMPT_AUTO_RESOLVED",
+  "DECK_SHUFFLED",
 ] as const satisfies readonly GameEventType[];
 
 type _AllGameEventTypesCovered =

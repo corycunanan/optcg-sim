@@ -32,7 +32,7 @@ import type {
 } from "../../../../shared/game-types.js";
 import type { StartOfGameEffect } from "./effect-types.js";
 import { dealOpeningHand, placeLifeCards, applyMulligan } from "./setup.js";
-import { emitPendingEvent } from "./events.js";
+import { deckShuffledEvent, emitPendingEvent } from "./events.js";
 import { executeActionChain } from "./effect-resolver/resolver.js";
 import { startOfGameEffectDescription } from "./effect-resolver/action-utils.js";
 import { takeEngineRandom } from "./execution-context.js";
@@ -219,7 +219,10 @@ export function resumePregameFromPrompt(
     if (action.type !== "PLAYER_CHOICE") return state;
     const redrew = action.choiceId === "REDRAW";
     let nextState = state;
-    if (redrew) nextState = applyMulligan(nextState, respondingPlayer);
+    if (redrew) {
+      nextState = applyMulligan(nextState, respondingPlayer);
+      nextState = emitPendingEvent(nextState, deckShuffledEvent(respondingPlayer), respondingPlayer);
+    }
 
     const decisions: [boolean | null, boolean | null] = [...pregame.mulliganDecisions];
     decisions[respondingPlayer] = redrew;

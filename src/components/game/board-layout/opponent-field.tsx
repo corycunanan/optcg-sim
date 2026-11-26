@@ -54,6 +54,8 @@ interface OpponentFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
+  /** OPT-1055: restarts the deck riffle when this player's deck shuffles. */
+  deckShuffleNonce?: number;
   /** Signed offsets merged into displayed DON count per target card
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
@@ -92,6 +94,7 @@ function OpponentFieldComponent({
   lifeTriggerPulse,
   lifeDamagePulseNonce,
   lifeScriedPulseNonce,
+  deckShuffleNonce,
   donCountAdjustments,
   pileArrivingCounts,
   arrivingInstanceIds,
@@ -156,6 +159,7 @@ function OpponentFieldComponent({
         cardDb={cardDb}
         sleeveUrl={opp?.sleeveUrl}
         zoneKey={zoneKey("deck")}
+        shuffleNonce={deckShuffleNonce}
         style={{
           position: "absolute",
           left: sideCardOffsetX,
