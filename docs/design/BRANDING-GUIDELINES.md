@@ -641,7 +641,7 @@ Motion communicates state changes and spatial relationships. Every animation mus
 |----------|----------|--------|-------|
 | **Micro** | 100-150ms | `ease-out` | Button press, toggle, checkbox |
 | **Standard** | 200-250ms | `ease-out` | Hover states, tooltips, dropdowns |
-| **Emphasis** | 300-400ms | `spring(1, 80, 10)` | Modal enter, card flip, page element reveal |
+| **Emphasis** | 300-400ms | `spring(1, 80, 10)` | Modal enter, page element reveal; the card flip sits in this band as a 300ms ease-in-out tween (`cardFlip`) |
 | **Exit** | 150-200ms | `ease-in` | Modal close, toast dismiss, dropdown close |
 
 **Rule**: Exit animations are 60-70% the duration of enter animations. This makes the UI feel snappy.
@@ -681,7 +681,8 @@ export const variants = {
 | **Page transition** | Fade + slide up 16px, 250ms | Fade 150ms | — |
 | **List stagger** | Each item delays 30ms | — | — |
 | **Skeleton→content** | Crossfade 300ms | — | — |
-| **Zone travel** | `zoneEnter` at destination | `zoneMove` 220ms ease-out | Stagger siblings by 60ms |
+| **Card flip** | — | — | `cardFlip` 300ms ease-in-out; lift 8px, grow 10%, tilt 3°, edge shade + gloss (INTERACTION-GRAMMAR MO-3a) |
+| **Zone travel** | `cardEntry` at destination | Flip first if the destination needs the other side, then a shallow arc (`cardTravel`): 180ms + 0.12ms/px, clamped 220–380ms, `cubic-bezier(0.2, 0.8, 0.2, 1)` | Stagger draws/DON!! 90ms, pile moves 70ms, other travel 60ms (MO-8) |
 | **Card transform** | Materializes through pile receipt | `cardFizzle` 360ms ease-out | Opacity + scale + slight lift at source |
 | **Pile receipt** | `pilePop` 200ms + `pileDelta` 700ms | — | One aggregated `+N` per batch |
 
