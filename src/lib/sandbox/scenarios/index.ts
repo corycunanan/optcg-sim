@@ -26,6 +26,7 @@ import { lifeToTrashScenario } from "./life/life-to-trash";
 import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
 import { opponentPlayCharacterScenario } from "./movement/opponent-play-character";
+import { opponentPlayThenDrawScenario } from "./movement/opponent-play-then-draw";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
 import { playCharacterRestedScenario } from "./playground/play-character-rested";
@@ -48,6 +49,7 @@ export const scenarios: Scenario[] = [
   peekTopThreeScenario,
   playCharacterSummonScenario,
   opponentPlayCharacterScenario,
+  opponentPlayThenDrawScenario,
   attachOneDonScenario,
   attachThreeDonStaggeredScenario,
   redistributeDonScenario,
