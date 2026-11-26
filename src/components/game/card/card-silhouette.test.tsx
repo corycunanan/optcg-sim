@@ -78,10 +78,10 @@ describe("board card silhouette (OPT-720)", () => {
     );
 
     // Wrapper + state-rotation + interaction + front + back +
-    // power flash + highlight ring + the flip's shade and gloss on each face
-    // (OPT-1054). If a layer is added or removed, this number moves with
-    // it — which is the point.
-    expect(silhouette).toHaveLength(11);
+    // power flash + highlight ring. (The flip's shade and gloss layers mount
+    // only while a flip runs, OPT-1054.) If a layer is added or removed,
+    // this number moves with it — which is the point.
+    expect(silhouette).toHaveLength(7);
     expect(classNames.filter((name) => CHROME_RADIUS.test(name))).toEqual([]);
   });
 

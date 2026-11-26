@@ -71,6 +71,10 @@ export function CardFaces({
   const startedAtRef = React.useRef<number | null>(null);
   const flipDelay = flipFrom?.delay ?? 0;
   const flipInstant = flipFrom?.instant ?? false;
+  // The shade and gloss layers exist only while a flip is scheduled or
+  // running. They start unmounted, so the server and first client render
+  // match, and a resting card carries no extra layers.
+  const [flipping, setFlipping] = React.useState(false);
 
   React.useEffect(() => {
     let controls: { stop: () => void } | null = null;
@@ -80,8 +84,14 @@ export function CardFaces({
       if (rotateY.get() === target) return;
       const elapsed = (now - startedAtRef.current) / 1000;
       const delay = Math.max(0, flipDelay - elapsed);
-      const base = flipTransition(reducedMotion || flipInstant);
-      controls = animate(rotateY, target, { ...base, delay });
+      const instant = reducedMotion || flipInstant;
+      const base = flipTransition(instant);
+      if (!instant) setFlipping(true);
+      controls = animate(rotateY, target, {
+        ...base,
+        delay,
+        onComplete: () => setFlipping(false),
+      });
     });
     return () => {
       cancelStart();
@@ -99,32 +109,34 @@ export function CardFaces({
       )}
     >
       {children}
-      {/* Edge shade + gloss, one pair per face. Each pair sits on its face's
-          side of the card (the back pair is pre-rotated 180°) and hides its
-          backface, so only the visible face darkens. They are transparent
-          whenever the card lies flat, which is always under reduced motion
-          (the swap is instant), so they render unconditionally and the
-          server and client trees match. */}
-      <motion.div
-        aria-hidden
-        className="gb-card-flip-shade rounded-card pointer-events-none absolute inset-0 [transform:translateZ(1px)] [backface-visibility:hidden]"
-        style={{ opacity: shade }}
-      />
-      <motion.div
-        aria-hidden
-        className="gb-card-flip-gloss rounded-card pointer-events-none absolute inset-0 [transform:translateZ(1px)] [backface-visibility:hidden]"
-        style={{ opacity: gloss }}
-      />
-      <motion.div
-        aria-hidden
-        className="gb-card-flip-shade rounded-card pointer-events-none absolute inset-0 [transform:rotateY(180deg)_translateZ(1px)] [backface-visibility:hidden]"
-        style={{ opacity: shade }}
-      />
-      <motion.div
-        aria-hidden
-        className="gb-card-flip-gloss rounded-card pointer-events-none absolute inset-0 [transform:rotateY(180deg)_translateZ(1px)] [backface-visibility:hidden]"
-        style={{ opacity: gloss }}
-      />
+      {/* Edge shade + gloss, one pair per face, mounted only while a flip
+          runs (never for an instant swap). Each pair sits on its face's side
+          of the card (the back pair is pre-rotated 180°) and hides its
+          backface, so only the visible face darkens. */}
+      {flipping && (
+        <>
+          <motion.div
+            aria-hidden
+            className="gb-card-flip-shade rounded-card pointer-events-none absolute inset-0 [transform:translateZ(1px)] [backface-visibility:hidden]"
+            style={{ opacity: shade }}
+          />
+          <motion.div
+            aria-hidden
+            className="gb-card-flip-gloss rounded-card pointer-events-none absolute inset-0 [transform:translateZ(1px)] [backface-visibility:hidden]"
+            style={{ opacity: gloss }}
+          />
+          <motion.div
+            aria-hidden
+            className="gb-card-flip-shade rounded-card pointer-events-none absolute inset-0 [transform:rotateY(180deg)_translateZ(1px)] [backface-visibility:hidden]"
+            style={{ opacity: shade }}
+          />
+          <motion.div
+            aria-hidden
+            className="gb-card-flip-gloss rounded-card pointer-events-none absolute inset-0 [transform:rotateY(180deg)_translateZ(1px)] [backface-visibility:hidden]"
+            style={{ opacity: gloss }}
+          />
+        </>
+      )}
     </motion.div>
   );
 }
