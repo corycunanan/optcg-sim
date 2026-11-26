@@ -80,6 +80,9 @@ function TravelGhost({
   cardDb,
   sleeveUrl,
   onComplete,
+  boardScale,
+  profile,
+  content,
 }: {
   transition: CardTransition;
   from: GhostBox;
@@ -88,6 +91,12 @@ function TravelGhost({
   cardDb: CardDb;
   sleeveUrl?: string | null;
   onComplete: () => void;
+  /** Viewport px per design px: distance, duration and arc use design px. */
+  boardScale: number;
+  /** A fixed duration and lower arc cap (DON!! tokens). */
+  profile?: { durationMs: number; arcMaxPx: number };
+  /** Replaces the travelling card (a DON!! token). */
+  content?: React.ReactNode;
 }) {
   const plan = planFlight(transition);
   const endRotate = transition.playedRested ? 90 : 0;
@@ -107,11 +116,21 @@ function TravelGhost({
 
   React.useEffect(() => {
     const first = resolveTargetRef.current();
-    const distance = Math.hypot(first.x - from.x, first.y - from.y);
+    const pxPerDesign = boardScale > 0 ? boardScale : 1;
+    // The ghost layer sits outside the zoomed board: convert to design px.
+    const distance = Math.hypot(first.x - from.x, first.y - from.y) / pxPerDesign;
+    const geometry = { scale: pxPerDesign, arcMaxPx: profile?.arcMaxPx };
     const progress = motionValue(0);
     const apply = (p: number) => {
       const target = resolveTargetRef.current();
-      const pose = flightPose(p, from, target, { from: 0, to: endRotate });
+      const pose = flightPose(
+        p,
+        from,
+        target,
+        { from: 0, to: endRotate },
+        false,
+        geometry
+      );
       x.set(pose.x);
       y.set(pose.y);
       width.set(from.w + (target.w - from.w) * p);
@@ -131,7 +150,7 @@ function TravelGhost({
     };
     const cancelStart = onNextFrame(() => {
       controls = animate(progress, 1, {
-        duration: flightDurationMs(distance) / 1000,
+        duration: (profile?.durationMs ?? flightDurationMs(distance)) / 1000,
         ease: cardTravel.ease,
         delay: plan.departAt,
         onUpdate: apply,
@@ -175,29 +194,31 @@ function TravelGhost({
         zIndex: transition.flip === "under" ? 0 : 1,
       }}
     >
-      <Card
-        variant={variant}
-        size={transition.spotlightSourceSize}
-        state="in-flight"
-        data={
-          transition.cardId && transition.cardId !== "hidden"
-            ? { cardId: transition.cardId, cardDb }
-            : undefined
-        }
-        faceDown={plan.faceDown}
-        flipFrom={
-          plan.flipAt === null
-            ? undefined
-            : {
-                faceDown: plan.initialFaceDown,
-                delay: plan.flipAt,
-                instant: plan.flipInstant,
-              }
-        }
-        sleeveUrl={sleeveUrl}
-        interaction={{ tooltipDisabled: true }}
-        style={FILL_TRANSITION_FRAME}
-      />
+      {content ?? (
+        <Card
+          variant={variant}
+          size={transition.spotlightSourceSize}
+          state="in-flight"
+          data={
+            transition.cardId && transition.cardId !== "hidden"
+              ? { cardId: transition.cardId, cardDb }
+              : undefined
+          }
+          faceDown={plan.faceDown}
+          flipFrom={
+            plan.flipAt === null
+              ? undefined
+              : {
+                  faceDown: plan.initialFaceDown,
+                  delay: plan.flipAt,
+                  instant: plan.flipInstant,
+                }
+          }
+          sleeveUrl={sleeveUrl}
+          interaction={{ tooltipDisabled: true }}
+          style={FILL_TRANSITION_FRAME}
+        />
+      )}
     </motion.div>
   );
 }
@@ -337,38 +358,48 @@ function FlyingCard({
         cardDb={cardDb}
         sleeveUrl={sleeveUrl}
         onComplete={onComplete}
+        boardScale={boardScale}
       />
     );
   }
 
-  // Transform-class cards dissolve at the source; DON tokens keep their
-  // straight flight. Destination pile receipt is owned by the pile
-  // components after this transition completes.
-  let animateTarget: Record<string, number | number[]>;
-  let transitionConfig: Record<string, unknown>;
-
-  if (isTransform) {
-    const fizzle = reducedMotion ? cardFizzleReduced : cardFizzle;
-    animateTarget = {
-      x: fromX,
-      y: reducedMotion ? fromY : cardFizzle.y.map((offset) => fromY + offset),
-      width: fromW,
-      height: fromH,
-      scale: reducedMotion ? 1 : [...cardFizzle.scale],
-      opacity: [...fizzle.opacity],
-    };
-    transitionConfig = { ...fizzle.transition, delay };
-  } else {
-    animateTarget = {
-      x: toX,
-      y: toY,
-      width: toW,
-      height: toH,
-      opacity: 1,
-      scale: 1,
-    };
-    transitionConfig = { ...cardTransitions.donAttach, delay };
+  if (isDonAttach) {
+    // DON!! tokens fly the shared arc at a fixed pace with a lower cap
+    // (OPT-1054), aimed at the target card's center.
+    return (
+      <TravelGhost
+        transition={transition}
+        from={{ x: fromX, y: fromY, w: fromW, h: fromH }}
+        resolveTarget={() => ({ x: toX, y: toY, w: toW, h: toH })}
+        variant="field"
+        cardDb={cardDb}
+        onComplete={onComplete}
+        boardScale={boardScale}
+        profile={cardTransitions.donAttach}
+        content={
+          <Card
+            variant="don"
+            state="in-flight"
+            artUrl={donArtUrl ?? undefined}
+            style={FILL_TRANSITION_FRAME}
+          />
+        }
+      />
+    );
   }
+
+  // Transform-class cards dissolve at the source. Destination pile receipt
+  // is owned by the pile components after this transition completes.
+  const fizzle = reducedMotion ? cardFizzleReduced : cardFizzle;
+  const animateTarget = {
+    x: fromX,
+    y: reducedMotion ? fromY : cardFizzle.y.map((offset) => fromY + offset),
+    width: fromW,
+    height: fromH,
+    scale: reducedMotion ? 1 : [...cardFizzle.scale],
+    opacity: [...fizzle.opacity],
+  };
+  const transitionConfig = { ...fizzle.transition, delay };
 
   const isFaceDown = !transition.cardId || transition.cardId === "hidden";
 
@@ -380,7 +411,7 @@ function FlyingCard({
         y: fromY,
         width: fromW,
         height: fromH,
-        opacity: isDonAttach ? 0 : 1,
+        opacity: 1,
         scale: 1,
       }}
       animate={animateTarget}
@@ -393,29 +424,20 @@ function FlyingCard({
         zIndex: 9999,
       }}
     >
-      {isDonAttach ? (
-        <Card
-          variant="don"
-          state="in-flight"
-          artUrl={donArtUrl ?? undefined}
-          style={FILL_TRANSITION_FRAME}
-        />
-      ) : (
-        <Card
-          variant={variant}
-          size={transition.spotlightSourceSize}
-          state="in-flight"
-          data={
-            transition.cardId && transition.cardId !== "hidden"
-              ? { cardId: transition.cardId, cardDb }
-              : undefined
-          }
-          faceDown={isFaceDown}
-          sleeveUrl={sleeveUrl}
-          interaction={{ tooltipDisabled: true }}
-          style={FILL_TRANSITION_FRAME}
-        />
-      )}
+      <Card
+        variant={variant}
+        size={transition.spotlightSourceSize}
+        state="in-flight"
+        data={
+          transition.cardId && transition.cardId !== "hidden"
+            ? { cardId: transition.cardId, cardDb }
+            : undefined
+        }
+        faceDown={isFaceDown}
+        sleeveUrl={sleeveUrl}
+        interaction={{ tooltipDisabled: true }}
+        style={FILL_TRANSITION_FRAME}
+      />
     </motion.div>
   );
 }

@@ -220,12 +220,24 @@ export function arcNormal(dx: number, dy: number): Point {
   return { x: nx + 0, y: ny + 0 };
 }
 
-/** Peak perpendicular offset of the arc for a distance in design px. */
-export function arcHeight(distance: number): number {
-  return Math.min(
-    cardTravel.arcRatio * Math.abs(distance),
-    cardTravel.arcMaxPx
-  );
+/** Peak perpendicular offset of the arc for a distance in design px,
+ *  capped at `maxPx` (design px; DON!! tokens use a lower cap). */
+export function arcHeight(
+  distance: number,
+  maxPx: number = cardTravel.arcMaxPx
+): number {
+  return Math.min(cardTravel.arcRatio * Math.abs(distance), maxPx);
+}
+
+/** How screen coordinates relate to design px for one flight. The ghost
+ *  layer is portaled outside the zoomed board, so its coordinates are
+ *  viewport px; `scale` (the board scale) converts them, keeping the arc's
+ *  ratio and cap in design px as the travel spec states. */
+export interface FlightGeometry {
+  /** Viewport px per design px. Defaults to 1. */
+  scale?: number;
+  /** Arc cap in design px. Defaults to `cardTravel.arcMaxPx`. */
+  arcMaxPx?: number;
 }
 
 /**
@@ -242,7 +254,8 @@ export function flightPose(
   from: Point,
   to: Point,
   rotation: { from: number; to: number } = { from: 0, to: 0 },
-  reducedMotion = false
+  reducedMotion = false,
+  geometry: FlightGeometry = {}
 ): FlightPose {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
@@ -255,7 +268,8 @@ export function flightPose(
   }
   const bump = Math.sin(Math.PI * p);
   const normal = arcNormal(dx, dy);
-  const arc = arcHeight(distance) * bump;
+  const scale = geometry.scale && geometry.scale > 0 ? geometry.scale : 1;
+  const arc = arcHeight(distance / scale, geometry.arcMaxPx) * scale * bump;
   const lean = Math.max(-1, Math.min(1, dx / distance)) * cardTravel.leanMaxDeg;
   return {
     x: x + normal.x * arc,

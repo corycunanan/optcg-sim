@@ -340,9 +340,11 @@ const board = {
     zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
-    /** DON token flight from DON pool onto a target card (OPT-274). A short
-     *  straight tween so multi-token batches read as a coherent set. */
-    donAttach: { duration: 0.22, ease: "easeOut" as const },
+    /** DON token flight from DON pool onto a target card (OPT-274). Since
+     *  OPT-1054 it flies the shared travel arc (ease, lean, peak growth) at a
+     *  fixed `durationMs`, with the arc capped lower (`arcMaxPx`, design px)
+     *  because tokens are small and travel in sets. */
+    donAttach: { durationMs: 260, arcMaxPx: 24 },
   },
   pile: {
     /** Destination-pile receipt: one quick top-card pulse after a batch has
