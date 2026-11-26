@@ -122,6 +122,13 @@ function TravelGhost({
     // Start the clock on the first frame after mount (as `CardFaces` does
     // for the flip), so a long commit cannot swallow the start of the move.
     let controls: { stop: () => void } | null = null;
+    let cancelFollow = () => {};
+    // After landing the ghost fades out over the card; it keeps following
+    // the live slot so a hand still settling from its re-fan stays flush.
+    const follow = () => {
+      apply(1);
+      cancelFollow = onNextFrame(follow);
+    };
     const cancelStart = onNextFrame(() => {
       controls = animate(progress, 1, {
         duration: flightDurationMs(distance) / 1000,
@@ -131,12 +138,17 @@ function TravelGhost({
         onComplete: () => {
           apply(1);
           onCompleteRef.current();
+          // Without a frame clock (tests) there is nothing to follow.
+          if (typeof requestAnimationFrame === "function") {
+            cancelFollow = onNextFrame(follow);
+          }
         },
       });
     });
     return () => {
       cancelStart();
       controls?.stop();
+      cancelFollow();
     };
     // The flight is planned once, at mount; later renders only refresh the
     // target resolver through the ref.
