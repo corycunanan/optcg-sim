@@ -9,6 +9,7 @@ import type {
   PendingPromptState,
   PromptOptions,
 } from "@shared/game-types";
+import { MULLIGAN_SHUFFLE_MS } from "@/lib/game/mulligan-motion";
 import { mulliganMotion } from "@/lib/motion";
 
 vi.mock("@/components/ui", () => ({
@@ -148,7 +149,7 @@ describe("mulligan redraw playback (OPT-1060)", () => {
     expect(stagePhase()).toBe("shuffle");
 
     act(() => {
-      vi.advanceTimersByTime(mulliganMotion.shuffleMs);
+      vi.advanceTimersByTime(MULLIGAN_SHUFFLE_MS);
     });
     expect(stagePhase()).toBe("deal");
 
@@ -176,7 +177,7 @@ describe("mulligan redraw playback (OPT-1060)", () => {
       vi.advanceTimersByTime(1000);
     });
     act(() => {
-      vi.advanceTimersByTime(mulliganMotion.shuffleMs);
+      vi.advanceTimersByTime(MULLIGAN_SHUFFLE_MS);
     });
     expect(stagePhase()).toBe("shuffle");
 

@@ -1,16 +1,14 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-import { mulliganMotion } from "@/lib/motion";
+import { motion } from "motion/react";
 import { Card } from "../card";
+import { DeckRiffle } from "../deck-riffle";
 
 /**
  * The viewer's deck as a face-down pile beside the Mulligan modal's hand
  * (OPT-1060). Two backing cards peek out under the top one so it reads as a
- * stack. Each new `shuffleNonce` shuffles it in place.
- *
- * TODO(OPT-1055): replace the placeholder shuffle with the shared
- * `DeckRiffle` once it lands.
+ * stack. Each new `shuffleNonce` plays the shared deck riffle (OPT-1055) in
+ * place.
  */
 export function MulliganDeckPile({
   sleeveUrl,
@@ -19,32 +17,34 @@ export function MulliganDeckPile({
   sleeveUrl?: string | null;
   shuffleNonce?: number;
 }) {
-  const reducedMotion = useReducedMotion() ?? false;
-  const shuffling = shuffleNonce !== undefined && !reducedMotion;
+  const back = (
+    <Card
+      variant="modal"
+      state="in-flight"
+      faceDown
+      sleeveUrl={sleeveUrl}
+      interaction={{ tooltipDisabled: true }}
+    />
+  );
   return (
-    <div data-mulligan-pile="" className="relative">
-      <motion.div
-        aria-hidden
-        className="absolute top-0 left-0"
-        style={{ x: 4, y: 4 }}
-      >
-        <Card variant="modal" state="in-flight" faceDown sleeveUrl={sleeveUrl} interaction={{ tooltipDisabled: true }} />
-      </motion.div>
-      <motion.div
-        aria-hidden
-        className="absolute top-0 left-0"
-        style={{ x: 2, y: 2 }}
-      >
-        <Card variant="modal" state="in-flight" faceDown sleeveUrl={sleeveUrl} interaction={{ tooltipDisabled: true }} />
-      </motion.div>
-      <motion.div
-        key={shuffleNonce ?? "idle"}
-        className="relative"
-        animate={shuffling ? { x: [0, -14, 14, -8, 0] } : undefined}
-        transition={{ duration: mulliganMotion.shuffleMs / 1000, ease: "easeInOut" }}
-      >
-        <Card variant="modal" state="in-flight" faceDown sleeveUrl={sleeveUrl} interaction={{ tooltipDisabled: true }} />
-      </motion.div>
-    </div>
+    <DeckRiffle nonce={shuffleNonce} slice={back} className="relative">
+      <div data-mulligan-pile="" className="relative">
+        <motion.div
+          aria-hidden
+          className="absolute top-0 left-0"
+          style={{ x: 4, y: 4 }}
+        >
+          {back}
+        </motion.div>
+        <motion.div
+          aria-hidden
+          className="absolute top-0 left-0"
+          style={{ x: 2, y: 2 }}
+        >
+          {back}
+        </motion.div>
+        <div className="relative">{back}</div>
+      </div>
+    </DeckRiffle>
   );
 }

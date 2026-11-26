@@ -15,7 +15,7 @@
  * they belong to (return from the click, deal from when dealing starts).
  */
 
-import { cardFlip, mulliganMotion } from "@/lib/motion";
+import { cardFlip, deckRiffle, mulliganMotion } from "@/lib/motion";
 import {
   assignPileFlips,
   flightDurationMs,
@@ -25,6 +25,10 @@ import {
 } from "./card-motion";
 
 const FLIP_MS = cardFlip.duration * 1000;
+
+/** How long the deck shuffle takes: the shared riffle plus its closing pop
+ *  (`DeckRiffle`, OPT-1055). The deal starts once the pile has settled. */
+export const MULLIGAN_SHUFFLE_MS = deckRiffle.totalMs + deckRiffle.popMs;
 
 export interface MulliganStageGeometry {
   cardWidth: number;

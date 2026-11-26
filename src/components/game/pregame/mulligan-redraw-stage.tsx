@@ -10,6 +10,7 @@ import {
 import type { CardDb, CardInstance } from "@shared/game-types";
 import { flightPose, onNextFrame } from "@/lib/game/card-motion";
 import {
+  MULLIGAN_SHUFFLE_MS,
   mulliganPilePoint,
   planMulliganDeal,
   planMulliganReturn,
@@ -98,7 +99,7 @@ export function MulliganRedrawStage({
     if (phase !== "shuffle") return;
     const id = window.setTimeout(
       () => setShuffleDone(true),
-      mulliganMotion.shuffleMs
+      MULLIGAN_SHUFFLE_MS
     );
     return () => window.clearTimeout(id);
   }, [phase]);
