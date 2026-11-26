@@ -89,7 +89,7 @@ describe("OPT-1056 deck look events", () => {
     expect(placements(resumed.events)).toEqual([]);
     expect(
       resumed.events.filter(
-        (event) => event.type === "CARD_TRASHED" && event.payload.reason === "search_trash",
+        (event) => event.type === "CARD_TRASHED" && event.payload?.reason === "search_trash",
       ),
     ).toHaveLength(2);
   });
