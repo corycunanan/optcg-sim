@@ -67,6 +67,7 @@ import type {
 } from "@/hooks/use-game-ws";
 import { ActionFeedbackProvider } from "./action-feedback";
 import { useCardSpotlight } from "@/hooks/use-card-spotlight";
+import { useEventPlayback } from "@/hooks/use-event-playback";
 import { SpotlightOverlay } from "../spotlight-overlay";
 import { useBoardDragState } from "./use-board-drag-state";
 import { BoardDragOverlay } from "./board-drag-overlay";
@@ -192,16 +193,19 @@ function BoardLayoutInner({
     myIndex,
     promptRespondingPlayer,
   });
+  // OPT-1040: prompts and board input wait for the update's effects to play.
+  const effectsPlaying = useEventPlayback(eventLog);
+  const boardBlocked = spotlight.isBlockingPrompt || effectsPlaying;
   const dispatchBoardAction = useCallback(
     (action: GameAction) => {
-      if (!spectatorMode && !spotlight.isBlockingPrompt) onAction(action);
+      if (!spectatorMode && !boardBlocked) onAction(action);
     },
-    [onAction, spectatorMode, spotlight.isBlockingPrompt]
+    [onAction, spectatorMode, boardBlocked]
   );
   const modalRouting = useBoardModalRouting({
     activePrompt,
     promptBlocked:
-      !interactiveBoardOverlaysEnabled || spotlight.isBlockingPrompt,
+      !interactiveBoardOverlaysEnabled || boardBlocked,
     me,
     opp,
     cardDb,
@@ -222,7 +226,7 @@ function BoardLayoutInner({
     boardInputEnabled &&
     bs.inBlockStep &&
     !modalRouting.targetSelectionActive &&
-    !spotlight.isBlockingPrompt;
+    !boardBlocked;
 
   const { orderedHand: playerOrderedHand, reorder: reorderPlayerHand } = useHandOrder(
     me?.hand ?? [],
@@ -238,7 +242,7 @@ function BoardLayoutInner({
     disabled:
       dndDisabled ||
       modalRouting.targetSelectionActive ||
-      spotlight.isBlockingPrompt,
+      boardBlocked,
     boardScale,
     outerScale,
   });
@@ -495,13 +499,13 @@ function BoardLayoutInner({
               boardInputEnabled &&
               bs.canEndPhase &&
               !boardPrompt &&
-              !spotlight.isBlockingPrompt
+              !boardBlocked
             }
             canPass={
               boardInputEnabled &&
               bs.canPass &&
               !boardPrompt &&
-              !spotlight.isBlockingPrompt
+              !boardBlocked
             }
             inBattle={bs.inBattle}
             activePrompt={boardPrompt}
@@ -533,7 +537,7 @@ function BoardLayoutInner({
             isPromptHidden={modalRouting.isPromptHidden}
             onShowPrompt={modalRouting.showPrompt}
             canUndo={
-              boardInputEnabled && canUndo && !spotlight.isBlockingPrompt
+              boardInputEnabled && canUndo && !boardBlocked
             }
             onAction={dispatchBoardAction}
           />
@@ -552,20 +556,20 @@ function BoardLayoutInner({
               boardInputEnabled &&
               bs.canInteract &&
               !modalRouting.targetSelectionActive &&
-              !spotlight.isBlockingPrompt
+              !boardBlocked
             }
             canActivateMain={
               boardInputEnabled &&
               bs.canInteract &&
               !activePrompt &&
-              !spotlight.isBlockingPrompt
+              !boardBlocked
             }
             oncePerTurnUsed={turn?.oncePerTurnUsed}
             canDragCounter={
               boardInputEnabled &&
               bs.canDragCounter &&
               !modalRouting.targetSelectionActive &&
-              !spotlight.isBlockingPrompt
+              !boardBlocked
             }
             inBlockStep={blockStepInputEnabled}
             selectedBlockerId={bs.selectedBlockerId}
@@ -613,13 +617,13 @@ function BoardLayoutInner({
             cardDb={cardDb}
             enableDrag={
               !dndDisabled &&
-              !spotlight.isBlockingPrompt &&
+              !boardBlocked &&
               !modalRouting.targetSelectionActive &&
               (bs.canInteract || bs.canDragCounter)
             }
             counterMode={
               !dndDisabled &&
-              !spotlight.isBlockingPrompt &&
+              !boardBlocked &&
               !modalRouting.targetSelectionActive &&
               bs.canDragCounter
             }

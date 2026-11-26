@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "motion/react";
 import type { CardInstance, GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import {
@@ -16,6 +17,11 @@ import {
   type FlightFlip,
 } from "@/lib/game/card-motion";
 import { cardStagger } from "@/lib/motion";
+import {
+  SPOTLIGHT_DWELL_MS,
+  buildEventTimeline,
+  eventOffsetMs,
+} from "@/lib/game/event-timeline";
 
 export interface CardTransition {
   id: string;
@@ -31,9 +37,9 @@ export interface CardTransition {
    *  renders a DON token flying from the DON pool onto the destination card.
    *  An omitted kind is a standard travel transition. */
   kind?: "transform" | "don-attach";
-  /** Flight start delay in seconds (OPT-274). Used to stagger multi-card
-   *  draws (`~60ms` between arrivals) and multi-DON attachments so they
-   *  fan out sequentially instead of landing in a single instant. */
+  /** Flight start delay in seconds. Carries the event's beat offset in the
+   *  update's playback timeline (OPT-1040) plus any sibling fan-out, so
+   *  multi-card draws and multi-DON attachments land one after another. */
   delay?: number;
   /** For `kind: "don-attach"`, the target character's instanceId (used by
    *  consumers to offset the displayed DON count until the token lands).
@@ -81,17 +87,18 @@ export function receivedHandsByPlayerIndex(
     : [topHand, bottomHand];
 }
 
-const MAX_CONCURRENT = 8;
-// Covers the worst case: `MAX_CONCURRENT * staggerMs` of start-time offset +
-// the flip that precedes a turned-over flight (300ms) + the longest flight
-// (380ms) before the flight completes (OPT-1054: 7 × 90 + 300 + 380 ≈ 1.3s).
-// `onComplete` is the normal cleanup path; this timer is a safety net.
-const AUTO_EXPIRE_MS = 2000;
-/** Per-batch stagger between arrivals (OPT-274, retuned by OPT-1054). Keeps
- *  multi-card draws (e.g. "draw 2", Perona peek, search-and-draw effects)
- *  from landing in a single instant: draws and DON!! tokens deal
- *  `cardStagger.drawMs` apart, moves into a stacked pile `pileMs` apart, any
- *  other travel `defaultMs` apart. */
+/** Queued flights kept at once. A long effect chain queues its later beats
+ *  up front, so this must cover a whole update's playback (OPT-1040). */
+const MAX_CONCURRENT = 24;
+// Safety net past a transition's own start delay (OPT-1040): the flip that
+// precedes a turned-over flight (300ms) plus the longest flight (380ms)
+// before the flight completes, with margin (OPT-1054). `onComplete` is the
+// normal cleanup path.
+const AUTO_EXPIRE_MS = 1500;
+/** Per-token stagger inside a count-N expansion (DON!! attach, Life to deck),
+ *  matching the timeline's sibling stagger (OPT-1054 `cardStagger`): DON!!
+ *  tokens and draws deal `drawMs` apart, moves into a stacked pile `pileMs`
+ *  apart, any other travel `defaultMs` apart. */
 function staggerMs(transition: Pick<CardTransition, "kind" | "toZoneKey">): number {
   if (transition.kind === "don-attach") return cardStagger.drawMs;
   if (transition.toZoneKey.endsWith("-hand")) return cardStagger.drawMs;
@@ -199,7 +206,7 @@ export function eventToTransitions(
 
 /** Helper for count-N face-down flights between two static zones. Each
  *  token gets its own per-token delay so the sequence fans out instead of
- *  landing in a single instant; a later `applyBatchStagger` may add more. */
+ *  landing in a single instant; the timeline's beat offset rides on top. */
 function makeFaceDownBurst(
   count: number,
   fromZoneKey: string,
@@ -502,25 +509,32 @@ function eventToTransition(
   };
 }
 
+export interface TimedTransition {
+  transition: CardTransition;
+  /** The source event's start offset in the playback timeline, in ms. */
+  offsetMs: number;
+}
+
 /**
- * Apply a per-index stagger to a batch of transitions so multi-card arrivals
- * fan out sequentially instead of landing in a single instant. The first
- * travel transition keeps its original delay; each subsequent travel sibling
- * gets an extra `staggerMs` delay. Transform siblings resolve together so a
- * simultaneous destruction does not become a misleading sequence.
+ * Turn timeline offsets into flight delays (OPT-1040). A transition that waits
+ * for a spotlight starts when the spotlight yields, so its delay counts from
+ * the spotlight's release instead of the update's arrival.
  *
  * Pure helper — exported for unit tests.
  */
-export function applyBatchStagger(batch: CardTransition[]): CardTransition[] {
-  if (batch.length <= 1) return batch;
-  let travelIndex = 0;
-  return batch.map((t) => ({
-    ...t,
-    delay:
-      t.kind === "transform"
-        ? t.delay
-        : (t.delay ?? 0) + (travelIndex++ * staggerMs(t)) / 1000,
-  }));
+export function applyTimelineDelays(
+  batch: readonly TimedTransition[],
+  spotlight: { id: string; releaseOffsetMs: number } | null
+): CardTransition[] {
+  return batch.map(({ transition, offsetMs }) => {
+    const waitsForBatchSpotlight =
+      spotlight !== null && transition.waitForSpotlightId === spotlight.id;
+    const beatMs = waitsForBatchSpotlight
+      ? Math.max(0, offsetMs - spotlight.releaseOffsetMs)
+      : offsetMs;
+    if (beatMs <= 0) return transition;
+    return { ...transition, delay: (transition.delay ?? 0) + beatMs / 1000 };
+  });
 }
 
 export function useCardTransitions(
@@ -532,6 +546,7 @@ export function useCardTransitions(
   receivedHands?: ReceivedHands,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
+  const reducedMotion = useReducedMotion();
   // Track the highest timestamp we've processed. Using timestamps (instead of
   // array length) keeps dedup stable when the server sends a reconstructed
   // eventLog with the same length but different content.
@@ -603,27 +618,42 @@ export function useCardTransitions(
     if (newEvents.length === 0) return;
     lastTimestampRef.current = maxTs;
 
-    const batchSpotlight = findLatestSpotlight(newEvents) ?? activeSpotlight;
-    const newTransitions: CardTransition[] = [];
+    const newSpotlight = findLatestSpotlight(newEvents);
+    const batchSpotlight = newSpotlight ?? activeSpotlight;
+    const timeline = buildEventTimeline(newEvents, {
+      reducedMotion: !!reducedMotion,
+    });
+    // A spotlight from this update shows at its own beat; only the steps from
+    // that beat on wait for it to yield. Earlier steps play on their own.
+    const spotlightOffsetMs = newSpotlight
+      ? (timeline.offsets.get(newSpotlight.timestamp) ?? 0)
+      : 0;
+    const newTransitions: TimedTransition[] = [];
     for (const event of newEvents) {
+      const offsetMs = eventOffsetMs(timeline, event);
+      const waitsForSpotlight =
+        batchSpotlight !== null &&
+        (newSpotlight === null || offsetMs >= spotlightOffsetMs);
       const produced = eventToTransitions(
         event,
         bottomPlayerIndex,
         zoneRegistry ?? null,
-        batchSpotlight,
+        waitsForSpotlight ? batchSpotlight : null,
         receivedHands,
       );
       for (const transition of produced) {
-        newTransitions.push(
-          batchSpotlight &&
+        newTransitions.push({
+          offsetMs,
+          transition:
+            waitsForSpotlight &&
             transition.kind === "transform" &&
             transition.waitForSpotlightId === undefined
-            ? {
-                ...transition,
-                waitForSpotlightId: batchSpotlight.id,
-              }
-            : transition
-        );
+              ? {
+                  ...transition,
+                  waitForSpotlightId: batchSpotlight.id,
+                }
+              : transition,
+        });
       }
     }
 
@@ -634,23 +664,28 @@ export function useCardTransitions(
     const presentableTransitions =
       isDragging || dragCooldownRef.current
         ? newTransitions.filter(
-            (transition) => transition.waitForSpotlightId !== undefined
+            ({ transition }) => transition.waitForSpotlightId !== undefined
           )
         : newTransitions;
 
     if (presentableTransitions.length === 0) return;
 
-    // Stagger a batch of new arrivals (OPT-274). Each transition carries its
-    // own delay — DON-attach delays are already assigned per-token inside
-    // `eventToTransitions`; others stagger by their position in the batch so
-    // multi-card draws fan out sequentially. The stagger rides on top of any
-    // existing delay (e.g. DON-attach tokens inside a bigger batch).
-    // OPT-1054: cards whose destination needs the other side turn over
-    // before they travel; only the top card of a pile flips.
-    // The concurrency cap applies to the batch before flips are assigned,
-    // so the card that flips is always one that is shown.
+    // Each event starts on its beat (OPT-1040). Sibling fan-out inside a beat
+    // is already in the offsets (OPT-1054 `cardStagger`); count-N expansions
+    // keep their own per-token delay on top. The concurrency cap applies
+    // before flips are assigned, and flips are assigned on the final delays,
+    // so the card that flips is always shown and each beat's pile top is
+    // chosen within that beat (OPT-1054).
     const staggered = assignPileFlips(
-      applyBatchStagger(presentableTransitions).slice(-MAX_CONCURRENT),
+      applyTimelineDelays(
+        presentableTransitions,
+        newSpotlight
+          ? {
+              id: newSpotlight.id,
+              releaseOffsetMs: spotlightOffsetMs + SPOTLIGHT_DWELL_MS,
+            }
+          : null
+      ).slice(-MAX_CONCURRENT)
     );
 
     queueMicrotask(() => {
@@ -666,6 +701,7 @@ export function useCardTransitions(
     zoneRegistry,
     activeSpotlight,
     receivedHands,
+    reducedMotion,
   ]);
 
   // Auto-expire old transitions
@@ -678,7 +714,7 @@ export function useCardTransitions(
         prev.filter(
           (t) =>
             t.waitForSpotlightId !== undefined ||
-            now - t.startedAt < AUTO_EXPIRE_MS
+            now - t.startedAt < AUTO_EXPIRE_MS + (t.delay ?? 0) * 1000
         )
       );
     }, AUTO_EXPIRE_MS);

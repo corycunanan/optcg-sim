@@ -71,6 +71,11 @@ function isFaceDownPile(zoneKey: string): boolean {
 
 // ─── Flip assignment ─────────────────────────────────────────────────
 
+/** Widest gap (seconds) between two cards dealt from one pile in the same
+ *  beat. Siblings sit one stagger apart (at most `cardStagger.drawMs`); the
+ *  next beat starts at least a flip plus a flight later. */
+const PILE_SIBLING_WINDOW_SECONDS = 0.2;
+
 /** How a travelling card turns over before it departs.
  *  - `turn`: it plays the shared flip where it stands.
  *  - `under`: it sat under a pile's top card while that card flipped, and is
@@ -105,8 +110,9 @@ export function needsFlip(candidate: FlipCandidate): boolean {
 }
 
 /**
- * Mark which cards in a batch flip before they travel. Run after the batch's
- * stagger so the `under` swap can be timed off the top card's delay.
+ * Mark which cards in a batch flip before they travel. Run on the final
+ * delays (beat offsets plus sibling stagger) so the `under` swap can be timed
+ * off the top card's delay, and so each beat picks its own top card.
  *
  * When several cards leave the same face-down pile for a face-up zone (draw
  * 2), only the first — the top card — flips; each card under it is marked
@@ -118,7 +124,8 @@ export function needsFlip(candidate: FlipCandidate): boolean {
 export function assignPileFlips<T extends FlipCandidate>(
   batch: readonly T[]
 ): T[] {
-  const pileTopDelay = new Map<string, number>();
+  // Per pile: the current top card's delay and the last sibling's delay.
+  const piles = new Map<string, { topDelay: number; lastDelay: number }>();
   return batch.map((transition) => {
     if (!needsFlip(transition)) return transition;
     const fromPile =
@@ -126,15 +133,19 @@ export function assignPileFlips<T extends FlipCandidate>(
       transition.sourceFaceDown === true;
     if (!fromPile) return { ...transition, flip: "turn" };
 
-    const topDelay = pileTopDelay.get(transition.fromZoneKey);
-    if (topDelay === undefined) {
-      pileTopDelay.set(transition.fromZoneKey, transition.delay ?? 0);
+    const delay = transition.delay ?? 0;
+    const pile = piles.get(transition.fromZoneKey);
+    // Siblings of one beat deal a stagger apart; a card further out belongs
+    // to a later beat (OPT-1040) and is that beat's own top card.
+    if (!pile || delay - pile.lastDelay > PILE_SIBLING_WINDOW_SECONDS) {
+      piles.set(transition.fromZoneKey, { topDelay: delay, lastDelay: delay });
       return { ...transition, flip: "turn" };
     }
+    pile.lastDelay = delay;
     return {
       ...transition,
       flip: "under",
-      pileFlipAt: topDelay + FLIP_SECONDS,
+      pileFlipAt: pile.topDelay + FLIP_SECONDS,
     };
   });
 }

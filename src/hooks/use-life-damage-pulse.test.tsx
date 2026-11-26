@@ -6,6 +6,10 @@ import {
   LIFE_DAMAGE_PULSE_DURATION_MS,
   useLifeDamagePulse,
 } from "./use-life-damage-pulse";
+import { BEAT_GAP_MS } from "@/lib/game/event-timeline";
+import { cardFizzle } from "@/lib/motion";
+
+const FIZZLE_MS = Math.round(cardFizzle.transition.duration * 1000);
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
 
@@ -110,6 +114,29 @@ describe("useLifeDamagePulse", () => {
       vi.advanceTimersByTime(LIFE_DAMAGE_PULSE_DURATION_MS);
     });
     expect(readActivePlayers().size).toBe(0);
+  });
+
+  it("waits for the steps before it in the same update (OPT-1040)", async () => {
+    const knockOut: GameEvent = {
+      type: "CARD_KO",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP01-002",
+        cardInstanceId: "k1",
+        cause: "effect",
+        preKO_donCount: 0,
+      },
+    };
+    await render([]);
+    await render([knockOut, damageEvent(2, 0)]);
+    expect(readActivePlayers().size).toBe(0);
+
+    await act(async () => {
+      vi.advanceTimersByTime(FIZZLE_MS + BEAT_GAP_MS);
+      await Promise.resolve();
+    });
+    expect(readActivePlayers()).toEqual(new Map([[1, 1]]));
   });
 
   it("ignores lethal leader damage because it removes no life card", async () => {

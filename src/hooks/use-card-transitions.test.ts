@@ -3,7 +3,7 @@ import type { CardInstance, GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import type { SpotlightPresentation } from "@/lib/game/spotlight";
 import {
-  applyBatchStagger,
+  applyTimelineDelays,
   eventToTransitions,
   receivedHandsByPlayerIndex,
   type CardTransition,
@@ -49,61 +49,50 @@ function handCard(
   } as unknown as CardInstance;
 }
 
-describe("applyBatchStagger", () => {
-  it("returns the batch unchanged when length <= 1", () => {
-    const batch = [mkTransition({ id: "a" })];
-    expect(applyBatchStagger(batch)).toEqual(batch);
-  });
-
-  it("deals draws 0, 90, 180, … ms apart (OPT-1054)", () => {
-    const batch = [
-      mkTransition({ id: "a" }),
-      mkTransition({ id: "b" }),
-      mkTransition({ id: "c" }),
-    ];
-    const out = applyBatchStagger(batch);
-    expect(out[0].delay).toBe(0);
-    expect(out[1].delay).toBeCloseTo(0.09, 5);
-    expect(out[2].delay).toBeCloseTo(0.18, 5);
-  });
-
-  it("staggers pile moves by 70ms and other travel by the original 60ms", () => {
-    const pile = applyBatchStagger([
-      mkTransition({ id: "a", fromZoneKey: "p-char-1", toZoneKey: "p-deck" }),
-      mkTransition({ id: "b", fromZoneKey: "p-char-2", toZoneKey: "p-deck" }),
+describe("applyTimelineDelays", () => {
+  it("leaves a first-beat transition without an added delay", () => {
+    const transition = mkTransition({ id: "a" });
+    expect(applyTimelineDelays([{ transition, offsetMs: 0 }], null)).toEqual([
+      transition,
     ]);
-    expect(pile[1].delay).toBeCloseTo(0.07, 5);
-    const field = applyBatchStagger([
-      mkTransition({ id: "a", fromZoneKey: "p-hand", toZoneKey: "p-char-1" }),
-      mkTransition({ id: "b", fromZoneKey: "p-hand", toZoneKey: "p-char-2" }),
-    ]);
-    expect(field[1].delay).toBeCloseTo(0.06, 5);
   });
 
-  it("adds batch stagger on top of per-transition delays (e.g. DON-attach tokens)", () => {
-    // Simulate a DON_GIVEN_TO_CARD expansion — each token already has its own
-    // per-token delay; the batch stagger rides on top.
-    const batch = [
-      mkTransition({ id: "d0", delay: 0 }),
-      mkTransition({ id: "d1", delay: 0.06 }),
-    ];
-    const out = applyBatchStagger(batch);
-    expect(out[0].delay).toBe(0);
-    expect(out[1].delay).toBeCloseTo(0.15, 5);
-  });
-
-  it("does not stagger simultaneous transform siblings or consume a travel slot", () => {
-    const batch = [
-      mkTransition({ id: "f0", kind: "transform" }),
-      mkTransition({ id: "move-0" }),
-      mkTransition({ id: "f1", kind: "transform" }),
-      mkTransition({ id: "move-1" }),
-    ];
-    const out = applyBatchStagger(batch);
+  it("starts each transition on its event's beat", () => {
+    const out = applyTimelineDelays(
+      [
+        { transition: mkTransition({ id: "a" }), offsetMs: 0 },
+        { transition: mkTransition({ id: "b" }), offsetMs: 570 },
+      ],
+      null
+    );
     expect(out[0].delay).toBeUndefined();
-    expect(out[1].delay).toBe(0);
-    expect(out[2].delay).toBeUndefined();
-    expect(out[3].delay).toBeCloseTo(0.09, 5);
+    expect(out[1].delay).toBeCloseTo(0.57, 5);
+  });
+
+  it("keeps a count-N token delay on top of the beat offset", () => {
+    const out = applyTimelineDelays(
+      [{ transition: mkTransition({ id: "d1", delay: 0.12 }), offsetMs: 500 }],
+      null
+    );
+    expect(out[0].delay).toBeCloseTo(0.62, 5);
+  });
+
+  it("counts a spotlight-held transition from the spotlight's release", () => {
+    const out = applyTimelineDelays(
+      [
+        {
+          transition: mkTransition({ id: "spot", waitForSpotlightId: "s" }),
+          offsetMs: 300,
+        },
+        {
+          transition: mkTransition({ id: "ko", waitForSpotlightId: "s" }),
+          offsetMs: 1650,
+        },
+      ],
+      { id: "s", releaseOffsetMs: 1300 }
+    );
+    expect(out[0].delay).toBeUndefined();
+    expect(out[1].delay).toBeCloseTo(0.35, 5);
   });
 });
 
