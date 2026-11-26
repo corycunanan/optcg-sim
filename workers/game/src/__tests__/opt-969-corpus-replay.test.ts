@@ -8,6 +8,7 @@ import { LegacyReaderRepository as SessionRepository } from "./legacy-reader-rep
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import type { GameAction, GameState } from "../types.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 
 const families = ["action-identity", "replacement-identity", "don-minus", "variable-three", "historical-bucket", "cost-child-replacement", "opponent-active-cost-area"] as const;
 for (const family of families) for (const resumeUndo of [false, true]) {
@@ -36,10 +37,10 @@ for (const family of families) for (const resumeUndo of [false, true]) {
         expect(result.responseRejected).toBe(false);
         const saved = await repo.save({ ...loaded, state: result.state, undoHistory: [] });
         state = toPersistedGameState(saved.state);
-        expect(state).toEqual(step.expected);
+        expect(withoutAssertedDonMoveDetail(state)).toEqual(step.expected);
         // Later pauses are persisted/reloaded too, not only the first one.
         state = (await repo.load())!.state;
-        expect(state).toEqual(step.expected);
+        expect(withoutAssertedDonMoveDetail(state)).toEqual(step.expected);
       }
       if (family === "opponent-active-cost-area") {
         expect(state.players[0].donCostArea).toHaveLength(stored.state.players[0].donCostArea.length);

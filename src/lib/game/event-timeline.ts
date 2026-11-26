@@ -1,5 +1,5 @@
 import type { GameEvent, GameEventType } from "@shared/game-types";
-import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel, deckRiffle } from "@/lib/motion";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import { eventToSpotlight } from "@/lib/game/spotlight";
 
@@ -85,8 +85,19 @@ export function isNamedDeckTrash(event: GameEvent): boolean {
   );
 }
 
+/** A DON!! move between the DON!! deck and the field (OPT-1057): DON!!
+ *  placement, and a DON_DETACHED return to the DON!! deck. The Refresh
+ *  Phase DON_DETACHED (`to: "COST_AREA"`, no count) is not one. Every such
+ *  move flips: the DON!! deck is face-down and the field face-up. */
+export function isDonDeckMove(event: GameEvent): boolean {
+  if (event.type === "DON_PLACED_ON_FIELD") return true;
+  if (event.type !== "DON_DETACHED") return false;
+  const payload = event.payload ?? {};
+  return payload.to !== "COST_AREA" && (payload.count ?? 0) > 0;
+}
+
 function mayFlip(event: GameEvent): boolean {
-  if (isNamedDeckTrash(event)) return true;
+  if (isNamedDeckTrash(event) || isDonDeckMove(event)) return true;
   if (!FLIPPING_TRAVEL_EVENTS.has(event.type)) return false;
   // Life to hand flips only when the event names the Life side (OPT-1059).
   if (event.type === "CARD_ADDED_TO_HAND_FROM_LIFE" && !event.payload.sourceFace) {
@@ -107,6 +118,8 @@ export function siblingStaggerMs(type: GameEventType): number {
     case "CARD_RETURNED_TO_HAND":
     case "CARD_ADDED_TO_HAND_FROM_LIFE":
     case "DON_GIVEN_TO_CARD":
+    case "DON_PLACED_ON_FIELD":
+    case "DON_DETACHED":
       return cardStagger.drawMs;
     case "CARD_RETURNED_TO_DECK":
     case "LIFE_CARD_TO_DECK":
@@ -145,7 +158,7 @@ const PULSE_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
 const COUNTED_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
   new Set<GameEventType>(["DON_GIVEN_TO_CARD", "LIFE_CARD_TO_DECK"]);
 
-export type BeatKind = "spotlight" | "travel" | "transform" | "pulse";
+export type BeatKind = "spotlight" | "travel" | "transform" | "pulse" | "shuffle";
 
 /**
  * What a board consumer sees for one event. `null` means the event has no
@@ -158,12 +171,15 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
   if (
     TRAVEL_EVENTS.has(event.type) ||
     COUNTED_TRAVEL_EVENTS.has(event.type) ||
-    isNamedDeckTrash(event)
+    isNamedDeckTrash(event) ||
+    isDonDeckMove(event)
   ) {
     return "travel";
   }
   if (TRANSFORM_EVENTS.has(event.type)) return "transform";
   if (PULSE_EVENTS.has(event.type)) return "pulse";
+  // OPT-1055: the deck riffles in place; later steps wait for it to square up.
+  if (event.type === "DECK_SHUFFLED") return "shuffle";
   return null;
 }
 
@@ -173,6 +189,9 @@ function countedFanOut(event: GameEvent): number {
   }
   if (event.type === "CARD_TRASHED" && isNamedDeckTrash(event)) {
     return event.payload.cards?.length ?? 1;
+  }
+  if (isDonDeckMove(event)) {
+    return Math.max(1, (event.payload as { count?: number }).count ?? 1);
   }
   return 1;
 }
@@ -187,6 +206,8 @@ function leadMsFor(kind: BeatKind): number {
       return FIZZLE_MS;
     case "pulse":
       return PULSE_READ_MS;
+    case "shuffle":
+      return deckRiffle.totalMs;
   }
 }
 

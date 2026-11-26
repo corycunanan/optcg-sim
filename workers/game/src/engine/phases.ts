@@ -27,6 +27,7 @@ import type {
 import {
   getActivePlayerIndex,
   returnAttachedDonToCostArea,
+  attachedDonCounts,
   activateAllRested,
   placeDonFromDeck,
 } from "./state.js";
@@ -87,7 +88,17 @@ export function executeAdvancePhaseWork(state: GameState, cardDb: Map<string, Ca
       // Rule 3-1-6-1: the returned DON!! changed area, so effects applied to
       // them end now — before step 4 decides what stays rested.
       nextState = releaseMovedDonEffects(beforeDonReturn, nextState);
-      events.push({ type: "DON_DETACHED", playerIndex: pi });
+      // OPT-1057: `to` + `sources` let the board fly each DON!! off its card.
+      // No `count`: this is not a DON!! deck return (triggers.ts, OPT-881).
+      const refreshSources = attachedDonCounts(beforeDonReturn.players[pi]);
+      events.push({
+        type: "DON_DETACHED",
+        playerIndex: pi,
+        payload: {
+          to: "COST_AREA",
+          ...(refreshSources.length > 0 ? { sources: refreshSources } : {}),
+        },
+      });
       // Step 4: Activate all rested cards — except those held rested by a
       // CANNOT_REFRESH prohibition, which is consumed by the refresh it skips
       const refreshProhib = applyRefreshProhibitions(nextState, pi, cardDb);
@@ -142,6 +153,7 @@ export function executeAdvancePhaseWork(state: GameState, cardDb: Map<string, Ca
         })) continue;
         givenCount = Math.min(placedCount, givenCount + rule.count);
       }
+      const placedDonIds = player.donDeck.slice(0, placedCount).map((d) => d.instanceId);
       nextState = placeDonFromDeck(nextState, pi, donCount);
       // Rule 1-3-3: a "cannot be given DON!!" effect beats the rule
       // modification, so the DON!! stay in the cost area (OPT-1036). Checked
@@ -165,7 +177,7 @@ export function executeAdvancePhaseWork(state: GameState, cardDb: Map<string, Ca
       events.push({
         type: "DON_PLACED_ON_FIELD",
         playerIndex: pi,
-        payload: { count: placedCount },
+        payload: { count: placedCount, donInstanceIds: placedDonIds },
       });
       if (givenCount > 0) {
         events.push({

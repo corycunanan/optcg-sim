@@ -9,6 +9,7 @@ import { toPersistedGameState } from "../session/game-state-schema.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import type { GameAction, GameState } from "../types.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 
 interface CapturedCase { index: number; stored: Record<string, unknown>; replies: GameAction[]; legacyUndo: Record<string, unknown> }
 const fixtures = corpus as unknown as { scenarios: { name: string; cases: CapturedCase[]; expected: unknown }[] };
@@ -51,10 +52,10 @@ describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => 
         const nextPause = scenario.cases[captured.index + replyIndex + 1];
         if (nextPause) {
           const expectedPause = (nextPause.stored.session as { state: unknown }).state;
-          expect(withoutAssertedMotionPayloads(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state))))).toEqual(writerEnvelope(expectedPause));
+          expect(withoutAssertedMotionPayloads(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))))).toEqual(writerEnvelope(expectedPause));
         }
       }
-      expect(withoutAssertedMotionPayloads(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
+      expect(withoutAssertedMotionPayloads(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
     });
   }
 });
@@ -103,7 +104,7 @@ it("rejects malformed complete event families on real OP15-009 v6 pauses without
     drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
   });
   expect(resumed.responseRejected).toBeFalsy();
-  expect(withoutAssertedMotionPayloads(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
+  expect(withoutAssertedMotionPayloads(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state)))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
   expect(resumed.state.eventLog.filter((event) => event.type === "CARD_KO")).toHaveLength(0);
 });
 
@@ -147,7 +148,7 @@ it("requires ordering prompt choices to be a unique bijection while allowing per
     await new SessionRepository(next, options).save({ ...loaded, state: resumed.state });
     loaded = (await new SessionRepository(next, options).load())!;
   }
-  expect(withoutAssertedMotionPayloads(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
+  expect(withoutAssertedMotionPayloads(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
 });
 
 const nativeOrderingPause = fixtures.scenarios.flatMap((scenario) => scenario.cases).find((captured) => {

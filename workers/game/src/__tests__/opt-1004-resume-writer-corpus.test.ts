@@ -8,6 +8,7 @@ import { GameSession } from "../GameSession.js";
 import type { CardData, Env, GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 
 const directory = resolve(__dirname, "fixtures/opt-1004-scheduled-resume-writer10");
 const manifest = JSON.parse(readFileSync(resolve(directory, "manifest.json"), "utf8"));
@@ -122,7 +123,7 @@ describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", 
           if (!ids.has(key)) ids.set(key, `engine-${ids.size}`); return ids.get(key)!;
         });
       };
-      expect(JSON.parse(normalizeIds(actual)), `${id} ${step.action.type}`).toEqual(JSON.parse(normalizeIds(expected)));
+      expect(JSON.parse(normalizeIds(withoutAssertedDonMoveDetail(actual))), `${id} ${step.action.type}`).toEqual(JSON.parse(normalizeIds(expected)));
       loaded = (await new SessionRepository(storage, options).load())!;
     }
     expect(loaded.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(scenario.expectedDonEvents);

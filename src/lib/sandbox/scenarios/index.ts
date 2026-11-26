@@ -19,6 +19,7 @@ import {
   waitingRevealSpotlightScenario,
 } from "./effects/public-reveal-spotlight";
 import { peekTopThreeScenario } from "./draws/peek-top-3";
+import { searchThenShuffleScenario } from "./draws/search-then-shuffle";
 import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
 import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
 import { lifeToHandScenario } from "./life/life-to-hand";
@@ -33,6 +34,8 @@ import { opponentPlayCharacterScenario } from "./movement/opponent-play-characte
 import { opponentPlayThenDrawScenario } from "./movement/opponent-play-then-draw";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
+import { donPhaseFromDonDeckScenario } from "./movement/don-phase-from-don-deck";
+import { donReturnToDonDeckScenario } from "./movement/don-return-to-don-deck";
 import { playCharacterRestedScenario } from "./playground/play-character-rested";
 import { playCharacterScenario } from "./playground/play-character";
 import { playEventTransformScenario } from "./playground/play-event-transform";
@@ -51,12 +54,15 @@ export const scenarios: Scenario[] = [
   drawTwoScenario,
   drawTwoOneUpdateScenario,
   peekTopThreeScenario,
+  searchThenShuffleScenario,
   playCharacterSummonScenario,
   opponentPlayCharacterScenario,
   opponentPlayThenDrawScenario,
   attachOneDonScenario,
   attachThreeDonStaggeredScenario,
   redistributeDonScenario,
+  donPhaseFromDonDeckScenario,
+  donReturnToDonDeckScenario,
   attackNoBlockerScenario,
   blockerInterceptsScenario,
   counterFromHandScenario,

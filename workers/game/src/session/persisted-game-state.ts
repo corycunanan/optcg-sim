@@ -672,8 +672,20 @@ const EventPayloadSchemas = {
     targetInstanceId: z.string().optional(),
     count: FiniteNumber,
   }),
-  DON_DETACHED: z.strictObject({ count: FiniteNumber.optional() }),
-  DON_PLACED_ON_FIELD: z.strictObject({ count: FiniteNumber }),
+  DON_DETACHED: z.strictObject({
+    count: FiniteNumber.optional(),
+    to: z.enum(["DON_DECK", "COST_AREA"]).optional(),
+    fromCostArea: FiniteNumber.optional(),
+    sources: z.array(z.strictObject({
+      cardInstanceId: z.string(),
+      count: FiniteNumber,
+    })).optional(),
+    donInstanceIds: z.array(z.string()).optional(),
+  }),
+  DON_PLACED_ON_FIELD: z.strictObject({
+    count: FiniteNumber,
+    donInstanceIds: z.array(z.string()).optional(),
+  }),
   DON_STATE_CHANGED: EmptyPayload,
   CARD_STATE_CHANGED: z.strictObject({
     cardInstanceId: z.string().optional(),
@@ -772,6 +784,7 @@ const EventPayloadSchemas = {
     detail: z.string(),
     cardId: z.string().optional(),
   }),
+  DECK_SHUFFLED: EmptyPayload,
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {

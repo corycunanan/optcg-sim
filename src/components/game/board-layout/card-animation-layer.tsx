@@ -33,8 +33,9 @@ import {
   BOARD_CARD_H,
   HAND_CARD_W,
   HAND_CARD_H,
+  DEFAULT_DON_IMG,
 } from "./constants";
-import { handSlotZoneKey } from "./board-geometry";
+import { donSlotZoneKey, handSlotZoneKey } from "./board-geometry";
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
@@ -242,7 +243,10 @@ function FlyingCard({
 }) {
   const zonePos = useZonePosition();
   const isTransform = transition.kind === "transform";
-  const isDonAttach = transition.kind === "don-attach";
+  // DON!! tokens stay DON-sized whether they attach to a card or move
+  // between the DON!! deck and the cost area.
+  const isDonAttach =
+    transition.kind === "don-attach" || transition.kind === "don-move";
   const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
   // A hand card's own slot is registered by `HandLayer`; a card that just
@@ -254,9 +258,20 @@ function FlyingCard({
           handSlotZoneKey(transition.fromZoneKey, transition.instanceId)
         )
       : null;
+  // A DON!! leaving the cost area departs from its own token's slot, which
+  // the registry remembers after the token unmounts (OPT-1057).
+  const isDonMove = transition.kind === "don-move";
+  const fromDonSlotRect =
+    isDonMove && transition.donInstanceId
+      ? zonePos.getRect(
+          donSlotZoneKey(transition.fromZoneKey, transition.donInstanceId)
+        )
+      : null;
   const fromRect = measured(fromSlotRect)
     ? fromSlotRect
-    : zonePos.getRect(transition.fromZoneKey);
+    : measured(fromDonSlotRect)
+      ? fromDonSlotRect
+      : zonePos.getRect(transition.fromZoneKey);
   const toRect = zonePos.getRect(transition.toZoneKey);
   const canAnimate = Boolean(
     fromRect && (isTransform || toRect) && (!reducedMotion || isTransform)
@@ -359,6 +374,63 @@ function FlyingCard({
         sleeveUrl={sleeveUrl}
         onComplete={onComplete}
         boardScale={boardScale}
+      />
+    );
+  }
+
+  if (isDonMove) {
+    // DON!! deck <-> field (OPT-1057): the token turns over where it stands
+    // when its destination needs the other side (the top of the DON!! deck
+    // flips; the ones under it come off already face-up), then flies the
+    // DON!! arc. A placed DON!! aims at its own cost-area slot, read live so
+    // it lands flush while the row re-fans.
+    const plan = planFlight(transition);
+    const donInstanceId = transition.donInstanceId;
+    const resolveTarget = (): GhostBox => {
+      if (donInstanceId) {
+        const slot = zonePos.getRect(
+          donSlotZoneKey(transition.toZoneKey, donInstanceId)
+        );
+        if (measured(slot)) {
+          return {
+            x: slot.left + (slot.width - toW) / 2,
+            y: slot.top + (slot.height - toH) / 2,
+            w: toW,
+            h: toH,
+          };
+        }
+      }
+      return { x: toX, y: toY, w: toW, h: toH };
+    };
+    return (
+      <TravelGhost
+        transition={transition}
+        from={{ x: fromX, y: fromY, w: fromW, h: fromH }}
+        resolveTarget={resolveTarget}
+        variant="field"
+        cardDb={cardDb}
+        onComplete={onComplete}
+        boardScale={boardScale}
+        profile={cardTransitions.donAttach}
+        content={
+          <Card
+            variant="don"
+            state="in-flight"
+            artUrl={donArtUrl || DEFAULT_DON_IMG}
+            faceDown={plan.faceDown}
+            flipFrom={
+              plan.flipAt === null
+                ? undefined
+                : {
+                    faceDown: plan.initialFaceDown,
+                    delay: plan.flipAt,
+                    instant: plan.flipInstant,
+                  }
+            }
+            interaction={{ tooltipDisabled: true }}
+            style={FILL_TRANSITION_FRAME}
+          />
+        }
       />
     );
   }

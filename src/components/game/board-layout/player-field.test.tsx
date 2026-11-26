@@ -18,6 +18,7 @@ vi.mock("@/hooks/use-field-arrivals", () => ({
 
 vi.mock("./deck-pile", () => ({ DeckPile: () => null }));
 vi.mock("./don-zone", () => ({ DonZone: () => null }));
+vi.mock("./don-deck-pile", () => ({ DonDeckPile: () => null }));
 vi.mock("./drop-zones", () => ({
   DroppableCharSlot: () => null,
   DroppableOwnField: () => null,

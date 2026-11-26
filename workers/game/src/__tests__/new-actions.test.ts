@@ -309,6 +309,22 @@ describe("SHUFFLE_DECK action", () => {
     const result = resolveEffect(state, block, "char-0-v1", 0, cardDb);
     expect(result.resolved).toBe(true);
     expect(result.state.players[0].deck.length).toBe(origDeckLen);
+    // OPT-1055: the board riffles the shuffled deck's owner's pile.
+    expect(result.events.filter((e) => e.type === "DECK_SHUFFLED")).toEqual([
+      expect.objectContaining({ type: "DECK_SHUFFLED", playerIndex: 0 }),
+    ]);
+  });
+
+  it("announces the opponent's deck when it shuffles theirs (OPT-1055)", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const block = makeEffectBlock({
+      actions: [{ type: "SHUFFLE_DECK", target: { controller: "OPPONENT" } }],
+    });
+    const result = resolveEffect(state, block, "char-0-v1", 0, cardDb);
+    expect(result.events.filter((e) => e.type === "DECK_SHUFFLED")).toEqual([
+      expect.objectContaining({ type: "DECK_SHUFFLED", playerIndex: 1 }),
+    ]);
   });
 });
 

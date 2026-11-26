@@ -23,7 +23,7 @@ import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
-  SIDE_ZONE_GAP,
+  DON_DECK_CLEARANCE,
   FIELD_W,
   FIELD_H,
   CHAR_ROW_W,
@@ -43,6 +43,7 @@ import {
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { DeckPile } from "./deck-pile";
+import { DonDeckPile } from "./don-deck-pile";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
 import { PlayerFieldCard } from "./field-card";
@@ -85,6 +86,8 @@ interface PlayerFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
+  /** OPT-1055: restarts the deck riffle when this player's deck shuffles. */
+  deckShuffleNonce?: number;
   /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   /** Field cards whose flight has not landed yet; they stay hidden in their
@@ -128,6 +131,7 @@ function PlayerFieldComponent({
   lifeTriggerPulse,
   lifeDamagePulseNonce,
   lifeScriedPulseNonce,
+  deckShuffleNonce,
   pileArrivingCounts,
   arrivingInstanceIds,
   targetSelectionById,
@@ -229,7 +233,20 @@ function PlayerFieldComponent({
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
         onInspect={me ? handlePreviewLife : undefined}
+        maxStackSpread={DON_DECK_CLEARANCE}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
+      />
+
+      {/* Zone 1 (left), under Life: DON!! deck */}
+      <DonDeckPile
+        count={me?.donDeck.length ?? 0}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("don-deck"))}
+        zoneKey={zoneKey("don-deck")}
+        style={{
+          position: "absolute",
+          left: sideCardOffsetX,
+          top: playerLeaderTop,
+        }}
       />
 
       {/* Zone 2: Character row */}
@@ -309,6 +326,7 @@ function PlayerFieldComponent({
         enableDrag={canInteract}
         zoneKey={zoneKey("don")}
         donArtUrl={me?.donArtUrl}
+        arrivingDonIds={arrivingInstanceIds}
         style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.2 : undefined}
       />
@@ -394,6 +412,7 @@ function PlayerFieldComponent({
         cardDb={cardDb}
         sleeveUrl={me?.sleeveUrl}
         zoneKey={zoneKey("deck")}
+        shuffleNonce={deckShuffleNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,
@@ -414,7 +433,7 @@ function PlayerFieldComponent({
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,
-          top: playerTop + SQUARE + SIDE_ZONE_GAP,
+          top: playerLeaderTop,
         }}
       />
     </>

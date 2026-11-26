@@ -13,12 +13,32 @@ const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 export function CardBack({
   sleeveUrl,
   label,
+  donBack = false,
   className,
 }: {
   sleeveUrl?: string | null;
   label?: string;
+  /** The DON!! back (OPT-1057): a plain dark face with an amber DON!! mark,
+   *  so the DON!! deck never reads as a sleeved pile like the deck or Life. */
+  donBack?: boolean;
   className?: string;
 }) {
+  if (donBack) {
+    return (
+      <div
+        className={cn(
+          "absolute inset-0 overflow-hidden rounded-card border border-gb-accent-amber/40",
+          "[backface-visibility:hidden] [transform:rotateY(180deg)]",
+          "bg-gb-board-dark",
+          className,
+        )}
+      >
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center font-display text-base text-gb-accent-amber/70 select-none">
+          DON!!
+        </span>
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

@@ -247,7 +247,11 @@ export function executeAddDonFromDeck(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[controller] = { ...p, donDeck: newDonDeck, donCostArea: newDonCostArea };
 
-  events.push({ type: "DON_PLACED_ON_FIELD", playerIndex: controller, payload: { count } });
+  events.push({
+    type: "DON_PLACED_ON_FIELD",
+    playerIndex: controller,
+    payload: { count, donInstanceIds: added.map((d) => d.instanceId) },
+  });
 
   return {
     state: { ...state, players: newPlayers },
@@ -340,6 +344,8 @@ export function applyFieldDonReturn(
   );
 
   // Detach the chosen attached DON!! from each named card.
+  const sources: { cardInstanceId: string; count: number }[] = [];
+  const attachedTaken: DonInstance[] = [];
   let newLeader = p.leader;
   const newCharacters = [...p.characters] as typeof p.characters;
   for (const { cardInstanceId, count } of plan.attached) {
@@ -347,6 +353,8 @@ export function applyFieldDonReturn(
     if (newLeader.instanceId === cardInstanceId) {
       const take = newLeader.attachedDon.slice(0, count);
       returned.push(...take.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })));
+      if (take.length > 0) sources.push({ cardInstanceId, count: take.length });
+      attachedTaken.push(...take);
       newLeader = { ...newLeader, attachedDon: newLeader.attachedDon.slice(take.length) };
       continue;
     }
@@ -355,6 +363,8 @@ export function applyFieldDonReturn(
       const char = newCharacters[charIdx]!;
       const take = char.attachedDon.slice(0, count);
       returned.push(...take.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })));
+      if (take.length > 0) sources.push({ cardInstanceId, count: take.length });
+      attachedTaken.push(...take);
       newCharacters[charIdx] = { ...char, attachedDon: char.attachedDon.slice(take.length) };
     }
   }
@@ -368,7 +378,11 @@ export function applyFieldDonReturn(
     donDeck: [...p.donDeck, ...returned],
   };
 
-  events.push({ type: "DON_DETACHED", playerIndex, payload: { count: returned.length } });
+  events.push({
+    type: "DON_DETACHED",
+    playerIndex,
+    payload: donDeckReturnPayload([...fromCostActive, ...fromCostRested], sources, attachedTaken),
+  });
   return { state: { ...state, players: newPlayers }, events, returned: returned.length };
 }
 
@@ -403,7 +417,35 @@ export function applyDonReturnIds(
     donCostArea: p.donCostArea.filter(d => !selected.has(d.instanceId)),
     donDeck: [...p.donDeck, ...returned],
   };
-  return { state: { ...state, players }, events: [{ type: "DON_DETACHED", playerIndex: owner, payload: { count: ids.length } }], returned: ids.length };
+  const sources = hosts
+    .map(c => ({ cardInstanceId: c.instanceId, count: c.attachedDon.filter(d => selected.has(d.instanceId)).length }))
+    .filter(s => s.count > 0);
+  const fromCostArea = p.donCostArea.filter(d => selected.has(d.instanceId));
+  const attachedTaken = hosts.flatMap(c => c.attachedDon.filter(d => selected.has(d.instanceId)));
+  return { state: { ...state, players }, events: [{ type: "DON_DETACHED", playerIndex: owner, payload: donDeckReturnPayload(fromCostArea, sources, attachedTaken) }], returned: ids.length };
+}
+
+/** DON_DETACHED payload for a return to the DON!! deck (OPT-1057): the
+ *  positive `count` that DON_RETURNED_TO_DON_DECK watchers key on, plus where
+ *  the DON!! came from so the board can fly each one from its real place. */
+export function donDeckReturnPayload(
+  costAreaDon: readonly { instanceId: string }[],
+  sources: readonly { cardInstanceId: string; count: number }[] = [],
+  attachedDon: readonly { instanceId: string }[] = [],
+): {
+  count: number;
+  to: "DON_DECK";
+  fromCostArea: number;
+  sources?: { cardInstanceId: string; count: number }[];
+  donInstanceIds: string[];
+} {
+  return {
+    count: costAreaDon.length + attachedDon.length,
+    to: "DON_DECK",
+    fromCostArea: costAreaDon.length,
+    ...(sources.length > 0 ? { sources: [...sources] } : {}),
+    donInstanceIds: [...costAreaDon, ...attachedDon].map((d) => d.instanceId),
+  };
 }
 
 /** Cards whose attached DON!! can be returned, in a stable order (Leader first). */
@@ -786,7 +828,7 @@ export function executeReturnDonToDeck(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[controller] = { ...p, donCostArea: remaining, donDeck: [...p.donDeck, ...returned] };
 
-  events.push({ type: "DON_DETACHED", playerIndex: controller, payload: { count } });
+  events.push({ type: "DON_DETACHED", playerIndex: controller, payload: donDeckReturnPayload(toReturn) });
 
   return {
     state: { ...state, players: newPlayers },

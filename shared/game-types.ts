@@ -372,8 +372,30 @@ export interface GameEventPayloadMap {
   };
   TRIGGER_ACTIVATED: { cardId: string; activated?: boolean };
   DON_GIVEN_TO_CARD: { targetInstanceId?: string; count: number };
-  DON_DETACHED: { count?: number };
-  DON_PLACED_ON_FIELD: { count: number };
+  /**
+   * DON!! left the field area they were in (OPT-1057). Two moves share this
+   * event, told apart by `to`:
+   * - `DON_DECK`: a return to the DON!! deck (DON!! −X, return effects). It
+   *   always carries a positive `count`, which `DON_RETURNED_TO_DON_DECK`
+   *   watchers key on (triggers.ts, OPT-881).
+   * - `COST_AREA`: the Refresh Phase return of attached DON!! (rule 6-2-3).
+   *   It carries no `count`, so it never matches those watchers.
+   * `fromCostArea`, `sources` and `donInstanceIds` say where the DON!! came from: the cost
+   * area, and the cards they were attached to (Leader first, then
+   * Characters in slot order). Older events carry only `count`.
+   */
+  DON_DETACHED: {
+    count?: number;
+    to?: "DON_DECK" | "COST_AREA";
+    fromCostArea?: number;
+    sources?: { cardInstanceId: string; count: number }[];
+    /** The DON!! that moved: the `fromCostArea` cost-area DON!! first, then
+     *  the attached ones in `sources` order. */
+    donInstanceIds?: string[];
+  };
+  /** `donInstanceIds` names the placed DON!! in DON!! deck order (OPT-1057),
+   *  so the board can fly each one to its own cost-area slot. */
+  DON_PLACED_ON_FIELD: { count: number; donInstanceIds?: string[] };
   DON_STATE_CHANGED: Record<string, never>;
   CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string; cause?: "EFFECT" | "EFFECT_COST"; causingController?: 0 | 1; causingSource?: EffectSourceIdentity };
   POWER_MODIFIED: { targetInstanceId: string; amount?: number; value?: number };
@@ -424,6 +446,8 @@ export interface GameEventPayloadMap {
    * player-facing words and never carries hidden card identities.
    */
   PROMPT_AUTO_RESOLVED: { detail: string; cardId?: string };
+  /** OPT-1055: `playerIndex`'s deck was shuffled (effect, search, mulligan). */
+  DECK_SHUFFLED: Record<string, never>;
 }
 
 /** Union of all event type strings. */
@@ -482,6 +506,7 @@ export const ALL_GAME_EVENT_TYPES = [
   "PREGAME_FIRST_PLAYER_DECIDED",
   "MULLIGAN_DECISION",
   "PROMPT_AUTO_RESOLVED",
+  "DECK_SHUFFLED",
 ] as const satisfies readonly GameEventType[];
 
 type _AllGameEventTypesCovered =

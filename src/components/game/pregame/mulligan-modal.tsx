@@ -1,7 +1,10 @@
 "use client";
 
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import { motion } from "motion/react";
+import type { MulliganRedrawPlayback } from "@/hooks/use-mulligan-redraw";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
+import { mulliganPilePoint, mulliganRowWidth } from "@/lib/game/mulligan-motion";
 import {
   Dialog,
   DialogContent,
@@ -9,15 +12,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { Card } from "../card";
+import { CARD_SIZES } from "../card/sizes";
 import { GameButton } from "../game-button";
+import { MulliganDeckPile } from "./mulligan-deck-pile";
+import {
+  MULLIGAN_STAGE_GEOMETRY,
+  MulliganRedrawStage,
+} from "./mulligan-redraw-stage";
 
 interface MulliganModalProps {
   /** True when this client owns the active mulligan prompt. False = waiting view. */
   isResponder: boolean;
   myHand: CardInstance[];
   cardDb: CardDb;
+  /** The viewer's card sleeve, for the deck pile and face-down cards. */
+  sleeveUrl?: string | null;
   onAction: (action: GameAction) => void;
+  /** Called just before Redraw is sent, to start the redraw animation. */
+  onRedraw?: () => void;
+  /** A redraw animation in progress (OPT-1060). While set, the modal plays
+   *  it over the hand row whatever the server's current phase. */
+  playback?: MulliganRedrawPlayback | null;
+  onPlaybackDone?: () => void;
 }
 
 /**
@@ -32,8 +50,13 @@ export function MulliganModal({
   isResponder,
   myHand,
   cardDb,
+  sleeveUrl,
   onAction,
+  onRedraw,
+  playback = null,
+  onPlaybackDone,
 }: MulliganModalProps) {
+  const showHand = isResponder || playback !== null;
   const rovingFocus = useRovingFocus<HTMLDivElement>(
     myHand.map((card) => card.instanceId)
   );
@@ -51,14 +74,42 @@ export function MulliganModal({
             Mulligan
           </DialogTitle>
           <DialogDescription className="text-gb-text-dim max-w-md text-center text-sm">
-            {isResponder
-              ? "Keep this opening hand, or shuffle it back into your deck and draw 5 new cards."
-              : "Waiting for the other player to decide on their opening hand…"}
+            {playback
+              ? "Shuffling your hand back into your deck and drawing 5 new cards…"
+              : isResponder
+                ? "Keep this opening hand, or shuffle it back into your deck and draw 5 new cards."
+                : "Waiting for the other player to decide on their opening hand…"}
           </DialogDescription>
         </div>
 
-        {isResponder && (
+        {showHand && (
           <>
+            {/* The hand row is the layout box; the deck pile hangs off its
+                right edge so the hand stays centered. The redraw stage draws
+                over the same box (OPT-1060). */}
+            <div
+              className="relative"
+              style={{
+                width: mulliganRowWidth(5, MULLIGAN_STAGE_GEOMETRY),
+                height: CARD_SIZES.modal.height,
+              }}
+            >
+            {playback ? (
+              <MulliganRedrawStage
+                oldHand={playback.oldHand}
+                newHand={playback.newHand}
+                cardDb={cardDb}
+                sleeveUrl={sleeveUrl}
+                onDone={() => onPlaybackDone?.()}
+              />
+            ) : (
+            <>
+            <motion.div
+              className="absolute top-0 left-0"
+              style={{ x: mulliganPilePoint(MULLIGAN_STAGE_GEOMETRY).x }}
+            >
+              <MulliganDeckPile sleeveUrl={sleeveUrl} />
+            </motion.div>
             <TooltipProvider delayDuration={0} disableHoverableContent>
             <div className="flex gap-3" role="list" aria-label="Opening hand">
               {myHand.map((card) => {
@@ -90,11 +141,16 @@ export function MulliganModal({
               })}
             </div>
             </TooltipProvider>
+            </>
+            )}
+            </div>
 
-            <div className="flex gap-3">
+            {/* Hidden, not removed, during the redraw so the layout holds. */}
+            <div className={cn("flex gap-3", playback && "invisible")}>
               <GameButton
                 variant="primary"
                 size="lg"
+                disabled={playback !== null}
                 onClick={() =>
                   onAction({ type: "PLAYER_CHOICE", choiceId: "KEEP" })
                 }
@@ -105,9 +161,11 @@ export function MulliganModal({
               <GameButton
                 variant="secondary"
                 size="lg"
-                onClick={() =>
-                  onAction({ type: "PLAYER_CHOICE", choiceId: "REDRAW" })
-                }
+                disabled={playback !== null}
+                onClick={() => {
+                  onRedraw?.();
+                  onAction({ type: "PLAYER_CHOICE", choiceId: "REDRAW" });
+                }}
                 className="min-w-[160px]"
               >
                 Redraw
