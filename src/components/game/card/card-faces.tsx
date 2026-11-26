@@ -71,10 +71,16 @@ export function CardFaces({
   const startedAtRef = React.useRef<number | null>(null);
   const flipDelay = flipFrom?.delay ?? 0;
   const flipInstant = flipFrom?.instant ?? false;
-  // The shade and gloss layers exist only while a flip is scheduled or
-  // running. They start unmounted, so the server and first client render
-  // match, and a resting card carries no extra layers.
+  // The shade and gloss layers exist only while a flip is pending or
+  // running, so a resting card carries no extra layers. A pending flip is
+  // read from props and the current angle during render, so the layers are
+  // in the same commit that schedules the flip (shade from its first frame)
+  // and the server and first client render agree. `flipping` keeps them
+  // mounted until the tween completes.
   const [flipping, setFlipping] = React.useState(false);
+  const instantFlip = reducedMotion || flipInstant;
+  const showFlipLayers =
+    !instantFlip && (flipping || rotateY.get() !== target);
 
   React.useEffect(() => {
     let controls: { stop: () => void } | null = null;
@@ -113,7 +119,7 @@ export function CardFaces({
           runs (never for an instant swap). Each pair sits on its face's side
           of the card (the back pair is pre-rotated 180°) and hides its
           backface, so only the visible face darkens. */}
-      {flipping && (
+      {showFlipLayers && (
         <>
           <motion.div
             aria-hidden

@@ -7,6 +7,7 @@ import { CardFaces } from "./card-faces";
 // OPT-1054: the shared flip's clock, instant swaps and reduced motion.
 
 interface AnimateCall {
+  value: { set: (next: number) => void };
   target: number;
   options: { duration?: number; delay?: number; onComplete?: () => void };
 }
@@ -19,17 +20,25 @@ vi.mock("motion/react", async () => {
   const { useState } = await import("react");
   return {
     animate: (
-      _value: unknown,
+      value: AnimateCall["value"],
       target: number,
       options: AnimateCall["options"]
     ) => {
-      motionState.calls.push({ target, options });
+      motionState.calls.push({ value, target, options });
       return { stop: () => {} };
     },
     motion: { div: "div" },
     // Stable per component, as the real hook is.
     useMotionValue: (initial: number) =>
-      useState(() => ({ get: () => initial, set: () => {} }))[0],
+      useState(() => {
+        let current = initial;
+        return {
+          get: () => current,
+          set: (next: number) => {
+            current = next;
+          },
+        };
+      })[0],
     useReducedMotion: () => motionState.reduced,
     useTransform: () => ({ get: () => 0 }),
   };
@@ -78,7 +87,10 @@ describe("CardFaces flip (OPT-1054)", () => {
     expect(options.duration).toBe(cardFlip.duration);
     // Shade and gloss on both faces while the flip runs, gone after.
     expect(overlayCount()).toBe(4);
-    act(() => options.onComplete?.());
+    act(() => {
+      motionState.calls[0].value.set(target);
+      options.onComplete?.();
+    });
     expect(overlayCount()).toBe(0);
   });
 
@@ -108,5 +120,31 @@ describe("CardFaces flip (OPT-1054)", () => {
     expect(target).toBe(0);
     expect(options.duration).toBe(0);
     expect(overlayCount()).toBe(0);
+  });
+
+  it("mounts the flip layers before the flip's first frame", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    try {
+      render(
+        <CardFaces faceDown={false} flipFrom={{ faceDown: true, delay: 0 }}>
+          face
+        </CardFaces>
+      );
+      // The flip has not started yet, but its shade is already in place.
+      expect(motionState.calls).toHaveLength(0);
+      expect(overlayCount()).toBe(4);
+      act(() => frames.shift()?.(0));
+      expect(motionState.calls).toHaveLength(1);
+      expect(overlayCount()).toBe(4);
+    } finally {
+      act(() => renderer?.unmount());
+      renderer = null;
+      vi.unstubAllGlobals();
+    }
   });
 });
