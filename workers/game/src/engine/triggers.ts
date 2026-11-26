@@ -680,7 +680,9 @@ function matchesCustomTrigger(
   // the DON!! deck. Every DON!!-deck return (field return, identity return,
   // unattached RETURN_DON_TO_DECK, DON!! −N cost) carries a positive `count`;
   // the Refresh event carries none.
+  // OPT-1057 adds `to`; a Refresh event says `to: "COST_AREA"` as well.
   if (trigger.event === "DON_RETURNED_TO_DON_DECK" && !(event.type === "DON_DETACHED" &&
+      event.payload.to !== "COST_AREA" &&
       typeof event.payload.count === "number" && event.payload.count > 0)) return false;
   // OPT-902: "When this Character battles / battles and K.O.'s" is bound to
   // the host's own battle, never a bystander's.

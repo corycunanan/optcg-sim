@@ -86,7 +86,11 @@ it("identity reader respects opponent actor and active cost-area eligibility on 
   if (result?.kind !== "continued") throw new Error("reader did not continue");
   expect(result.state.players[1].donCostArea).toHaveLength(before.players[1].donCostArea.length - 1);
   expect(result.state.players[0]).toEqual(before.players[0]);
-  expect(events).toEqual([{ type: "DON_DETACHED", playerIndex: 1, payload: { count: 1 } }]);
+  expect(events).toEqual([{
+    type: "DON_DETACHED",
+    playerIndex: 1,
+    payload: { count: 1, to: "DON_DECK", fromCostArea: 1, donInstanceIds: [expect.any(String)] },
+  }]);
   for (const changed of ["RESTED", "ATTACHED"] as const) {
     const state = structuredClone(before);
     if (changed === "RESTED") state.players[1].donCostArea[0].state = "RESTED";

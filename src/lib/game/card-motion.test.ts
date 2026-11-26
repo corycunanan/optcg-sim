@@ -343,3 +343,29 @@ describe("handDepartures", () => {
     expect(departures.has("elsewhere")).toBe(false);
   });
 });
+
+describe("DON!! moves (OPT-1057)", () => {
+  const donMove = {
+    kind: "don-move",
+    cardId: null,
+    instanceId: null,
+    startedAt: 0,
+    sourceFaceDown: true,
+    destinationFaceDown: false,
+  } as const;
+
+  it("flips a DON!! token although it has no cardId", () => {
+    expect(needsFlip({ ...donMove, fromZoneKey: "p-don-deck" })).toBe(true);
+    expect(
+      planFlight({ ...donMove, fromZoneKey: "p-don", flip: "turn" }),
+    ).toMatchObject({ initialFaceDown: true, faceDown: false, departAt: FLIP_SECONDS });
+  });
+
+  it("holds a DON!! flying into the cost area hidden in its slot", () => {
+    const ids = fieldArrivingInstanceIds([
+      { ...donMove, fromZoneKey: "p-don-deck", toZoneKey: "p-don", donInstanceId: "d1" },
+      { ...donMove, fromZoneKey: "p-don", toZoneKey: "p-don-deck", donInstanceId: "d2" },
+    ]);
+    expect([...ids]).toEqual(["d1"]);
+  });
+});

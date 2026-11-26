@@ -1,5 +1,6 @@
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 /** Frozen actual-writer bytes replay through production activation; cost modes and all gameplay fields remain exact. */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -31,7 +32,7 @@ for (const file of files) {
         state = command(state, step.action, loaded.cardDb);
         const saved = await repo.save({ ...loaded, state, undoHistory: [state] });
         state = toPersistedGameState(saved.state);
-        expect(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(state))).toEqual(writerEnvelope(step.expected));
+        expect(withoutAssertedDonMoveDetail(withoutAssertedEndReasonCode(withoutAssertedCostEvidence(state)))).toEqual(writerEnvelope(step.expected));
         expect((await repo.load())!.state).toEqual(state);
       }
       if (f.knownDebt) {

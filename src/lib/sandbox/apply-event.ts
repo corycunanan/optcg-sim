@@ -48,9 +48,70 @@ export function applyEvent(
       return mapPlayer(state, event.playerIndex, (p) =>
         addLifeCardToHand(p, event.payload, event.playerIndex),
       );
+    case "DON_PLACED_ON_FIELD":
+      return mapPlayer(state, event.playerIndex, (p) =>
+        placeDonFromDonDeck(p, event.payload.count),
+      );
+    case "DON_DETACHED":
+      return mapPlayer(state, event.playerIndex, (p) =>
+        returnDonToDonDeck(p, event.payload ?? {}),
+      );
     default:
       return state;
   }
+}
+
+function placeDonFromDonDeck(
+  p: PartialPlayerState,
+  count: number,
+): PartialPlayerState {
+  const placed = p.donDeck.slice(0, count).map((d) => ({
+    ...d,
+    state: "ACTIVE" as const,
+    attachedTo: null,
+  }));
+  return {
+    ...p,
+    donDeck: p.donDeck.slice(placed.length),
+    donCostArea: [...p.donCostArea, ...placed],
+  };
+}
+
+/** A DON_DETACHED return to the DON!! deck (OPT-1057). Named DON!! move
+ *  from wherever they are; a count-only event takes the cost area's last
+ *  DON!!. The Refresh return (`to: "COST_AREA"`) is left alone. */
+function returnDonToDonDeck(
+  p: PartialPlayerState,
+  payload: {
+    count?: number;
+    to?: "DON_DECK" | "COST_AREA";
+    donInstanceIds?: string[];
+  },
+): PartialPlayerState {
+  const count = payload.count ?? 0;
+  if (payload.to === "COST_AREA" || count <= 0) return p;
+  const ids = new Set(
+    payload.donInstanceIds ??
+      p.donCostArea.slice(-count).map((d) => d.instanceId),
+  );
+  const take = (don: DonInstance[]) => don.filter((d) => ids.has(d.instanceId));
+  const keep = (don: DonInstance[]) => don.filter((d) => !ids.has(d.instanceId));
+  const detach = <T extends { attachedDon: DonInstance[] }>(card: T): T => ({
+    ...card,
+    attachedDon: keep(card.attachedDon),
+  });
+  const returned = [
+    ...take(p.donCostArea),
+    ...take(p.leader?.attachedDon ?? []),
+    ...p.characters.flatMap((c) => (c ? take(c.attachedDon) : [])),
+  ].map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+  return {
+    ...p,
+    leader: p.leader ? detach(p.leader) : p.leader,
+    characters: p.characters.map((c) => (c ? detach(c) : c)),
+    donCostArea: keep(p.donCostArea),
+    donDeck: [...p.donDeck, ...returned],
+  };
 }
 
 // ─── per-event handlers ─────────────────────────────────────────────────

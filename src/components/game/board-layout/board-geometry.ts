@@ -61,6 +61,11 @@ export function boardZoneKey(
 /** Registry key for one card's slot inside a hand zone (OPT-1054). Flights
  *  to and from a hand use it to leave from, and land in, the card's own
  *  place in the fan instead of the hand container's edge. */
+/** Registry key for one cost-area DON!! token's slot (OPT-1057). */
+export function donSlotZoneKey(donZoneKey: string, donInstanceId: string): string {
+  return `${donZoneKey}/${donInstanceId}`;
+}
+
 export function handSlotZoneKey(handZoneKey: string, instanceId: string): string {
   return `${handZoneKey}/${instanceId}`;
 }
