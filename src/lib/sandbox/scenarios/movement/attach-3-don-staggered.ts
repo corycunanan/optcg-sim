@@ -1,7 +1,7 @@
 // Spectator scenario: a single DON_GIVEN_TO_CARD event with `count: 3` fans
 // out into three staggered token flights via `eventToTransitions`. Verifies
-// the multi-DON fan-out — three distinct arrivals separated by `STAGGER_MS`
-// (60ms), not one merged token.
+// the multi-DON fan-out — three distinct arrivals separated by `cardStagger.drawMs`
+// (90ms), not one merged token.
 
 import type { GameEvent, TurnState } from "@shared/game-types";
 import {

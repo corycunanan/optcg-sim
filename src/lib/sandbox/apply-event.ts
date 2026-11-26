@@ -68,6 +68,7 @@ function drawTopOfDeck(p: PartialPlayerState): PartialPlayerState {
 function playFromHand(
   p: PartialPlayerState,
   payload: {
+    cardId: string;
     cardInstanceId: string;
     zone: CardInstance["zone"];
     playedRested?: boolean;
@@ -80,6 +81,9 @@ function playFromHand(
   const newHand = [...p.hand.slice(0, idx), ...p.hand.slice(idx + 1)];
   const placed: CardInstance = {
     ...card,
+    // Playing a card reveals it: a redacted hand card takes the public
+    // identity the event carries.
+    cardId: card.cardId === "hidden" ? payload.cardId : card.cardId,
     zone: payload.zone,
     state: payload.playedRested ? "RESTED" : "ACTIVE",
     turnPlayed: turnNumber,

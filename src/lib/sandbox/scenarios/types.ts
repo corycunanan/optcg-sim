@@ -57,7 +57,15 @@ export interface PartialGameState {
 }
 
 export type ScenarioStep =
-  | { type: "event"; event: GameEvent; delayMs?: number }
+  | {
+      type: "event";
+      event: GameEvent;
+      delayMs?: number;
+      /** Further events delivered in the same server update as `event`, so
+       *  the board sees them as one batch (e.g. both CARD_DRAWN events of a
+       *  "draw 2"). */
+      batch?: GameEvent[];
+    }
   | { type: "wait"; ms: number }
   | { type: "prompt"; prompt: PromptOptions }
   | { type: "checkpoint"; label: string };
