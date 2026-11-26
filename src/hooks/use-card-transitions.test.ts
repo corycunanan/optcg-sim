@@ -128,8 +128,8 @@ describe("eventToTransitions — DON_GIVEN_TO_CARD", () => {
   it("assigns per-token stagger delays inside the expansion", () => {
     const out = eventToTransitions(donEvent(3), 0, registry);
     expect(out[0].delay).toBe(0);
-    expect(out[1].delay).toBeCloseTo(0.12, 5);
-    expect(out[2].delay).toBeCloseTo(0.24, 5);
+    expect(out[1].delay).toBeCloseTo(0.09, 5);
+    expect(out[2].delay).toBeCloseTo(0.18, 5);
   });
 
   it("uses opponent prefix when the event originated from the other player", () => {
@@ -450,7 +450,7 @@ describe("eventToTransitions — LIFE_CARD_TO_DECK (OPT-121)", () => {
       expect(t.kind).toBeUndefined();
     }
     expect(out[0].delay).toBe(0);
-    expect(out[1].delay).toBeCloseTo(0.12, 5);
+    expect(out[1].delay).toBeCloseTo(0.07, 5);
   });
 
   it("treats an omitted count as 1 token and uses opponent prefix when needed", () => {
@@ -635,3 +635,93 @@ it.each([0, 1] as const)(
     }
   }
 );
+
+describe("eventToTransitions — card sides (OPT-1054)", () => {
+  const registry = mkRegistry({
+    getCardZone: (id) => (id === "field-1" ? "p-char-3" : null),
+  });
+
+  it("stamps a draw as leaving the face-down deck for the face-up hand", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-001", cardInstanceId: "i-1" },
+    } as unknown as GameEvent;
+    const receivedHands = receivedHandsByPlayerIndex(
+      [handCard("i-1", "OP01-001", 0)],
+      [],
+      0,
+    );
+    const [t] = eventToTransitions(ev, 0, registry, null, receivedHands);
+    expect(t.sourceFaceDown).toBe(true);
+    expect(t.destinationFaceDown).toBe(false);
+  });
+
+  it("treats a fully redacted hand as face-down wherever it sits", () => {
+    const ev = {
+      type: "CARD_PLAYED",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP01-010",
+        cardInstanceId: "opp-hand-2",
+        zone: "CHARACTER",
+        source: "HAND",
+      },
+    } as unknown as GameEvent;
+    const receivedHands = receivedHandsByPlayerIndex(
+      [],
+      [handCard("opp-hand-1", "hidden", 1)],
+      0,
+    );
+    const [t] = eventToTransitions(ev, 0, registry, null, receivedHands);
+    expect(t.fromZoneKey).toBe("o-hand");
+    expect(t.sourceFaceDown).toBe(true);
+    expect(t.destinationFaceDown).toBe(false);
+  });
+
+  it("falls back to the board side for a hand it cannot see (top = face-down)", () => {
+    const ev = {
+      type: "CARD_PLAYED",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP01-010",
+        cardInstanceId: "opp-hand-2",
+        zone: "CHARACTER",
+        source: "HAND",
+      },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, registry);
+    expect(t.sourceFaceDown).toBe(true);
+  });
+
+  it("sends a field card back to the deck face-down", () => {
+    const ev = {
+      type: "CARD_RETURNED_TO_DECK",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-010", cardInstanceId: "field-1" },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, registry);
+    expect(t.fromZoneKey).toBe("p-char-3");
+    expect(t.sourceFaceDown).toBe(false);
+    expect(t.destinationFaceDown).toBe(true);
+  });
+
+  it("reads a Life card's side from the event's sourceFace", () => {
+    const lifeRegistry = mkRegistry({
+      getCardZone: (id) => (id === "life-1" ? "p-life" : null),
+    });
+    const ev = (sourceFace: "UP" | "DOWN") =>
+      ({
+        type: "CARD_RETURNED_TO_DECK",
+        playerIndex: 0,
+        timestamp: 1,
+        payload: { cardId: "OP01-010", cardInstanceId: "life-1", sourceFace },
+      }) as unknown as GameEvent;
+    expect(eventToTransitions(ev("UP"), 0, lifeRegistry)[0].sourceFaceDown).toBe(false);
+    expect(eventToTransitions(ev("DOWN"), 0, lifeRegistry)[0].sourceFaceDown).toBe(true);
+  });
+});

@@ -58,6 +58,9 @@ interface OpponentFieldProps {
   donCountAdjustments?: Map<string, number>;
   /** Active arrivals keyed by anchor-derived top pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
+  /** Field cards whose flight has not landed yet; they stay hidden in their
+   *  slot until it does (OPT-1054). */
+  arrivingInstanceIds?: ReadonlySet<string>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
 }
@@ -89,6 +92,7 @@ function OpponentFieldComponent({
   lifeScriedPulseNonce,
   donCountAdjustments,
   pileArrivingCounts,
+  arrivingInstanceIds,
   targetSelectionById,
   onTargetToggle,
 }: OpponentFieldProps) {
@@ -215,6 +219,9 @@ function OpponentFieldComponent({
                 tooltipNotice: stageSelection?.disabledReason ?? undefined,
               }}
               motionDelay={refreshWave ? 0.18 : undefined}
+              className={cn(
+                arrivingInstanceIds?.has(stage.instanceId) && "invisible",
+              )}
             />
             {stageSelection?.disabledReason && (
               <span id={stageDescriptionId} className="sr-only">
@@ -249,6 +256,7 @@ function OpponentFieldComponent({
           animationDelay={refreshWave ? 0 : undefined}
           donCountAdjust={donCountAdjustments?.get(opp.leader.instanceId)}
           entering={arrivals.has(opp.leader.instanceId)}
+          arrivalPending={arrivingInstanceIds?.has(opp.leader.instanceId)}
         />
       ) : (
         <EmptySlot
@@ -291,6 +299,7 @@ function OpponentFieldComponent({
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
             entering={arrivals.has(char.instanceId)}
+            arrivalPending={arrivingInstanceIds?.has(char.instanceId)}
           />
         ) : (
           <EmptySlot

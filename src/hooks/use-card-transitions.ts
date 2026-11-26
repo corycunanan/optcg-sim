@@ -12,7 +12,12 @@ import {
 } from "@/lib/game/spotlight";
 import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
 import {
-  MULTI_CARD_STAGGER_MS,
+  assignPileFlips,
+  zoneFaceDown,
+  type FlightFlip,
+} from "@/lib/game/card-motion";
+import { cardStagger } from "@/lib/motion";
+import {
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
   eventOffsetMs,
@@ -52,6 +57,19 @@ export interface CardTransition {
   /** Spotlight cards can be preview- or modal-sized; the animation ghost
    *  must preserve that source footprint before it travels or dissolves. */
   spotlightSourceSize?: "modal" | "preview";
+  /** Side the card shows the viewer where it starts (OPT-1054). Deck, DON!!
+   *  deck and the opponent's hand are face-down; Life follows the event's
+   *  `sourceFace` when present. */
+  sourceFaceDown?: boolean;
+  /** Side the destination zone needs (OPT-1054). */
+  destinationFaceDown?: boolean;
+  /** Set when the card turns over before it travels (OPT-1054): `turn`
+   *  flips in place; `under` sat under a pile's flipping top card and is
+   *  dealt already turned (see `assignPileFlips`). */
+  flip?: FlightFlip;
+  /** For `flip: "under"`, seconds after mount when the top card's flip ends
+   *  and this card swaps to its destination side. */
+  pileFlipAt?: number;
 }
 
 export type ReceivedHands = readonly [
@@ -72,11 +90,21 @@ export function receivedHandsByPlayerIndex(
 /** Queued flights kept at once. A long effect chain queues its later beats
  *  up front, so this must cover a whole update's playback (OPT-1040). */
 const MAX_CONCURRENT = 24;
-// Safety net past a transition's own start delay: the longest flight path
-// before `onAnimationComplete` fires. `onComplete` is the normal cleanup path.
+// Safety net past a transition's own start delay (OPT-1040): the flip that
+// precedes a turned-over flight (300ms) plus the longest flight (380ms)
+// before the flight completes, with margin (OPT-1054). `onComplete` is the
+// normal cleanup path.
 const AUTO_EXPIRE_MS = 1500;
-/** Per-token delay inside a count-N expansion (DON attach, life to deck). */
-const STAGGER_MS = MULTI_CARD_STAGGER_MS;
+/** Per-token stagger inside a count-N expansion (DON!! attach, Life to deck),
+ *  matching the timeline's sibling stagger (OPT-1054 `cardStagger`): DON!!
+ *  tokens and draws deal `drawMs` apart, moves into a stacked pile `pileMs`
+ *  apart, any other travel `defaultMs` apart. */
+function staggerMs(transition: Pick<CardTransition, "kind" | "toZoneKey">): number {
+  if (transition.kind === "don-attach") return cardStagger.drawMs;
+  if (transition.toZoneKey.endsWith("-hand")) return cardStagger.drawMs;
+  if (/-(deck|trash|life)$/.test(transition.toZoneKey)) return cardStagger.pileMs;
+  return cardStagger.defaultMs;
+}
 
 /** CARD_TRASHED `reason` values that originate from the life zone. The engine
  *  emits these without `from`, so the visual layer infers the source from the
@@ -128,7 +156,7 @@ export function eventToTransitions(
         playerIndex,
         startedAt,
         kind: "don-attach",
-        delay: (i * STAGGER_MS) / 1000,
+        delay: (i * cardStagger.drawMs) / 1000,
         targetInstanceId: targetId,
       });
     }
@@ -178,7 +206,7 @@ export function eventToTransitions(
 
 /** Helper for count-N face-down flights between two static zones. Each
  *  token gets its own per-token delay so the sequence fans out instead of
- *  landing in a single instant; a later `applyBatchStagger` may add more. */
+ *  landing in a single instant; the timeline's beat offset rides on top. */
 function makeFaceDownBurst(
   count: number,
   fromZoneKey: string,
@@ -212,7 +240,7 @@ function makeFaceDownBurst(
       toZoneKey,
       playerIndex,
       startedAt,
-      delay: (i * STAGGER_MS) / 1000,
+      delay: (i * staggerMs({ toZoneKey })) / 1000,
     });
   }
   return out;
@@ -245,6 +273,16 @@ function trashSourceZone(
   // Legacy count-only cost/effect events predate the explicit `from` field;
   // those overwhelmingly originate in hand. New worker events set `from`.
   return `${prefix}-hand`;
+}
+
+/** A received hand is face-down for this viewer when every card in it is
+ *  redacted; undefined (fall back to the board side) when it is unknown or
+ *  empty. */
+function receivedHandFaceDown(
+  hand: readonly CardInstance[] | undefined,
+): boolean | undefined {
+  if (!hand || hand.length === 0) return undefined;
+  return hand.every((card) => card.cardId === "hidden");
 }
 
 function matchSpotlightCard(
@@ -282,6 +320,11 @@ function eventToTransition(
   let cardId: string | null = null;
   let cardInstanceId: string | null = null;
   let kind: CardTransition["kind"];
+  // Life takes either side; events that say which one set this (OPT-1054).
+  let lifeFaceDown: boolean | undefined;
+  // The source side is unknown: plan no flip, so the ghost shows its
+  // destination side for the whole move.
+  let sourceSideUnknown = false;
 
   switch (type) {
     case "CARD_PLAYED": {
@@ -380,6 +423,10 @@ function eventToTransition(
       cardInstanceId = event.payload.cardInstanceId ?? null;
       from = `${prefix}-life`;
       to = `${prefix}-hand`;
+      // The payload carries no face, and its instance id is the new hand
+      // id, not the Life card's, so the Life side cannot be looked up
+      // (OPT-1054; an engine-side face is OPT-1059).
+      sourceSideUnknown = true;
       break;
     }
     case "CARD_RETURNED_TO_DECK": {
@@ -387,6 +434,7 @@ function eventToTransition(
       cardId = p.cardId ?? null;
       const sourceInstanceId = p.cardInstanceId;
       cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
+      if (p.sourceFace) lifeFaceDown = p.sourceFace === "DOWN";
       const resolvedZone =
         sourceInstanceId && zoneRegistry
           ? zoneRegistry.getCardZone(sourceInstanceId)
@@ -437,6 +485,7 @@ function eventToTransition(
     from = spotlightCardZoneKey(spotlight!.id, spotlightCard);
   }
 
+  const handFaceDown = receivedHandFaceDown(receivedHands?.[playerIndex]);
   return {
     id: nextId(),
     cardId,
@@ -446,6 +495,10 @@ function eventToTransition(
     playerIndex,
     startedAt: Date.now(),
     kind,
+    sourceFaceDown: sourceSideUnknown
+      ? zoneFaceDown(to, { handFaceDown, lifeFaceDown })
+      : zoneFaceDown(from, { handFaceDown, lifeFaceDown }),
+    destinationFaceDown: zoneFaceDown(to, { handFaceDown, lifeFaceDown }),
     playedRested: event.type === "CARD_PLAYED" ? event.payload.playedRested : undefined,
     waitForSpotlightId: spotlightCard ? spotlight!.id : undefined,
     spotlightSourceSize: spotlightCard
@@ -618,16 +671,21 @@ export function useCardTransitions(
     if (presentableTransitions.length === 0) return;
 
     // Each event starts on its beat (OPT-1040). Sibling fan-out inside a beat
-    // is already in the offsets; count-N expansions keep their own per-token
-    // delay on top.
-    const staggered = applyTimelineDelays(
-      presentableTransitions,
-      newSpotlight
-        ? {
-            id: newSpotlight.id,
-            releaseOffsetMs: spotlightOffsetMs + SPOTLIGHT_DWELL_MS,
-          }
-        : null
+    // is already in the offsets (OPT-1054 `cardStagger`); count-N expansions
+    // keep their own per-token delay on top. The concurrency cap applies
+    // before flips are assigned, and flips are assigned on the final delays,
+    // so the card that flips is always shown and each beat's pile top is
+    // chosen within that beat (OPT-1054).
+    const staggered = assignPileFlips(
+      applyTimelineDelays(
+        presentableTransitions,
+        newSpotlight
+          ? {
+              id: newSpotlight.id,
+              releaseOffsetMs: spotlightOffsetMs + SPOTLIGHT_DWELL_MS,
+            }
+          : null
+      ).slice(-MAX_CONCURRENT)
     );
 
     queueMicrotask(() => {

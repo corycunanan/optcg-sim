@@ -11,6 +11,7 @@ import { doubleAttackVsLifeScenario } from "./combat/double-attack-vs-life";
 import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
+import { drawTwoOneUpdateScenario } from "./draws/draw-2-one-update";
 import { actionRejectedScenario } from "./effects/action-rejected";
 import { activateMainMenuScenario } from "./effects/activate-main-menu";
 import {
@@ -24,6 +25,8 @@ import { lifeToHandScenario } from "./life/life-to-hand";
 import { lifeToTrashScenario } from "./life/life-to-trash";
 import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
+import { opponentPlayCharacterScenario } from "./movement/opponent-play-character";
+import { opponentPlayThenDrawScenario } from "./movement/opponent-play-then-draw";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
 import { playCharacterRestedScenario } from "./playground/play-character-rested";
@@ -42,8 +45,11 @@ export const scenarios: Scenario[] = [
   playEventTransformScenario,
   drawOneScenario,
   drawTwoScenario,
+  drawTwoOneUpdateScenario,
   peekTopThreeScenario,
   playCharacterSummonScenario,
+  opponentPlayCharacterScenario,
+  opponentPlayThenDrawScenario,
   attachOneDonScenario,
   attachThreeDonStaggeredScenario,
   redistributeDonScenario,

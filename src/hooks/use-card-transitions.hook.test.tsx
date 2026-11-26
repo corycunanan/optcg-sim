@@ -1,0 +1,143 @@
+import React from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { afterEach, describe, expect, it } from "vitest";
+import type { CardInstance, GameEvent } from "@shared/game-types";
+import { FLIP_SECONDS } from "@/lib/game/card-motion";
+import {
+  receivedHandsByPlayerIndex,
+  useCardTransitions,
+  type CardTransition,
+} from "./use-card-transitions";
+
+// Hook-level coverage for OPT-1054: the flip assignment, the concurrency
+// cap and the Life-to-hand no-flip rule all happen inside the hook's event
+// effect.
+
+function handCard(instanceId: string, cardId: string): CardInstance {
+  return {
+    instanceId,
+    cardId,
+    owner: 0,
+    controller: 0,
+    zone: "HAND",
+    attachedDon: [],
+  } as unknown as CardInstance;
+}
+
+function draw(timestamp: number, instanceId: string): GameEvent {
+  return {
+    type: "CARD_DRAWN",
+    playerIndex: 0,
+    timestamp,
+    payload: { cardId: "OP01-001", cardInstanceId: instanceId },
+  } as unknown as GameEvent;
+}
+
+interface ProbeProps {
+  eventLog: GameEvent[];
+  hand: CardInstance[];
+}
+
+function Probe({ eventLog, hand }: ProbeProps) {
+  const receivedHands = receivedHandsByPlayerIndex(hand, [], 0);
+  const { transitions } = useCardTransitions(
+    eventLog,
+    0,
+    false,
+    null,
+    null,
+    receivedHands
+  );
+  return <output>{JSON.stringify(transitions)}</output>;
+}
+
+let renderer: ReactTestRenderer | null = null;
+async function render(props: ProbeProps) {
+  await act(async () => {
+    if (renderer) renderer.update(<Probe {...props} />);
+    else renderer = create(<Probe {...props} />);
+    await Promise.resolve();
+  });
+  latest = JSON.parse(
+    renderer!.root.findByType("output").children.join("") || "[]"
+  ) as CardTransition[];
+}
+
+let latest: CardTransition[] = [];
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = null;
+  latest = [];
+});
+
+describe("useCardTransitions flips (OPT-1054)", () => {
+  it("flips only the top card of a multi-card draw", async () => {
+    await render({ eventLog: [], hand: [] });
+    const hand = [handCard("d-1", "OP01-001"), handCard("d-2", "OP01-002")];
+    await render({ eventLog: [draw(1, "d-1"), draw(2, "d-2")], hand });
+    expect(latest.map((t) => t.flip)).toEqual(["turn", "under"]);
+    expect(latest[1].pileFlipAt).toBeCloseTo(
+      (latest[0].delay ?? 0) + FLIP_SECONDS
+    );
+  });
+
+  it("keeps the flipping top card when a big draw hits the cap", async () => {
+    await render({ eventLog: [], hand: [] });
+    const ids = Array.from({ length: 26 }, (_, i) => `big-${i}`);
+    const hand = ids.map((id) => handCard(id, "OP01-001"));
+    await render({ eventLog: ids.map((id, i) => draw(i + 1, id)), hand });
+    expect(latest).toHaveLength(24);
+    expect(latest.filter((t) => t.flip === "turn")).toHaveLength(1);
+    expect(latest[0].flip).toBe("turn");
+    for (const t of latest.slice(1)) {
+      expect(t.flip).toBe("under");
+      expect(t.pileFlipAt).toBeCloseTo((latest[0].delay ?? 0) + FLIP_SECONDS);
+    }
+  });
+
+  it("gives draws in different beats their own top card", async () => {
+    await render({ eventLog: [], hand: [] });
+    const hand = [handCard("b-1", "OP01-001"), handCard("b-2", "OP01-002")];
+    const knockOut = {
+      type: "CARD_KO",
+      playerIndex: 1,
+      timestamp: 2,
+      payload: {
+        cardId: "OP01-010",
+        cardInstanceId: "ko-1",
+        cause: "effect",
+        preKO_donCount: 0,
+      },
+    } as unknown as GameEvent;
+    // Draw, an effect's K.O., then another draw: three beats (OPT-1040).
+    await render({
+      eventLog: [draw(1, "b-1"), knockOut, { ...draw(3, "b-2") }],
+      hand,
+    });
+    const draws = latest.filter((t) => t.fromZoneKey === "p-deck");
+    expect(draws).toHaveLength(2);
+    expect(draws[1].delay ?? 0).toBeGreaterThan(draws[0].delay ?? 0);
+    expect(draws.map((t) => t.flip)).toEqual(["turn", "turn"]);
+  });
+
+  it("moves a Life card to hand without a flip (its side is unknown)", async () => {
+    await render({ eventLog: [], hand: [] });
+    await render({
+      eventLog: [
+        {
+          type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+          playerIndex: 0,
+          timestamp: 1,
+          // The engine sends the new hand instance id, never the Life one.
+          payload: { cardId: "OP01-003", cardInstanceId: "hand-new-7" },
+        } as unknown as GameEvent,
+      ],
+      hand: [handCard("hand-new-7", "OP01-003")],
+    });
+    expect(latest).toHaveLength(1);
+    expect(latest[0].fromZoneKey).toBe("p-life");
+    expect(latest[0].sourceFaceDown).toBe(false);
+    expect(latest[0].destinationFaceDown).toBe(false);
+    expect(latest[0].flip).toBeUndefined();
+  });
+});

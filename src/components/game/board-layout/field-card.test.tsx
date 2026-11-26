@@ -47,9 +47,16 @@ vi.mock("@/components/ui", () => ({
 }));
 
 vi.mock("../card", () => ({
-  Card: ({ overlays }: { overlays?: CardOverlays }) => (
+  Card: ({
+    overlays,
+    className,
+  }: {
+    overlays?: CardOverlays;
+    className?: string;
+  }) => (
     <div
       data-testid="card"
+      data-class={className}
       data-highlight-ring={overlays?.highlightRing}
       data-highlight-nonce={overlays?.highlightRingNonce}
       data-power-kind={overlays?.powerMod?.kind}
@@ -466,6 +473,70 @@ describe("read-only viewer target-selection boundary", () => {
         "eligible for selection",
       );
       expect(target.props.onClick).toBeUndefined();
+    },
+  );
+});
+
+describe("arrival pending (OPT-1054)", () => {
+  const cardClass = () =>
+    String(renderer?.root.findByProps({ "data-testid": "card" }).props["data-class"]);
+
+  it.each([
+    [
+      "player character",
+      (pending: boolean) => (
+        <PlayerFieldCard
+          card={card}
+          cardDb={{}}
+          activeDragType={null}
+          canAttack={false}
+          arrivalPending={pending}
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />
+      ),
+    ],
+    [
+      "opponent character",
+      (pending: boolean) => (
+        <OpponentFieldCard
+          card={card}
+          cardDb={{}}
+          activeDragType={null}
+          attackTargetEligible={false}
+          arrivalPending={pending}
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />
+      ),
+    ],
+    [
+      "stage",
+      (pending: boolean) => (
+        <DroppableStageZone
+          card={card}
+          cardDb={{}}
+          activeDragType={null}
+          zoneKey="p-stage"
+          arrivalPending={pending}
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />
+      ),
+    ],
+  ])(
+    "hides the %s while its flight is in the air, then shows it in place",
+    (_label, element) => {
+      act(() => {
+        renderer = create(
+          <InteractionModeProvider value="full">{element(true)}</InteractionModeProvider>,
+        );
+      });
+      expect(cardClass()).toContain("invisible");
+
+      act(() => {
+        renderer?.update(
+          <InteractionModeProvider value="full">{element(false)}</InteractionModeProvider>,
+        );
+      });
+      expect(cardClass()).not.toContain("invisible");
     },
   );
 });

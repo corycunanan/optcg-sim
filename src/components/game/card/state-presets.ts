@@ -182,12 +182,11 @@ export function faceDownRotateY(faceDown: boolean | undefined): number {
 }
 
 /**
- * Transition used by the face-up ↔ face-down flip (OPT-276). The flip has
- * its own spring (`cardFlip`) so it doesn't inherit the ambient state
- * transition — a rested card flipping face-up shouldn't borrow `cardRest`
- * timing, and a flight-layer card flipping mid-arc shouldn't borrow
- * `cardActivate` timing. Reduced motion collapses the rotation to an instant
- * swap, satisfying the `prefers-reduced-motion` requirement.
+ * Transition used by the shared face-up ↔ face-down flip (OPT-276, OPT-1054).
+ * The flip has its own 300ms ease-in-out tween (`cardFlip`) so it doesn't
+ * inherit the ambient state transition — a rested card flipping face-up
+ * shouldn't borrow `cardRest` timing. Reduced motion collapses the rotation
+ * to an instant swap, satisfying the `prefers-reduced-motion` requirement.
  */
 export function flipTransition(reducedMotion: boolean): Transition {
   return reducedMotion ? { duration: 0 } : cardFlip;

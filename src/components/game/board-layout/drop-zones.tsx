@@ -159,6 +159,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   zoneKey,
   style,
   animationDelay,
+  arrivalPending,
 }: {
   card: CardInstance | null;
   cardDb: CardDb;
@@ -174,6 +175,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   zoneKey: string;
   style: React.CSSProperties;
   animationDelay?: number;
+  /** Hidden until its flight lands (OPT-1054). See PlayerFieldCard. */
+  arrivalPending?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const descriptionId = useId();
@@ -343,6 +346,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
                   tooltipNotice: targetSelection?.disabledReason ?? undefined,
                 }}
                 motionDelay={animationDelay}
+                className={cn(arrivalPending && "invisible")}
               />
               {disabledReason && (
                 <span id={descriptionId} className="sr-only">

@@ -17,10 +17,12 @@ vi.mock("motion/react", () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  animate: () => ({ stop: vi.fn() }),
   motion: { div: "div" },
-  useMotionValue: () => ({ set: vi.fn() }),
+  useMotionValue: (initial: number) => ({ get: () => initial, set: vi.fn() }),
   useReducedMotion: () => motionState.reduced,
   useSpring: (value: unknown) => value,
+  useTransform: () => ({ get: () => 0 }),
 }));
 
 vi.mock("../use-card-tooltip", () => ({
@@ -76,8 +78,9 @@ describe("board card silhouette (OPT-720)", () => {
     );
 
     // Wrapper + state-rotation + interaction + front + back +
-    // power flash + highlight ring. If a layer is added or removed, this
-    // number moves with it — which is the point.
+    // power flash + highlight ring. (The flip's shade and gloss layers mount
+    // only while a flip runs, OPT-1054.) If a layer is added or removed,
+    // this number moves with it — which is the point.
     expect(silhouette).toHaveLength(7);
     expect(classNames.filter((name) => CHROME_RADIUS.test(name))).toEqual([]);
   });

@@ -58,6 +58,13 @@ export function boardZoneKey(
   return `${boardZonePrefix(playerIndex, bottomPlayerIndex)}-${zone}`;
 }
 
+/** Registry key for one card's slot inside a hand zone (OPT-1054). Flights
+ *  to and from a hand use it to leave from, and land in, the card's own
+ *  place in the fan instead of the hand container's edge. */
+export function handSlotZoneKey(handZoneKey: string, instanceId: string): string {
+  return `${handZoneKey}/${instanceId}`;
+}
+
 export interface BoardComposition<T> {
   bottom: T;
   top: T;

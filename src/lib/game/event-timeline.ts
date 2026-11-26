@@ -1,5 +1,6 @@
 import type { GameEvent, GameEventType } from "@shared/game-types";
-import { cardFizzle, cardTransitions } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import { eventToSpotlight } from "@/lib/game/spotlight";
 
 /**
@@ -23,8 +24,10 @@ import { eventToSpotlight } from "@/lib/game/spotlight";
 export const BEAT_GAP_MS = 350;
 /** Smallest gap a long chain may be compressed to. */
 export const MIN_BEAT_GAP_MS = 120;
-/** Spacing between sibling cards moving together (draw 2, DON!! x2). */
-export const MULTI_CARD_STAGGER_MS = 120;
+/** Spacing between sibling cards drawn together (draw 2, DON!! x2). Other
+ *  sibling moves use `siblingStaggerMs` (OPT-1054): 70ms into a pile, 60ms
+ *  otherwise. */
+export const MULTI_CARD_STAGGER_MS = cardStagger.drawMs;
 /** A single action's playback is compressed to stay near this length. */
 export const MAX_PLAYBACK_MS = 4000;
 /** How long a public card spotlight stays at board center. */
@@ -33,11 +36,14 @@ export const SPOTLIGHT_DWELL_MS = 1000;
  *  tail is still fading out. */
 export const PULSE_READ_MS = 400;
 
-const FLIGHT_MS = Math.round(cardTransitions.zoneMove.duration * 1000);
+/** The longest card flight (OPT-1054 travel spec: 220–380ms by distance). */
+const FLIGHT_MS = cardTravel.maxMs;
+/** The shared flip a card plays at its source before it travels. */
+const FLIP_MS = Math.round(FLIP_SECONDS * 1000);
 const FIZZLE_MS = Math.round(cardFizzle.transition.duration * 1000);
 
 /** Events that move a card between zones along a flight path. Siblings in the
- *  same beat fan out by `MULTI_CARD_STAGGER_MS`. */
+ *  same beat fan out by `siblingStaggerMs`. */
 const TRAVEL_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
   "CARD_PLAYED",
   "CARD_DRAWN",
@@ -45,6 +51,46 @@ const TRAVEL_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
   "CARD_ADDED_TO_HAND_FROM_LIFE",
   "CARD_RETURNED_TO_DECK",
 ]);
+
+/** Travel events whose card may turn over before it leaves (OPT-1054): a
+ *  public card crossing between a face-down zone (deck, the opponent's
+ *  hand) and a face-up one. Whether it does depends on the viewer's side,
+ *  which the timeline does not know, so a public card on one of these
+ *  holds its beat for the flip. Life to hand never flips (its source side
+ *  is unknown), and redacted cards stay sleeved. */
+const FLIPPING_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
+  new Set<GameEventType>([
+    "CARD_PLAYED",
+    "CARD_DRAWN",
+    "CARD_RETURNED_TO_HAND",
+    "CARD_RETURNED_TO_DECK",
+  ]);
+
+function mayFlip(event: GameEvent): boolean {
+  if (!FLIPPING_TRAVEL_EVENTS.has(event.type)) return false;
+  const cardId = (event.payload as { cardId?: string | null }).cardId;
+  return !!cardId && cardId !== "hidden";
+}
+
+/**
+ * Spacing between sibling cards of one beat (OPT-1054 `cardStagger`): draws
+ * and DON!! tokens deal 90ms apart, moves into a stacked pile (deck, Life
+ * to deck) 70ms apart, other travel (plays) 60ms apart.
+ */
+export function siblingStaggerMs(type: GameEventType): number {
+  switch (type) {
+    case "CARD_DRAWN":
+    case "CARD_RETURNED_TO_HAND":
+    case "CARD_ADDED_TO_HAND_FROM_LIFE":
+    case "DON_GIVEN_TO_CARD":
+      return cardStagger.drawMs;
+    case "CARD_RETURNED_TO_DECK":
+    case "LIFE_CARD_TO_DECK":
+      return cardStagger.pileMs;
+    default:
+      return cardStagger.defaultMs;
+  }
+}
 
 /** Events that dissolve a card at its source. Siblings resolve together so a
  *  simultaneous K.O. does not read as a sequence. */
@@ -190,15 +236,19 @@ export function buildEventTimeline(
       current.type === event.type &&
       (kind === "transform" || current.playerIndex === event.playerIndex);
 
+    const staggerMs = siblingStaggerMs(event.type);
+    // A card that flips first holds its departure for the flip; siblings
+    // under a flipping pile top wait for it too (OPT-1054).
+    const flipMs = kind === "travel" && mayFlip(event) ? FLIP_MS : 0;
+
     if (joinsCurrent) {
       const innerOffsetMs = kind === "travel" ? current.nextTravelOffsetMs : 0;
       current.members.push({ timestamp: event.timestamp, innerOffsetMs });
       if (kind === "travel") {
-        current.nextTravelOffsetMs =
-          innerOffsetMs + fanOut * MULTI_CARD_STAGGER_MS;
+        current.nextTravelOffsetMs = innerOffsetMs + fanOut * staggerMs;
         current.leadMs = Math.max(
           current.leadMs,
-          innerOffsetMs + (fanOut - 1) * MULTI_CARD_STAGGER_MS + FLIGHT_MS
+          innerOffsetMs + (fanOut - 1) * staggerMs + flipMs + FLIGHT_MS
         );
       }
       continue;
@@ -208,9 +258,9 @@ export function buildEventTimeline(
       kind,
       type: event.type,
       playerIndex: event.playerIndex,
-      leadMs: leadMsFor(kind) + (fanOut - 1) * MULTI_CARD_STAGGER_MS,
+      leadMs: leadMsFor(kind) + flipMs + (fanOut - 1) * staggerMs,
       members: [{ timestamp: event.timestamp, innerOffsetMs: 0 }],
-      nextTravelOffsetMs: fanOut * MULTI_CARD_STAGGER_MS,
+      nextTravelOffsetMs: fanOut * staggerMs,
     });
   }
 

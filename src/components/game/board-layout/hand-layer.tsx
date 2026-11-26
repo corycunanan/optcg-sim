@@ -12,11 +12,15 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { getCardAffordability } from "@/lib/game/client-legality";
 import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
-import { cardReject, cardRejectReduced } from "@/lib/motion";
+import { cardReject, cardRejectReduced, handReflow } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
+import { handSlotZoneKey } from "./board-geometry";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 import { useInteractionMode } from "./interaction-mode";
 import { cn } from "@/lib/utils";
+
+/** How long a just-seen card waits for its flight to register (OPT-1054). */
+const ARRIVAL_GRACE_MS = 120;
 
 /**
  * OPT-364: returns instanceIds present in `currentIds` that were not in
@@ -88,6 +92,7 @@ function SortableHandCard({
   style,
   enableLayout,
   layoutDep,
+  slotRef,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -108,6 +113,8 @@ function SortableHandCard({
    *  only runs when this changes, scoping reflow to true composition events
    *  (card added/removed/reordered) instead of every render. */
   layoutDep: number;
+  /** Registers this card's slot so flights land in (and leave from) it. */
+  slotRef?: (node: HTMLDivElement | null) => void;
 }) {
   const descriptionId = useId();
   const rejectionSequence = useCardRejection(card.instanceId);
@@ -144,9 +151,10 @@ function SortableHandCard({
   // transform) while sortable still handles its own drag-follow + drop-back.
   return (
     <motion.div
+      ref={slotRef}
       layout={enableLayout ? "position" : false}
       layoutDependency={enableLayout ? layoutDep : undefined}
-      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      transition={handReflow}
       style={style}
     >
       <div
@@ -227,6 +235,7 @@ export const HandLayer = React.memo(function HandLayer({
   availableDon,
   zoneKey,
   inFlightInstanceIds,
+  departures,
   sleeveUrl,
 }: {
   cards: CardInstance[];
@@ -240,6 +249,8 @@ export const HandLayer = React.memo(function HandLayer({
   zoneKey?: string;
   /** Set of instanceIds currently in-flight (render as invisible placeholders). */
   inFlightInstanceIds?: Set<string>;
+  /** Epoch ms at which each arriving card leaves its source (OPT-1054). */
+  departures?: ReadonlyMap<string, number>;
   sleeveUrl?: string | null;
 }) {
   const count = cards.length;
@@ -263,9 +274,85 @@ export const HandLayer = React.memo(function HandLayer({
     () => computeFreshlyAdded(seenIds, cardIds),
     [seenIds, cardIds]
   );
+  // OPT-1054: a card leaving `freshlyAdded` keeps its slot closed for a short
+  // grace window, so the render between the seen-ids reconcile and the
+  // transition registering never opens (and paints) the hand's gap early.
+  const [awaitingIds, setAwaitingIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const [graceTimers] = useState(
+    () => new Set<ReturnType<typeof setTimeout>>()
+  );
   useEffect(() => {
     setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
-  }, [cardIds]);
+    if (freshlyAdded.size === 0) return;
+    const ids = [...freshlyAdded];
+    setAwaitingIds((prev) => new Set([...prev, ...ids]));
+    // Not cleared on re-run: `freshlyAdded` empties on the very next render.
+    // Pending timers are cleared on unmount (below).
+    const timer = setTimeout(() => {
+      graceTimers.delete(timer);
+      setAwaitingIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    }, ARRIVAL_GRACE_MS);
+    graceTimers.add(timer);
+  }, [cardIds, freshlyAdded, graceTimers]);
+  useEffect(
+    () => () => {
+      for (const timer of graceTimers) clearTimeout(timer);
+      graceTimers.clear();
+    },
+    [graceTimers]
+  );
+
+  // OPT-1054: an arriving card's slot stays closed (zero width) until its
+  // flight departs, so the hand re-fans alongside the flight instead of
+  // opening a gap while the card is still flipping on the deck. A card on its
+  // first render is held too, until its transition registers. `openIds` maps
+  // each arrival whose departure time has passed to that departure, so a card
+  // that leaves and comes back (bounce, then redraw) is held again for its
+  // new flight instead of reusing the old opening.
+  const [openIds, setOpenIds] = useState<ReadonlyMap<string, number>>(
+    () => new Map()
+  );
+  useEffect(() => {
+    if (!departures || departures.size === 0) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const [id, departAt] of departures) {
+      if (!Number.isFinite(departAt)) continue;
+      const wait = Math.max(0, departAt - Date.now());
+      timers.push(
+        setTimeout(() => {
+          setOpenIds((prev) => {
+            if (prev.get(id) === departAt) return prev;
+            // Drop openings whose flight has ended or been replaced.
+            const next = new Map(
+              [...prev].filter(
+                ([openId, openedFor]) => departures.get(openId) === openedFor
+              )
+            );
+            next.set(id, departAt);
+            return next;
+          });
+        }, wait)
+      );
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [departures]);
+  const heldIds = new Set<string>();
+  for (const id of cardIds) {
+    if (
+      freshlyAdded.has(id) ||
+      (awaitingIds.has(id) && departures?.has(id) !== true) ||
+      (departures?.has(id) === true &&
+        openIds.get(id) !== departures.get(id))
+    ) {
+      heldIds.add(id);
+    }
+  }
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -277,47 +364,102 @@ export const HandLayer = React.memo(function HandLayer({
     [zoneKey, zonePos]
   );
 
+  // OPT-1054: every card registers its own slot so a flight to this hand
+  // aims at the card's placeholder (and a play leaves from the card's real
+  // place). Ref callbacks are cached per instance so a re-render does not
+  // detach and re-measure every slot.
+  const [slotRefs] = useState(
+    () => new Map<string, (node: HTMLDivElement | null) => void>()
+  );
+  useEffect(() => {
+    if (!zoneKey) return;
+    const live = new Set(cardIds.map((id) => handSlotZoneKey(zoneKey, id)));
+    for (const key of slotRefs.keys()) {
+      if (!live.has(key)) slotRefs.delete(key);
+    }
+  }, [cardIds, zoneKey, slotRefs]);
+  const slotRef = (instanceId: string) => {
+    if (!zoneKey) return undefined;
+    const key = handSlotZoneKey(zoneKey, instanceId);
+    let ref = slotRefs.get(key);
+    if (!ref) {
+      // The callback stays cached for as long as the card is in the hand:
+      // deleting it on detach would hand a remounted slot a new callback
+      // every render, churning unregister/register (and a forced measure).
+      // Entries for cards that left the hand are pruned below.
+      ref = (node: HTMLDivElement | null) => {
+        if (node) zonePos.register(key, node);
+        else zonePos.unregister(key);
+      };
+      slotRefs.set(key, ref);
+    }
+    return ref;
+  };
+
   if (count === 0) return null;
 
   const maxWidth = FIELD_W - 60;
-  const totalCardsW = count * HAND_CARD_W;
-  const rawGap = count > 1 ? (maxWidth - totalCardsW) / (count - 1) : 0;
+  // Held slots take no room, so the fan is laid out for the open cards.
+  const openCount = count - heldIds.size;
+  const totalCardsW = openCount * HAND_CARD_W;
+  const rawGap =
+    openCount > 1 ? (maxWidth - totalCardsW) / (openCount - 1) : 0;
   const gap = Math.min(12, rawGap);
+  // Reflow whenever a card is added, removed, or its slot opens.
+  const layoutKey = count * 1000 + heldIds.size;
 
   const renderCard = (card: CardInstance, i: number) => {
-    const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
+    const held = heldIds.has(card.instanceId);
+    const marginStyle = held
+      ? { width: 0, minWidth: 0, marginLeft: 0 }
+      : i > 0
+        ? { marginLeft: gap }
+        : undefined;
     // Hide if the transition system says in-flight, or if the card is
     // appearing for the first time on this layer instance (the transition
     // hasn't been registered yet by `useCardTransitions`).
     const isInFlight =
       (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
-      freshlyAdded.has(card.instanceId);
+      freshlyAdded.has(card.instanceId) ||
+      held;
 
     // The server projection is the sole visibility authority. A real cardId
     // renders face-up on either side; the redaction sentinel degrades to a
     // sleeve without relying on viewer identity or board position.
     if (card.cardId === "hidden") {
       return (
-        <Card
+        <motion.div
           key={card.instanceId}
-          data={{ card, cardDb }}
-          variant="hand"
-          faceDown
-          sleeveUrl={sleeveUrl}
+          ref={slotRef(card.instanceId)}
+          layout={reducedMotion ? false : "position"}
+          layoutDependency={reducedMotion ? undefined : layoutKey}
+          transition={handReflow}
           style={marginStyle}
-        />
+          className={cn(held && "invisible")}
+        >
+          <Card
+            data={{ card, cardDb }}
+            variant="hand"
+            faceDown
+            sleeveUrl={sleeveUrl}
+          />
+        </motion.div>
       );
     }
 
     if (inputSuppressed) {
       return (
-        <div
+        <motion.div
           key={card.instanceId}
+          ref={slotRef(card.instanceId)}
+          layout={reducedMotion ? false : "position"}
+          layoutDependency={reducedMotion ? undefined : layoutKey}
+          transition={handReflow}
           style={marginStyle}
           className={cn(isInFlight && "invisible")}
         >
           <Card data={{ card, cardDb }} variant="hand" />
-        </div>
+        </motion.div>
       );
     }
 
@@ -352,7 +494,8 @@ export const HandLayer = React.memo(function HandLayer({
         reducedMotion={reducedMotion}
         style={marginStyle}
         enableLayout={!reducedMotion}
-        layoutDep={count}
+        layoutDep={layoutKey}
+        slotRef={slotRef(card.instanceId)}
       />
     );
   };

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { CardInstance } from "@shared/game-types";
+import { handDepartures } from "@/lib/game/card-motion";
 import type { CardTransition } from "./use-card-transitions";
 
 export interface HandAnimationState {
@@ -9,6 +10,9 @@ export interface HandAnimationState {
   inFlightInstanceIds: Set<string>;
   /** Total number of cards that will be in hand after flights complete. */
   projectedCount: number;
+  /** Epoch ms at which each arriving card leaves its source (OPT-1054). The
+   *  hand keeps the card's slot closed until then. */
+  departures: Map<string, number>;
 }
 
 export function computeHandAnimationState(
@@ -45,6 +49,7 @@ export function computeHandAnimationState(
   return {
     inFlightInstanceIds,
     projectedCount: handCards.length + arrivingCount,
+    departures: handDepartures(transitions, zoneKey),
   };
 }
 

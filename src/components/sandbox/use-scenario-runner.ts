@@ -317,7 +317,7 @@ function collectEventLog(
   const limit = Math.min(upToIndex, script.length);
   for (let i = 0; i < limit; i++) {
     const step = script[i];
-    if (step.type === "event") out.push(step.event);
+    if (step.type === "event") out.push(step.event, ...(step.batch ?? []));
   }
   return out;
 }

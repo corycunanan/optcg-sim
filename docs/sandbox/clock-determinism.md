@@ -12,9 +12,9 @@ The animation hook reads the current time directly from the host environment in 
 
 - `Date.now()` at lines 73, 141, 208 — assigned to `CardTransition.startedAt` so the auto-expire pass can age out flights that never fired their `onAnimationComplete`.
 - `Date.now()` at line 305 — the auto-expire pass itself, used as the reference point against `t.startedAt`.
-- `setTimeout(..., AUTO_EXPIRE_MS = 1500)` at line 304 — the safety-net cleanup timer.
+- `setTimeout(..., AUTO_EXPIRE_MS = 2000)` (raised by OPT-1054 to cover a flip plus the longest flight) — the safety-net cleanup timer.
 - `setTimeout(..., 300)` at line 248 — the post-drag cooldown that suppresses a redundant ghost card after the server-confirmed state lands.
-- `STAGGER_MS = 60` at line 41 — the per-batch delay between sibling arrivals (multi-card draws, multi-DON fan-outs). Not a wall-clock read, but a load-bearing timing constant; any clock-injection scheme would also need to surface this so tests can fast-forward through staggers.
+- `staggerMs()` (from `cardStagger` in `src/lib/motion.ts`, OPT-1054) — the per-batch delay between sibling arrivals: 90ms for draws and DON!! tokens, 70ms for moves into a pile (deck, trash, Life), 60ms otherwise. Flights that flip first also hold their departure for the 300ms flip (`FLIP_SECONDS` in `src/lib/game/card-motion.ts`). Not wall-clock reads, but load-bearing timing constants; any clock-injection scheme would also need to surface them so tests can fast-forward through staggers and flips.
 
 ### `src/components/sandbox/use-scenario-runner.ts`
 

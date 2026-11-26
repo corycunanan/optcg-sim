@@ -1,6 +1,6 @@
 // Spectator scenario: two CARD_DRAWN events fired ~60ms apart so
 // `useCardTransitions` produces two distinct deck → hand flights, exercising
-// the per-batch stagger (`STAGGER_MS`) and the hand fan reflow in
+// the per-batch stagger (`cardStagger`) and the hand fan reflow in
 // `useHandAnimationState`.
 
 import type { CardInstance, GameEvent, TurnState } from "@shared/game-types";
