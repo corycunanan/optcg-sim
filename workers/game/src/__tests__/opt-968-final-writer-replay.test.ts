@@ -1,3 +1,4 @@
+import { withoutAssertedMotionPayloads } from "./motion-payload-support.js";
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -28,7 +29,7 @@ for (const scenario of corpus.scenarios) for (const start of scenario.cases) for
     for (const [offset, reply] of start.replies.entries()) {
       expect(loaded.state.schemaVersion).toBe(6);
       const expectedPause = (scenario.cases[start.index + offset].stored.session as { state: GameState }).state;
-      expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(expectedPause);
+      expect(withoutAssertedMotionPayloads(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state))))).toEqual(expectedPause);
       const result = lifecycle.resumePromptLifecycle(loaded.state, reply, loaded.cardDb, { drainPregame: (state) => state, advanceStartOfTurn: (state) => state });
       expect(result.responseRejected).toBeFalsy();
       const next = new MemorySessionStorage();
@@ -36,6 +37,6 @@ for (const scenario of corpus.scenarios) for (const start of scenario.cases) for
       loaded = (await new repository.SessionRepository(next, config).load())!;
     }
     expect(loaded.state.schemaVersion).toBe(6);
-    expect(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state))))).toEqual(scenario.expected);
+    expect(withoutAssertedMotionPayloads(withoutAssertedDonMoveDetail(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))))).toEqual(scenario.expected);
   });
 }

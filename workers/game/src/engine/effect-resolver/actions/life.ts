@@ -388,6 +388,7 @@ export function executeLifeToHand(
       payload: {
         cardId: transition.fact.cardId,
         cardInstanceId: transition.fact.newInstanceId,
+        sourceFace: transition.lifeFace,
       },
     });
     events.push({
@@ -746,6 +747,7 @@ export function executeAddToLifeFromField(
           sourceController: moved.fact.controller,
           causingController,
           movementCause: "EFFECT",
+          face,
         },
       });
     }

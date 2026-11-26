@@ -233,7 +233,7 @@ function applyCostSelectionUnreleased(
         if (moved.transitions.length !== amount) return { state, events: [] };
         const events: PendingEvent[] = moved.transitions.map(({ fact }) => ({
           type: "CARD_ADDED_TO_LIFE", playerIndex: fact.owner,
-          payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" },
+          payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST", face: cost.face ?? "UP" },
         }));
         return { state: moved.state, events };
       }
@@ -251,7 +251,7 @@ function applyCostSelectionUnreleased(
       });
       const events: PendingEvent[] = moved.transitions.map(({ fact }) => ({
         type: "CARD_ADDED_TO_LIFE", playerIndex: fact.owner,
-        payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" },
+        payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST", face },
       }));
       return { state: moved.state, events };
     }

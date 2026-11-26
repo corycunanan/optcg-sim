@@ -8,14 +8,19 @@ import { pileDelta, pileDeltaReduced, pilePop } from "@/lib/motion";
 /** Top-of-pile receipt shared by deck, trash, and life. */
 export function PileReceipt({
   visibleCount,
+  showRemovals = false,
   children,
 }: {
   visibleCount: number;
+  /** Also pop with −N when cards leave (Life, OPT-1059). */
+  showRemovals?: boolean;
   children: ReactNode;
 }) {
   const reducedMotion = useReducedMotion();
   const popControls = useAnimationControls();
-  const { receipt, clearReceipt } = usePileReceipt(visibleCount);
+  const { receipt, clearReceipt } = usePileReceipt(visibleCount, {
+    removals: showRemovals,
+  });
   const deltaMotion = reducedMotion ? pileDeltaReduced : pileDelta;
 
   useEffect(() => {
@@ -53,7 +58,7 @@ export function PileReceipt({
             transition={deltaMotion.transition}
             onAnimationComplete={() => clearReceipt(receipt.id)}
           >
-            +{receipt.count}
+            {receipt.count < 0 ? `−${-receipt.count}` : `+${receipt.count}`}
           </motion.span>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { withoutAssertedMotionPayloads } from "./motion-payload-support.js";
 import { chooseFirstObligation, orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
@@ -63,7 +64,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
         const storage = new MemorySessionStorage();
         await new Repository(storage, config).save({ ...loaded, state: actual, undoHistory: [actual] });
         actual = (await new Repository(storage, config).load())!.state;
-        expect(actual).toEqual(
+        expect(withoutAssertedMotionPayloads(actual)).toEqual(
             root
               ? expected
               : historicalBattle ? candidateExpected(`final/${name}/${item.index}/pause/${offset}`)

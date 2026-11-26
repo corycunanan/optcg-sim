@@ -225,7 +225,20 @@ export function executeMill(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill", from: "DECK" } });
+  events.push({
+    type: "CARD_TRASHED",
+    playerIndex: controller,
+    payload: {
+      count: millCount,
+      reason: "mill",
+      from: "DECK",
+      // OPT-1059: trashed cards are public; the board shows their faces.
+      cards: moved.transitions.map(({ fact }) => ({
+        instanceId: fact.newInstanceId,
+        cardId: fact.cardId,
+      })),
+    },
+  });
 
   // Record the cards actually moved: new trash instance ids plus a snapshot
   // of each printed card, so a later "if the trashed card ..." condition

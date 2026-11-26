@@ -604,6 +604,7 @@ const EventPayloadSchemas = {
     count: FiniteNumber.optional(),
     reason: z.string(),
     from: z.string().optional(),
+    cards: z.array(CardRef).optional(),
   }),
   CARD_RETURNED_TO_HAND: z.strictObject({
     sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
@@ -629,6 +630,7 @@ const EventPayloadSchemas = {
     cardId: z.string().optional(),
     cardInstanceId: z.string().optional(),
     count: FiniteNumber.optional(),
+    sourceFace: z.enum(["UP", "DOWN"]).optional(),
   }),
   LIFE_CARD_FACE_CHANGED: z.strictObject({ face: z.enum(["UP", "DOWN"]) }),
   ATTACK_DECLARED: z.strictObject({

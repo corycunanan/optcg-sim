@@ -257,7 +257,7 @@ describe("buildEventTimeline", () => {
       playerIndex: 0,
       payload: { cardId: "OP01-006", cardInstanceId: "h-1" },
     });
-    // Life to hand never flips (its source side is unknown).
+    // Life to hand without a Life side never flips (OPT-1059 adds sourceFace).
     expect(buildEventTimeline([lifeToHand]).durationMs).toBe(FLIGHT_MS);
   });
 
@@ -310,5 +310,74 @@ describe("DON!! deck moves (OPT-1057)", () => {
         classifyEventBeat(at({ type: "DON_DETACHED", playerIndex: 0, payload })),
       ).toBeNull();
     }
+  });
+});
+
+describe("Life, mill and bounce beats (OPT-1059)", () => {
+  const mill = (n: number) =>
+    at({
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      payload: {
+        count: n,
+        reason: "mill",
+        from: "DECK",
+        cards: Array.from({ length: n }, (_, i) => ({
+          instanceId: `t-${i}`,
+          cardId: `OP01-00${i}`,
+        })),
+      },
+    } as Omit<GameEvent, "timestamp">);
+
+  it("plays a named mill as one travel beat that flips its top card", () => {
+    const event = mill(3);
+    expect(classifyEventBeat(event)).toBe("travel");
+    const timeline = buildEventTimeline([event]);
+    expect(timeline.durationMs).toBe(
+      FLIP_MS + 2 * cardStagger.pileMs + FLIGHT_MS
+    );
+  });
+
+  it("keeps a count-only mill a dissolve", () => {
+    const event = at({
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      payload: { count: 2, reason: "mill", from: "DECK" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(event)).toBe("transform");
+  });
+
+  it("holds an add-to-Life beat for its flip", () => {
+    const event = at({
+      type: "CARD_ADDED_TO_LIFE",
+      playerIndex: 0,
+      payload: {
+        cardId: "OP01-010",
+        cardInstanceId: "f-1",
+        newCardInstanceId: "l-1",
+        face: "DOWN",
+      },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(event)).toBe("travel");
+    expect(buildEventTimeline([event]).durationMs).toBe(TRAVEL_MS);
+    expect(siblingStaggerMs("CARD_ADDED_TO_LIFE")).toBe(cardStagger.pileMs);
+  });
+
+  it("holds a public Life-to-hand beat for its flip", () => {
+    const event = at({
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 0,
+      payload: { cardId: "OP01-010", cardInstanceId: "h-1", sourceFace: "DOWN" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(buildEventTimeline([event]).durationMs).toBe(TRAVEL_MS);
+  });
+
+  it("gives a Life card turning over its own beat", () => {
+    const turn = at({
+      type: "LIFE_CARD_FACE_CHANGED",
+      playerIndex: 0,
+      payload: { face: "UP" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(turn)).toBe("pulse");
   });
 });

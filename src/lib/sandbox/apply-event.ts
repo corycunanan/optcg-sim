@@ -26,7 +26,17 @@ export function applyEvent(
       );
     case "CARD_TRASHED":
       return mapPlayer(state, event.playerIndex, (p) =>
-        trashFromAnyZone(p, event.payload, event.playerIndex),
+        event.payload.cards && event.payload.from === "DECK"
+          ? millNamedCards(p, event.payload.cards)
+          : trashFromAnyZone(p, event.payload, event.playerIndex),
+      );
+    case "CARD_ADDED_TO_LIFE":
+      return mapPlayer(state, event.playerIndex, (p) =>
+        addCardToLife(p, event.payload),
+      );
+    case "LIFE_CARD_FACE_CHANGED":
+      return mapPlayer(state, event.playerIndex, (p) =>
+        turnTopLifeCard(p, event.payload.face),
       );
     case "DON_GIVEN_TO_CARD":
       return mapPlayer(state, event.playerIndex, (p) =>
@@ -42,7 +52,11 @@ export function applyEvent(
       );
     case "CARD_RETURNED_TO_HAND":
       return mapPlayer(state, event.playerIndex, (p) =>
-        returnFieldCardToHand(p, event.payload.cardInstanceId),
+        returnFieldCardToHand(
+          p,
+          event.payload.cardInstanceId,
+          event.payload.newCardInstanceId,
+        ),
       );
     case "CARD_ADDED_TO_HAND_FROM_LIFE":
       return mapPlayer(state, event.playerIndex, (p) =>
@@ -299,15 +313,29 @@ function koFieldCard(
 function returnFieldCardToHand(
   p: PartialPlayerState,
   cardInstanceId: string,
+  newCardInstanceId?: string,
 ): PartialPlayerState {
   const located = locateAndRemove(p, cardInstanceId);
   if (!located) return p;
+  // A hand the viewer only sees redacted stays redacted: the returned card
+  // joins it as a sleeve, as the server projection would send it.
+  const hiddenHand =
+    p.hand.length > 0 && p.hand.every((card) => card.cardId === "hidden");
   return {
     ...located.player,
     hand: [
       ...located.player.hand,
       {
         ...located.card,
+        ...(hiddenHand
+          ? {
+              cardId: "hidden",
+              instanceId:
+                newCardInstanceId && newCardInstanceId !== "hidden"
+                  ? newCardInstanceId
+                  : `${located.card.instanceId}-hand`,
+            }
+          : {}),
         zone: "HAND",
         state: "ACTIVE",
         turnPlayed: null,
@@ -350,6 +378,66 @@ function addLifeCardToHand(
     owner: controller,
   }));
   return { ...p, life: newLife, hand: [...p.hand, ...newCards] };
+}
+
+function millNamedCards(
+  p: PartialPlayerState,
+  cards: ReadonlyArray<{ instanceId: string; cardId: string }>,
+): PartialPlayerState {
+  const count = Math.min(cards.length, p.deck.length);
+  if (count === 0) return p;
+  // The top card lands first, so it ends up under the later ones.
+  const trashed: CardInstance[] = cards.slice(0, count).map((card, i) => ({
+    ...p.deck[i],
+    instanceId: card.instanceId,
+    cardId: card.cardId,
+    zone: "TRASH",
+    state: "ACTIVE",
+    turnPlayed: null,
+    attachedDon: [],
+  }));
+  return {
+    ...p,
+    deck: p.deck.slice(count),
+    trash: [...trashed.reverse(), ...p.trash],
+  };
+}
+
+function addCardToLife(
+  p: PartialPlayerState,
+  payload: {
+    cardInstanceId: string;
+    newCardInstanceId: string;
+    cardId: string;
+    face?: "UP" | "DOWN";
+  },
+): PartialPlayerState {
+  const located = locateAndRemove(p, payload.cardInstanceId);
+  if (!located) return p;
+  return {
+    ...located.player,
+    life: [
+      {
+        instanceId: payload.newCardInstanceId,
+        cardId: payload.cardId,
+        face: payload.face ?? "DOWN",
+      },
+      ...located.player.life,
+    ],
+    donCostArea: returnAttachedDon(
+      located.player.donCostArea,
+      located.card.attachedDon,
+    ),
+  };
+}
+
+function turnTopLifeCard(
+  p: PartialPlayerState,
+  face: "UP" | "DOWN",
+): PartialPlayerState {
+  const top = p.life[0];
+  if (!top || top.face === face) return p;
+  return { ...p, life: [{ ...top, face }, ...p.life.slice(1)] };
 }
 
 // ─── lower-level helpers ────────────────────────────────────────────────

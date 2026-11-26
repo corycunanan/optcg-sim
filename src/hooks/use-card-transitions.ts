@@ -21,6 +21,7 @@ import {
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
   eventOffsetMs,
+  isNamedDeckTrash,
 } from "@/lib/game/event-timeline";
 
 export interface CardTransition {
@@ -239,6 +240,28 @@ export function eventToTransitions(
     );
   }
 
+  // OPT-1059: a deck trash (mill) names the cards it moved. Trashed cards are
+  // public, so each one travels face-up: the top card flips on the deck and
+  // the cards under it come off already turned (`assignPileFlips`), dealt
+  // `cardStagger.pileMs` apart, and the trash takes them all as one +N.
+  if (event.type === "CARD_TRASHED" && isNamedDeckTrash(event)) {
+    const { playerIndex } = event;
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
+    const startedAt = Date.now();
+    return (event.payload.cards ?? []).map((card, i) => ({
+      id: nextId(),
+      cardId: card.cardId,
+      instanceId: card.instanceId,
+      fromZoneKey: `${prefix}-deck`,
+      toZoneKey: `${prefix}-trash`,
+      playerIndex,
+      startedAt,
+      delay: (i * cardStagger.pileMs) / 1000,
+      sourceFaceDown: true,
+      destinationFaceDown: false,
+    }));
+  }
+
   // Count-only trash events do not expose individual cards. Represent the
   // batch with one face-down source fizzle and carry the full arrival count
   // to the destination pile receipt. Instance- or card-bearing events must
@@ -358,6 +381,38 @@ function trashSourceZone(
   // Legacy count-only cost/effect events predate the explicit `from` field;
   // those overwhelmingly originate in hand. New worker events set `from`.
   return `${prefix}-hand`;
+}
+
+/** Board zone a provenance `sourceZone` names, for events whose source
+ *  instance is no longer on the board (OPT-1059). Characters fall back to
+ *  the middle slot, as the other field events do. */
+function provenanceZone(
+  sourceZone: string | undefined,
+  prefix: "p" | "o",
+): string | null {
+  switch (sourceZone) {
+    case "HAND":
+      return `${prefix}-hand`;
+    case "DECK":
+      return `${prefix}-deck`;
+    case "TRASH":
+      return `${prefix}-trash`;
+    case "LIFE":
+      return `${prefix}-life`;
+    case "STAGE":
+      return `${prefix}-stage`;
+    case "LEADER":
+      return `${prefix}-leader`;
+    case "CHARACTER":
+      return `${prefix}-char-2`;
+    default:
+      return null;
+  }
+}
+
+/** Zones whose cards are public to both players: the field and the trash. */
+function isPublicZone(zoneKey: string): boolean {
+  return /^[po]-(char-\d+|leader|stage|trash)$/.test(zoneKey);
 }
 
 /** A received hand is face-down for this viewer when every card in it is
@@ -498,7 +553,10 @@ function eventToTransition(
           sourceInstanceId && zoneRegistry
             ? zoneRegistry.getCardZone(sourceInstanceId)
             : null;
-        from = resolvedZone ?? `${prefix}-char-2`;
+        from =
+          resolvedZone ??
+          provenanceZone(p.sourceZone, prefix) ??
+          `${prefix}-char-2`;
       }
       to = `${prefix}-hand`;
       break;
@@ -508,10 +566,30 @@ function eventToTransition(
       cardInstanceId = event.payload.cardInstanceId ?? null;
       from = `${prefix}-life`;
       to = `${prefix}-hand`;
-      // The payload carries no face, and its instance id is the new hand
-      // id, not the Life card's, so the Life side cannot be looked up
-      // (OPT-1054; an engine-side face is OPT-1059).
-      sourceSideUnknown = true;
+      // The instance id is the new hand id, so the Life side comes from the
+      // payload's `sourceFace` (OPT-1059). Events written before it carry no
+      // face: plan no flip for those.
+      if (event.payload.sourceFace) {
+        lifeFaceDown = event.payload.sourceFace === "DOWN";
+      } else {
+        sourceSideUnknown = true;
+      }
+      break;
+    }
+    case "CARD_ADDED_TO_LIFE": {
+      // OPT-1059: a card added to Life travels to the top of the pile. Life
+      // takes either side; a face-down add flips at its source first.
+      const p = event.payload;
+      cardId = p.cardId ?? null;
+      const sourceInstanceId = p.cardInstanceId;
+      cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
+      lifeFaceDown = p.face !== "UP";
+      const resolvedZone =
+        sourceInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(sourceInstanceId)
+          : null;
+      from = resolvedZone ?? provenanceZone(p.sourceZone, prefix);
+      to = `${prefix}-life`;
       break;
     }
     case "CARD_RETURNED_TO_DECK": {
@@ -543,15 +621,25 @@ function eventToTransition(
         : undefined;
     // The destination projection is the sole art authority. If it cannot
     // identify this transition unambiguously, render a face-down ghost rather
-    // than trusting an event payload whose redaction may differ.
-    cardId = receivedCard?.cardId ?? null;
+    // than trusting an event payload whose redaction may differ. A card
+    // leaving a public zone (the field, the trash) for a hand this viewer
+    // cannot see keeps its public face for the flip at its source; it lands
+    // face-down (OPT-1059).
+    const leavesPublicForHiddenHand =
+      !receivedCard &&
+      zoneFaceDown(to, { handFaceDown: receivedHandFaceDown(receivedHand) }) &&
+      isPublicZone(from) &&
+      !!cardId &&
+      cardId !== "hidden";
+    cardId = receivedCard?.cardId ?? (leavesPublicForHiddenHand ? cardId : null);
   }
 
   const allowSpotlightCardIdFallback =
     type === "CARD_DRAWN" ||
     type === "CARD_RETURNED_TO_HAND" ||
     type === "CARD_ADDED_TO_HAND_FROM_LIFE" ||
-    type === "CARD_RETURNED_TO_DECK";
+    type === "CARD_RETURNED_TO_DECK" ||
+    type === "CARD_ADDED_TO_LIFE";
   const spotlightCard =
     type === "CARD_KO"
       ? null
