@@ -1,7 +1,7 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CardInstance, GameEvent, LifeCard } from "@shared/game-types";
+import type { CardInstance, GameEvent } from "@shared/game-types";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import {
   receivedHandsByPlayerIndex,
@@ -10,7 +10,8 @@ import {
 } from "./use-card-transitions";
 
 // Hook-level coverage for OPT-1054: the flip assignment, the concurrency
-// cap and the Life face lookup all happen inside the hook's event effect.
+// cap and the Life-to-hand no-flip rule all happen inside the hook's event
+// effect.
 
 function handCard(instanceId: string, cardId: string): CardInstance {
   return {
@@ -35,10 +36,9 @@ function draw(timestamp: number, instanceId: string): GameEvent {
 interface ProbeProps {
   eventLog: GameEvent[];
   hand: CardInstance[];
-  life?: LifeCard[];
 }
 
-function Probe({ eventLog, hand, life }: ProbeProps) {
+function Probe({ eventLog, hand }: ProbeProps) {
   const receivedHands = receivedHandsByPlayerIndex(hand, [], 0);
   const { transitions } = useCardTransitions(
     eventLog,
@@ -46,8 +46,7 @@ function Probe({ eventLog, hand, life }: ProbeProps) {
     false,
     null,
     null,
-    receivedHands,
-    life,
+    receivedHands
   );
   return <output>{JSON.stringify(transitions)}</output>;
 }
@@ -60,7 +59,7 @@ async function render(props: ProbeProps) {
     await Promise.resolve();
   });
   latest = JSON.parse(
-    renderer!.root.findByType("output").children.join("") || "[]",
+    renderer!.root.findByType("output").children.join("") || "[]"
   ) as CardTransition[];
 }
 
@@ -78,7 +77,7 @@ describe("useCardTransitions flips (OPT-1054)", () => {
     await render({ eventLog: [draw(1, "d-1"), draw(2, "d-2")], hand });
     expect(latest.map((t) => t.flip)).toEqual(["turn", "under"]);
     expect(latest[1].pileFlipAt).toBeCloseTo(
-      (latest[0].delay ?? 0) + FLIP_SECONDS,
+      (latest[0].delay ?? 0) + FLIP_SECONDS
     );
   });
 
@@ -96,30 +95,24 @@ describe("useCardTransitions flips (OPT-1054)", () => {
     }
   });
 
-  it.each([
-    ["UP", false, undefined],
-    ["DOWN", true, "turn"],
-  ] as const)(
-    "reads a %s Life card's side from the Life zone it left",
-    async (face, sourceFaceDown, flip) => {
-      const lifeCard: LifeCard = { instanceId: "life-1", cardId: "OP01-003", face };
-      await render({ eventLog: [], hand: [], life: [lifeCard] });
-      await render({
-        eventLog: [
-          {
-            type: "CARD_ADDED_TO_HAND_FROM_LIFE",
-            playerIndex: 0,
-            timestamp: 1,
-            payload: { cardId: "OP01-003", cardInstanceId: "life-1" },
-          } as unknown as GameEvent,
-        ],
-        // The same update removes the card from Life.
-        hand: [handCard("life-1", "OP01-003")],
-        life: [],
-      });
-      expect(latest).toHaveLength(1);
-      expect(latest[0].sourceFaceDown).toBe(sourceFaceDown);
-      expect(latest[0].flip).toBe(flip);
-    },
-  );
+  it("moves a Life card to hand without a flip (its side is unknown)", async () => {
+    await render({ eventLog: [], hand: [] });
+    await render({
+      eventLog: [
+        {
+          type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+          playerIndex: 0,
+          timestamp: 1,
+          // The engine sends the new hand instance id, never the Life one.
+          payload: { cardId: "OP01-003", cardInstanceId: "hand-new-7" },
+        } as unknown as GameEvent,
+      ],
+      hand: [handCard("hand-new-7", "OP01-003")],
+    });
+    expect(latest).toHaveLength(1);
+    expect(latest[0].fromZoneKey).toBe("p-life");
+    expect(latest[0].sourceFaceDown).toBe(false);
+    expect(latest[0].destinationFaceDown).toBe(false);
+    expect(latest[0].flip).toBeUndefined();
+  });
 });

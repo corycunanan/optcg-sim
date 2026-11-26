@@ -253,13 +253,6 @@ function BoardLayoutInner({
     bottomPlayerIndex,
   );
 
-  const bottomLife = bottomPlayer?.life;
-  const topLife = topPlayer?.life;
-  const lifeCards = useMemo(
-    () => [...(bottomLife ?? []), ...(topLife ?? [])],
-    [bottomLife, topLife],
-  );
-
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
     eventLog,
     bottomPlayerIndex,
@@ -267,7 +260,6 @@ function BoardLayoutInner({
     zoneRegistry,
     spotlight.presentation,
     receivedHands,
-    lifeCards,
   );
 
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
