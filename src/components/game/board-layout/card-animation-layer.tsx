@@ -2,11 +2,29 @@
 
 import React from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import {
+  animate,
+  motion,
+  motionValue,
+  AnimatePresence,
+  useMotionValue,
+  useReducedMotion,
+} from "motion/react";
 import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { cardFizzle, cardFizzleReduced, cardTransitions } from "@/lib/motion";
+import {
+  flightDurationMs,
+  flightPose,
+  onNextFrame,
+  planFlight,
+} from "@/lib/game/card-motion";
+import {
+  cardFizzle,
+  cardFizzleReduced,
+  cardTransitions,
+  cardTravel,
+} from "@/lib/motion";
 import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
 import { CARD_SIZES } from "../card/sizes";
@@ -16,6 +34,7 @@ import {
   HAND_CARD_W,
   HAND_CARD_H,
 } from "./constants";
+import { handSlotZoneKey } from "./board-geometry";
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
@@ -27,6 +46,148 @@ interface CardAnimationLayerProps {
   onComplete: (id: string) => void;
   sleeveUrls?: [string | null, string | null];
   donArtUrls?: [string | null, string | null];
+  /** The board's CSS zoom. Ghosts render outside the zoomed board (in the
+   *  portal), so board-card sizes are scaled to match the cards they leave
+   *  and land on. Defaults to 1. */
+  boardScale?: number;
+}
+
+interface GhostBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Usable when the registered element was measured while laid out. */
+function measured(rect: DOMRect | null): rect is DOMRect {
+  return !!rect && rect.width > 0 && rect.height > 0;
+}
+
+/**
+ * A travelling card (OPT-1054): flips where it stands when its destination
+ * needs the other side, then flies a shallow arc to its destination. The
+ * pose is a pure function of eased progress (`flightPose`), and the
+ * destination is re-read every frame, so a landing slot that is still
+ * reflowing (a hand opening space for the drawn cards) pulls the card along
+ * with it: the card lands exactly where its placeholder is, with no jump.
+ */
+function TravelGhost({
+  transition,
+  from,
+  resolveTarget,
+  variant,
+  cardDb,
+  sleeveUrl,
+  onComplete,
+}: {
+  transition: CardTransition;
+  from: GhostBox;
+  resolveTarget: () => GhostBox;
+  variant: "hand" | "field" | "modal";
+  cardDb: CardDb;
+  sleeveUrl?: string | null;
+  onComplete: () => void;
+}) {
+  const plan = planFlight(transition);
+  const endRotate = transition.playedRested ? 90 : 0;
+  const x = useMotionValue(from.x);
+  const y = useMotionValue(from.y);
+  const width = useMotionValue(from.w);
+  const height = useMotionValue(from.h);
+  const rotate = useMotionValue(0);
+  const scale = useMotionValue(1);
+
+  const resolveTargetRef = React.useRef(resolveTarget);
+  const onCompleteRef = React.useRef(onComplete);
+  React.useEffect(() => {
+    resolveTargetRef.current = resolveTarget;
+    onCompleteRef.current = onComplete;
+  });
+
+  React.useEffect(() => {
+    const first = resolveTargetRef.current();
+    const distance = Math.hypot(first.x - from.x, first.y - from.y);
+    const progress = motionValue(0);
+    const apply = (p: number) => {
+      const target = resolveTargetRef.current();
+      const pose = flightPose(p, from, target, { from: 0, to: endRotate });
+      x.set(pose.x);
+      y.set(pose.y);
+      width.set(from.w + (target.w - from.w) * p);
+      height.set(from.h + (target.h - from.h) * p);
+      rotate.set(pose.rotate);
+      scale.set(pose.scale);
+    };
+    // Start the clock on the first frame after mount (as `CardFaces` does
+    // for the flip), so a long commit cannot swallow the start of the move.
+    let controls: { stop: () => void } | null = null;
+    const cancelStart = onNextFrame(() => {
+      controls = animate(progress, 1, {
+        duration: flightDurationMs(distance) / 1000,
+        ease: cardTravel.ease,
+        delay: plan.departAt,
+        onUpdate: apply,
+        onComplete: () => {
+          apply(1);
+          onCompleteRef.current();
+        },
+      });
+    });
+    return () => {
+      cancelStart();
+      controls?.stop();
+    };
+    // The flight is planned once, at mount; later renders only refresh the
+    // target resolver through the ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <motion.div
+      data-flight-id={transition.id}
+      exit={{ opacity: 0 }}
+      transition={cardTransitions.zoneExit}
+      style={{
+        position: "fixed",
+        left: 0,
+        top: 0,
+        x,
+        y,
+        width,
+        height,
+        rotate,
+        scale,
+        pointerEvents: "none",
+        // A card dealt from under a flipping pile top stays beneath it.
+        zIndex: transition.flip === "under" ? 0 : 1,
+      }}
+    >
+      <Card
+        variant={variant}
+        size={transition.spotlightSourceSize}
+        state="in-flight"
+        data={
+          transition.cardId && transition.cardId !== "hidden"
+            ? { cardId: transition.cardId, cardDb }
+            : undefined
+        }
+        faceDown={plan.faceDown}
+        flipFrom={
+          plan.flipAt === null
+            ? undefined
+            : {
+                faceDown: plan.initialFaceDown,
+                delay: plan.flipAt,
+                instant: plan.flipInstant,
+              }
+        }
+        sleeveUrl={sleeveUrl}
+        interaction={{ tooltipDisabled: true }}
+        style={FILL_TRANSITION_FRAME}
+      />
+    </motion.div>
+  );
 }
 
 function FlyingCard({
@@ -36,6 +197,7 @@ function FlyingCard({
   sleeveUrl,
   donArtUrl,
   reducedMotion,
+  boardScale,
 }: {
   transition: CardTransition;
   cardDb: CardDb;
@@ -43,11 +205,25 @@ function FlyingCard({
   sleeveUrl?: string | null;
   donArtUrl?: string | null;
   reducedMotion: boolean;
+  boardScale: number;
 }) {
   const zonePos = useZonePosition();
   const isTransform = transition.kind === "transform";
   const isDonAttach = transition.kind === "don-attach";
-  const fromRect = zonePos.getRect(transition.fromZoneKey);
+  const isFromHand = transition.fromZoneKey.endsWith("-hand");
+  const isHandBound = transition.toZoneKey.endsWith("-hand");
+  // A hand card's own slot is registered by `HandLayer`; a card that just
+  // left the hand keeps its last measured slot. Prefer it over the hand
+  // container so the card departs from (and lands in) its real place.
+  const fromSlotRect =
+    isFromHand && transition.instanceId
+      ? zonePos.getRect(
+          handSlotZoneKey(transition.fromZoneKey, transition.instanceId)
+        )
+      : null;
+  const fromRect = measured(fromSlotRect)
+    ? fromSlotRect
+    : zonePos.getRect(transition.fromZoneKey);
   const toRect = zonePos.getRect(transition.toZoneKey);
   const canAnimate = Boolean(
     fromRect && (isTransform || toRect) && (!reducedMotion || isTransform)
@@ -60,8 +236,6 @@ function FlyingCard({
 
   if (!canAnimate || !fromRect) return null;
 
-  const isFromHand = transition.fromZoneKey.endsWith("-hand");
-  const isHandBound = transition.toZoneKey.endsWith("-hand");
   const isFromSpotlight = transition.spotlightSourceSize !== undefined;
   const destinationRect = toRect ?? fromRect;
 
@@ -80,39 +254,32 @@ function FlyingCard({
   const spotlightSource = transition.spotlightSourceSize
     ? CARD_SIZES[transition.spotlightSourceSize]
     : null;
+  const fromSlot = measured(fromSlotRect) && fromRect === fromSlotRect;
   const fromW = isDonAttach
     ? DON_TOKEN_W
     : spotlightSource
       ? spotlightSource.width
-      : isFromHand
-        ? HAND_CARD_W
-        : BOARD_CARD_W;
+      : fromSlot
+        ? fromRect.width
+        : (isFromHand ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
   const fromH = isDonAttach
     ? DON_TOKEN_H
     : spotlightSource
       ? spotlightSource.height
-      : isFromHand
-        ? HAND_CARD_H
-        : BOARD_CARD_H;
+      : fromSlot
+        ? fromRect.height
+        : (isFromHand ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
   const toW = isDonAttach
     ? DON_TOKEN_W
-    : isHandBound
-      ? HAND_CARD_W
-      : BOARD_CARD_W;
+    : (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
   const toH = isDonAttach
     ? DON_TOKEN_H
-    : isHandBound
-      ? HAND_CARD_H
-      : BOARD_CARD_H;
+    : (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
-  // Cards arriving in hand target the right edge (end of hand fan); DON
-  // tokens aim for the target card's center.
-  const toX =
-    isHandBound && !isDonAttach
-      ? destinationRect.right - toW
-      : destinationRect.left + (destinationRect.width - toW) / 2;
+  // DON tokens aim for the target card's center.
+  const toX = destinationRect.left + (destinationRect.width - toW) / 2;
   const toY = destinationRect.top + (destinationRect.height - toH) / 2;
 
   // Variant tracks the destination footprint — the primitive's size token
@@ -125,13 +292,46 @@ function FlyingCard({
       : isHandBound
         ? "hand"
         : "field";
-  const isFaceDown = !transition.cardId || transition.cardId === "hidden";
 
   const delay = transition.delay ?? 0;
 
-  // Transform-class cards dissolve at the source; travel cards keep the
-  // existing straight-line flight. Destination pile receipt is owned by the
-  // pile components after this transition completes.
+  if (!isTransform && !isDonAttach) {
+    const toZoneKey = transition.toZoneKey;
+    const instanceId = transition.instanceId;
+    // Cards arriving in hand aim at their own placeholder slot, read live so
+    // the card and the reflowing hand settle together. Without a slot, fall
+    // back to the end of the hand fan.
+    const resolveTarget = (): GhostBox => {
+      if (isHandBound && instanceId) {
+        const slot = zonePos.getRect(handSlotZoneKey(toZoneKey, instanceId));
+        if (measured(slot)) {
+          return { x: slot.left, y: slot.top, w: slot.width, h: slot.height };
+        }
+      }
+      const rect = zonePos.getRect(toZoneKey) ?? destinationRect;
+      return {
+        x: isHandBound ? rect.right - toW : rect.left + (rect.width - toW) / 2,
+        y: rect.top + (rect.height - toH) / 2,
+        w: toW,
+        h: toH,
+      };
+    };
+    return (
+      <TravelGhost
+        transition={transition}
+        from={{ x: fromX, y: fromY, w: fromW, h: fromH }}
+        resolveTarget={resolveTarget}
+        variant={variant === "don" ? "field" : variant}
+        cardDb={cardDb}
+        sleeveUrl={sleeveUrl}
+        onComplete={onComplete}
+      />
+    );
+  }
+
+  // Transform-class cards dissolve at the source; DON tokens keep their
+  // straight flight. Destination pile receipt is owned by the pile
+  // components after this transition completes.
   let animateTarget: Record<string, number | number[]>;
   let transitionConfig: Record<string, unknown>;
 
@@ -146,16 +346,6 @@ function FlyingCard({
       opacity: [...fizzle.opacity],
     };
     transitionConfig = { ...fizzle.transition, delay };
-  } else if (isDonAttach) {
-    animateTarget = {
-      x: toX,
-      y: toY,
-      width: toW,
-      height: toH,
-      opacity: 1,
-      scale: 1,
-    };
-    transitionConfig = { ...cardTransitions.donAttach, delay };
   } else {
     animateTarget = {
       x: toX,
@@ -165,9 +355,10 @@ function FlyingCard({
       opacity: 1,
       scale: 1,
     };
-    animateTarget.rotate = transition.playedRested ? 90 : 0;
-    transitionConfig = { ...cardTransitions.zoneMove, delay };
+    transitionConfig = { ...cardTransitions.donAttach, delay };
   }
+
+  const isFaceDown = !transition.cardId || transition.cardId === "hidden";
 
   return (
     <motion.div
@@ -223,6 +414,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   onComplete,
   sleeveUrls,
   donArtUrls,
+  boardScale = 1,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
   const readyTransitions = transitions.filter(
@@ -251,6 +443,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             sleeveUrl={sleeveUrls?.[t.playerIndex] ?? null}
             donArtUrl={donArtUrls?.[t.playerIndex] ?? null}
             reducedMotion={reducedMotion ?? false}
+            boardScale={boardScale}
           />
         ))}
       </AnimatePresence>

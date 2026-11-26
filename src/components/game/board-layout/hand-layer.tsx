@@ -12,8 +12,9 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { getCardAffordability } from "@/lib/game/client-legality";
 import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
-import { cardReject, cardRejectReduced } from "@/lib/motion";
+import { cardReject, cardRejectReduced, handReflow } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
+import { handSlotZoneKey } from "./board-geometry";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 import { useInteractionMode } from "./interaction-mode";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,7 @@ function SortableHandCard({
   style,
   enableLayout,
   layoutDep,
+  slotRef,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -108,6 +110,8 @@ function SortableHandCard({
    *  only runs when this changes, scoping reflow to true composition events
    *  (card added/removed/reordered) instead of every render. */
   layoutDep: number;
+  /** Registers this card's slot so flights land in (and leave from) it. */
+  slotRef?: (node: HTMLDivElement | null) => void;
 }) {
   const descriptionId = useId();
   const rejectionSequence = useCardRejection(card.instanceId);
@@ -144,9 +148,10 @@ function SortableHandCard({
   // transform) while sortable still handles its own drag-follow + drop-back.
   return (
     <motion.div
+      ref={slotRef}
       layout={enableLayout ? "position" : false}
       layoutDependency={enableLayout ? layoutDep : undefined}
-      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      transition={handReflow}
       style={style}
     >
       <div
@@ -277,6 +282,31 @@ export const HandLayer = React.memo(function HandLayer({
     [zoneKey, zonePos]
   );
 
+  // OPT-1054: every card registers its own slot so a flight to this hand
+  // aims at the card's placeholder (and a play leaves from the card's real
+  // place). Ref callbacks are cached per instance so a re-render does not
+  // detach and re-measure every slot.
+  const [slotRefs] = useState(
+    () => new Map<string, (node: HTMLDivElement | null) => void>()
+  );
+  const slotRef = (instanceId: string) => {
+    if (!zoneKey) return undefined;
+    const key = handSlotZoneKey(zoneKey, instanceId);
+    let ref = slotRefs.get(key);
+    if (!ref) {
+      ref = (node: HTMLDivElement | null) => {
+        if (node) {
+          zonePos.register(key, node);
+        } else {
+          zonePos.unregister(key);
+          slotRefs.delete(key);
+        }
+      };
+      slotRefs.set(key, ref);
+    }
+    return ref;
+  };
+
   if (count === 0) return null;
 
   const maxWidth = FIELD_W - 60;
@@ -298,26 +328,37 @@ export const HandLayer = React.memo(function HandLayer({
     // sleeve without relying on viewer identity or board position.
     if (card.cardId === "hidden") {
       return (
-        <Card
+        <motion.div
           key={card.instanceId}
-          data={{ card, cardDb }}
-          variant="hand"
-          faceDown
-          sleeveUrl={sleeveUrl}
+          ref={slotRef(card.instanceId)}
+          layout={reducedMotion ? false : "position"}
+          layoutDependency={reducedMotion ? undefined : count}
+          transition={handReflow}
           style={marginStyle}
-        />
+        >
+          <Card
+            data={{ card, cardDb }}
+            variant="hand"
+            faceDown
+            sleeveUrl={sleeveUrl}
+          />
+        </motion.div>
       );
     }
 
     if (inputSuppressed) {
       return (
-        <div
+        <motion.div
           key={card.instanceId}
+          ref={slotRef(card.instanceId)}
+          layout={reducedMotion ? false : "position"}
+          layoutDependency={reducedMotion ? undefined : count}
+          transition={handReflow}
           style={marginStyle}
           className={cn(isInFlight && "invisible")}
         >
           <Card data={{ card, cardDb }} variant="hand" />
-        </div>
+        </motion.div>
       );
     }
 
@@ -353,6 +394,7 @@ export const HandLayer = React.memo(function HandLayer({
         style={marginStyle}
         enableLayout={!reducedMotion}
         layoutDep={count}
+        slotRef={slotRef(card.instanceId)}
       />
     );
   };

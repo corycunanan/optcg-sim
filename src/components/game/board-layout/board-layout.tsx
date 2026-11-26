@@ -671,6 +671,7 @@ function BoardLayoutInner({
       onComplete={removeTransition}
       sleeveUrls={sleeveUrls}
       donArtUrls={donArtUrls}
+      boardScale={boardScale}
     />
 
     </DndContext>

@@ -39,8 +39,12 @@ vi.mock("motion/react", () => ({
 vi.mock("@/contexts/active-effects-context", () => ({
   useActiveEffects: () => [],
 }));
+const zoneRegistry = vi.hoisted(() => ({
+  register: vi.fn(),
+  unregister: vi.fn(),
+}));
 vi.mock("@/contexts/zone-position-context", () => ({
-  useZonePosition: () => ({ register: vi.fn(), unregister: vi.fn() }),
+  useZonePosition: () => zoneRegistry,
 }));
 vi.mock("../card", () => ({
   Card: ({
@@ -89,6 +93,8 @@ afterEach(() => {
   renderer = null;
   SortableContext.mockClear();
   useSortable.mockClear();
+  zoneRegistry.register.mockClear();
+  zoneRegistry.unregister.mockClear();
 });
 
 describe("HandLayer spectator interaction", () => {
@@ -272,5 +278,37 @@ describe("HandLayer spectator interaction", () => {
     ]);
     expect(useSortable).toHaveBeenCalledTimes(1);
     expect(renderer!.root.findAllByProps({ role: "button" })).toHaveLength(1);
+  });
+
+  it("registers every card's slot so flights land in it (OPT-1054)", () => {
+    const hiddenCard = makeHiddenCard("top-hand-hidden", 1);
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <HandLayer
+            cards={[bottomCard, hiddenCard]}
+            cardDb={{} as CardDb}
+            zoneKey="p-hand"
+          />
+        </InteractionModeProvider>,
+        { createNodeMock: () => ({}) },
+      );
+    });
+
+    const keys = zoneRegistry.register.mock.calls.map(([key]) => key);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "p-hand",
+        "p-hand/bottom-hand-1",
+        "p-hand/top-hand-hidden",
+      ]),
+    );
+
+    act(() => renderer?.unmount());
+    renderer = null;
+    const removed = zoneRegistry.unregister.mock.calls.map(([key]) => key);
+    expect(removed).toEqual(
+      expect.arrayContaining(["p-hand/bottom-hand-1", "p-hand/top-hand-hidden"]),
+    );
   });
 });

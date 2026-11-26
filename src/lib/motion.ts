@@ -302,10 +302,6 @@ const board = {
     },
   },
   flight: {
-    /** Card flying between zones (OPT-274 tuned). Short easeOut tween —
-     *  straight line, ~220ms. The arrival pop lives on the destination card
-     *  (`cardEntry` spring on mount) so the flight itself stays snappy. */
-    zoneMove: { duration: 0.22, ease: "easeOut" as const },
     /** Card travelling between zones (OPT-1054). A shallow arc: the path
      *  bulges toward screen-up by `arcRatio` of the distance at its midpoint,
      *  capped at `arcMaxPx`; the card leans up to `leanMaxDeg` toward its
