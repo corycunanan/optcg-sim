@@ -67,6 +67,16 @@ const FLIPPING_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
   ]);
 
 function mayFlip(event: GameEvent): boolean {
+  // OPT-1056: the looking player sees the fan face-up, everyone else
+  // face-down, so the top card turns on the deck, rest cards turn before
+  // they go back, and trashed cards turn for the viewer who saw their backs.
+  if (
+    event.type === "DECK_TOP_LOOKED" ||
+    event.type === "CARDS_PLACED_IN_DECK" ||
+    isLookTrash(event)
+  ) {
+    return true;
+  }
   if (!FLIPPING_TRAVEL_EVENTS.has(event.type)) return false;
   const cardId = (event.payload as { cardId?: string | null }).cardId;
   return !!cardId && cardId !== "hidden";
@@ -86,6 +96,9 @@ export function siblingStaggerMs(type: GameEventType): number {
       return cardStagger.drawMs;
     case "CARD_RETURNED_TO_DECK":
     case "LIFE_CARD_TO_DECK":
+    case "DECK_TOP_LOOKED":
+    case "CARDS_PLACED_IN_DECK":
+    case "CARD_TRASHED":
       return cardStagger.pileMs;
     default:
       return cardStagger.defaultMs;
@@ -113,7 +126,31 @@ const PULSE_EVENTS: ReadonlySet<GameEventType> = new Set<GameEventType>([
 
 /** Events whose fan-out is internal (count tokens from one event). */
 const COUNTED_TRAVEL_EVENTS: ReadonlySet<GameEventType> =
-  new Set<GameEventType>(["DON_GIVEN_TO_CARD", "LIFE_CARD_TO_DECK"]);
+  new Set<GameEventType>([
+    "DON_GIVEN_TO_CARD",
+    "LIFE_CARD_TO_DECK",
+    // OPT-1056: the looked-at cards fan out, and the rest go back, one by one.
+    "DECK_TOP_LOOKED",
+    "CARDS_PLACED_IN_DECK",
+  ]);
+
+/** A looked-at card the effect trashes travels from the fan to the trash
+ *  (OPT-1056) instead of dissolving. */
+function isLookTrash(event: GameEvent): boolean {
+  return (
+    event.type === "CARD_TRASHED" && event.payload.reason === "search_trash"
+  );
+}
+
+/** A searched pick revealed to both players rises and shows its face in the
+ *  look fan (OPT-1056) for one spotlight dwell, instead of the spotlight. */
+export function isLookPickReveal(event: GameEvent): boolean {
+  return (
+    event.type === "CARDS_REVEALED" &&
+    event.payload.source === "search" &&
+    event.payload.visibility === "BOTH"
+  );
+}
 
 export type BeatKind = "spotlight" | "travel" | "transform" | "pulse";
 
@@ -123,6 +160,8 @@ export type BeatKind = "spotlight" | "travel" | "transform" | "pulse";
  * so it must not hold the following steps back.
  */
 export function classifyEventBeat(event: GameEvent): BeatKind | null {
+  if (isLookPickReveal(event)) return "spotlight";
+  if (isLookTrash(event)) return "travel";
   if (eventToSpotlight(event)) return "spotlight";
   if (event.type === "EVENT_ACTIVATED_FROM_HAND") return "transform";
   if (TRAVEL_EVENTS.has(event.type) || COUNTED_TRAVEL_EVENTS.has(event.type)) {
@@ -134,7 +173,12 @@ export function classifyEventBeat(event: GameEvent): BeatKind | null {
 }
 
 function countedFanOut(event: GameEvent): number {
-  if (event.type === "DON_GIVEN_TO_CARD" || event.type === "LIFE_CARD_TO_DECK") {
+  if (
+    event.type === "DON_GIVEN_TO_CARD" ||
+    event.type === "LIFE_CARD_TO_DECK" ||
+    event.type === "DECK_TOP_LOOKED" ||
+    event.type === "CARDS_PLACED_IN_DECK"
+  ) {
     return Math.max(1, event.payload.count ?? 1);
   }
   return 1;
@@ -174,12 +218,16 @@ export interface EventTimeline {
   durationMs: number;
   /** Number of sequenced steps. */
   beatCount: number;
+  /** The update opens a look fan (OPT-1056): its selection prompt waits for
+   *  the cards to land in the fan, even when that is the only step. */
+  holdsPrompt: boolean;
 }
 
 const EMPTY_TIMELINE: EventTimeline = {
   offsets: new Map(),
   durationMs: 0,
   beatCount: 0,
+  holdsPrompt: false,
 };
 
 export interface BuildEventTimelineOptions {
@@ -204,6 +252,7 @@ export function buildEventTimeline(
       offsets: new Map(events.map((event) => [event.timestamp, 0])),
       durationMs: 0,
       beatCount: 0,
+      holdsPrompt: false,
     };
   }
 
@@ -287,7 +336,12 @@ export function buildEventTimeline(
     start = durationMs + gapMs;
   }
 
-  return { offsets, durationMs, beatCount: beats.length };
+  return {
+    offsets,
+    durationMs,
+    beatCount: beats.length,
+    holdsPrompt: events.some((event) => event.type === "DECK_TOP_LOOKED"),
+  };
 }
 
 /** Offset for one event, 0 when the timeline does not list it. */

@@ -55,6 +55,8 @@ export function eventToSpotlight(
   switch (event.type) {
     case "CARDS_REVEALED": {
       if (event.payload.visibility !== "BOTH") return null;
+      // OPT-1056: a searched pick shows its face in the look fan instead.
+      if (event.payload.source === "search") return null;
       const cards = event.payload.cards
         .filter((card) => isPublicCardId(card.cardId))
         .map((card) => ({

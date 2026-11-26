@@ -1,3 +1,4 @@
+import { pushCardsPlacedInDeck } from "../deck-look-events.js";
 import { prepareResumeProvenance, settleResumeProvenance, abandonedResume } from "./resume-provenance.js";
 import { updateEffectContinuation } from "./event-activation.js";
 /**
@@ -207,6 +208,13 @@ function resumeEffectChainCore(
   if (deckScry) {
     nextState = deckScry.state;
     pausedActionSucceeded = true;
+    // OPT-1056: the looked-at group goes back to the deck as one.
+    pushCardsPlacedInDeck(
+      events,
+      controller,
+      action.type === "ARRANGE_TOP_CARDS" ? (action.orderedInstanceIds?.length ?? 0) : 0,
+      action.type === "ARRANGE_TOP_CARDS" ? action.destination : "TOP",
+    );
   }
 
   const returnToDeck = handleArrangeReturnToDeck(

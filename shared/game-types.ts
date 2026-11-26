@@ -420,6 +420,18 @@ export interface GameEventPayloadMap {
    * player-facing words and never carries hidden card identities.
    */
   PROMPT_AUTO_RESOLVED: { detail: string; cardId?: string };
+  /**
+   * OPT-1056: the player is looking at the top `count` cards of their own deck
+   * (a "look at N" search or rearrange). Emitted when the selection opens.
+   * `cards` lists them top first; only the looking player sees identities.
+   */
+  DECK_TOP_LOOKED: {
+    cards: Array<{ instanceId: string; cardId: string }>;
+    count: number;
+  };
+  /** OPT-1056: `count` looked-at cards went back to the `position` end of the
+   *  player's deck, without naming them. */
+  CARDS_PLACED_IN_DECK: { count: number; position: "TOP" | "BOTTOM" };
 }
 
 /** Union of all event type strings. */
@@ -478,6 +490,8 @@ export const ALL_GAME_EVENT_TYPES = [
   "PREGAME_FIRST_PLAYER_DECIDED",
   "MULLIGAN_DECISION",
   "PROMPT_AUTO_RESOLVED",
+  "DECK_TOP_LOOKED",
+  "CARDS_PLACED_IN_DECK",
 ] as const satisfies readonly GameEventType[];
 
 type _AllGameEventTypesCovered =

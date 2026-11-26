@@ -770,6 +770,11 @@ const EventPayloadSchemas = {
     detail: z.string(),
     cardId: z.string().optional(),
   }),
+  DECK_TOP_LOOKED: z.strictObject({ cards: z.array(CardRef), count: FiniteNumber }),
+  CARDS_PLACED_IN_DECK: z.strictObject({
+    count: FiniteNumber,
+    position: z.enum(["TOP", "BOTTOM"]),
+  }),
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {

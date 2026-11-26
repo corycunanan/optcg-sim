@@ -18,6 +18,11 @@ import {
 } from "@/lib/game/card-motion";
 import { cardStagger } from "@/lib/motion";
 import {
+  EMPTY_DECK_LOOK_INDEX,
+  lookSlotZoneKey,
+  type DeckLookIndex,
+} from "@/lib/game/deck-look";
+import {
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
   eventOffsetMs,
@@ -70,6 +75,9 @@ export interface CardTransition {
   /** For `flip: "under"`, seconds after mount when the top card's flip ends
    *  and this card swaps to its destination side. */
   pileFlipAt?: number;
+  /** Stay invisible until `delay` (OPT-1056). A card leaving the look fan
+   *  shows its fan slot until then, and may not have arrived there yet. */
+  hiddenUntilDelay?: boolean;
 }
 
 export type ReceivedHands = readonly [
@@ -125,7 +133,17 @@ export function eventToTransitions(
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  deckLooks: DeckLookIndex = EMPTY_DECK_LOOK_INDEX,
 ): CardTransition[] {
+  const look = deckLookTransitions(
+    event,
+    bottomPlayerIndex,
+    zoneRegistry,
+    receivedHands,
+    deckLooks,
+  );
+  if (look) return look;
+
   const single = eventToTransition(
     event,
     bottomPlayerIndex,
@@ -202,6 +220,81 @@ export function eventToTransitions(
   }
 
   return [];
+}
+
+/**
+ * OPT-1056: flights into and out of the look fan. The look event deals its
+ * cards from the deck into the fan slots; a departing event leaves from the
+ * slot `deck-look.ts` assigned to it. Returns null for events that do not
+ * touch a fan.
+ */
+function deckLookTransitions(
+  event: GameEvent,
+  bottomPlayerIndex: 0 | 1,
+  zoneRegistry: ZonePositionRegistry | null,
+  receivedHands: ReceivedHands | undefined,
+  deckLooks: DeckLookIndex,
+): CardTransition[] | null {
+  const prefix = boardZonePrefix(event.playerIndex, bottomPlayerIndex);
+  const deckKey = `${prefix}-deck`;
+  const startedAt = Date.now();
+
+  if (event.type === "DECK_TOP_LOOKED") {
+    const look = deckLooks.arrivals.get(event.timestamp);
+    if (!look) return null;
+    return look.cardIds.map((cardId, index) => ({
+      id: nextId(),
+      cardId,
+      instanceId: null,
+      fromZoneKey: deckKey,
+      toZoneKey: lookSlotZoneKey(prefix, look, index),
+      playerIndex: event.playerIndex,
+      startedAt,
+      delay: (index * cardStagger.pileMs) / 1000,
+      sourceFaceDown: true,
+      destinationFaceDown: look.faceDown,
+    }));
+  }
+
+  const source = deckLooks.departures.get(event.timestamp);
+  if (!source) return null;
+  const { look, slots } = source;
+
+  if (event.type === "CARDS_PLACED_IN_DECK") {
+    return slots.map((slot, index) => ({
+      id: nextId(),
+      cardId: look.cardIds[slot] ?? null,
+      instanceId: null,
+      fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+      toZoneKey: deckKey,
+      playerIndex: event.playerIndex,
+      startedAt,
+      delay: (index * cardStagger.pileMs) / 1000,
+      sourceFaceDown: look.faceDown,
+      destinationFaceDown: true,
+      hiddenUntilDelay: true,
+    }));
+  }
+
+  const single = eventToTransition(
+    event,
+    bottomPlayerIndex,
+    zoneRegistry,
+    null,
+    receivedHands,
+  );
+  const slot = slots[0];
+  if (!single || slot === undefined) return null;
+  return [
+    {
+      ...single,
+      // A trashed fan card travels to the trash instead of dissolving.
+      kind: undefined,
+      fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+      sourceFaceDown: look.faceDown,
+      hiddenUntilDelay: true,
+    },
+  ];
 }
 
 /** Helper for count-N face-down flights between two static zones. Each
@@ -544,6 +637,7 @@ export function useCardTransitions(
   zoneRegistry?: ZonePositionRegistry | null,
   activeSpotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  deckLooks: DeckLookIndex = EMPTY_DECK_LOOK_INDEX,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
   const reducedMotion = useReducedMotion();
@@ -640,6 +734,7 @@ export function useCardTransitions(
         zoneRegistry ?? null,
         waitsForSpotlight ? batchSpotlight : null,
         receivedHands,
+        deckLooks,
       );
       for (const transition of produced) {
         newTransitions.push({
@@ -702,6 +797,7 @@ export function useCardTransitions(
     activeSpotlight,
     receivedHands,
     reducedMotion,
+    deckLooks,
   ]);
 
   // Auto-expire old transitions

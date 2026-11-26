@@ -35,12 +35,14 @@ export function useEventPlayback(eventLog: GameEvent[]): boolean {
     if (newEvents.length === 0) return;
     lastTimestampRef.current = latest ?? since;
 
-    const { durationMs, beatCount } = buildEventTimeline(newEvents, {
-      reducedMotion: !!reducedMotion,
-    });
+    const { durationMs, beatCount, holdsPrompt } = buildEventTimeline(
+      newEvents,
+      { reducedMotion: !!reducedMotion },
+    );
     // A single step reads on its own and holds nothing back, so routine
-    // plays do not flicker the board's controls.
-    if (beatCount < 2 || durationMs <= 0) return;
+    // plays do not flicker the board's controls. A look fan (OPT-1056) holds
+    // its selection prompt until the cards have landed.
+    if ((beatCount < 2 && !holdsPrompt) || durationMs <= 0) return;
 
     // A newer update extends playback; it never cuts a running one short.
     const now = Date.now();

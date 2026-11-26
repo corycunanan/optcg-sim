@@ -35,6 +35,7 @@ import {
   HAND_CARD_H,
 } from "./constants";
 import { handSlotZoneKey } from "./board-geometry";
+import { isLookSlotZoneKey } from "@/lib/game/deck-look";
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
@@ -106,6 +107,12 @@ function TravelGhost({
   const height = useMotionValue(from.h);
   const rotate = useMotionValue(0);
   const scale = useMotionValue(1);
+  // A card leaving the look fan stays invisible until its own start, while
+  // its fan slot still shows it (OPT-1056).
+  const hiddenUntil =
+    transition.hiddenUntilDelay && (transition.delay ?? 0) > 0
+      ? (transition.delay ?? 0)
+      : 0;
 
   const resolveTargetRef = React.useRef(resolveTarget);
   const onCompleteRef = React.useRef(onComplete);
@@ -177,6 +184,11 @@ function TravelGhost({
   return (
     <motion.div
       data-flight-id={transition.id}
+      initial={hiddenUntil > 0 ? { opacity: 0 } : false}
+      animate={{
+        opacity: 1,
+        transition: { duration: 0, delay: hiddenUntil },
+      }}
       exit={{ opacity: 0 }}
       transition={cardTransitions.zoneExit}
       style={{
@@ -245,6 +257,10 @@ function FlyingCard({
   const isDonAttach = transition.kind === "don-attach";
   const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
+  // Look fan slots (OPT-1056) are larger than board cards: flights into and
+  // out of them take the slot's own footprint.
+  const isFromLook = isLookSlotZoneKey(transition.fromZoneKey);
+  const isLookBound = isLookSlotZoneKey(transition.toZoneKey);
   // A hand card's own slot is registered by `HandLayer`; a card that just
   // left the hand keeps its last measured slot. Prefer it over the hand
   // container so the card departs from (and lands in) its real place.
@@ -287,7 +303,9 @@ function FlyingCard({
   const spotlightSource = transition.spotlightSourceSize
     ? CARD_SIZES[transition.spotlightSourceSize]
     : null;
-  const fromSlot = measured(fromSlotRect) && fromRect === fromSlotRect;
+  const fromSlot =
+    (measured(fromSlotRect) && fromRect === fromSlotRect) ||
+    (isFromLook && measured(fromRect));
   const fromW = isDonAttach
     ? DON_TOKEN_W
     : spotlightSource
@@ -302,12 +320,17 @@ function FlyingCard({
       : fromSlot
         ? fromRect.height
         : (isFromHand ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
+  const lookTarget = isLookBound && measured(toRect) ? toRect : null;
   const toW = isDonAttach
     ? DON_TOKEN_W
-    : (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
+    : lookTarget
+      ? lookTarget.width
+      : (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
   const toH = isDonAttach
     ? DON_TOKEN_H
-    : (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
+    : lookTarget
+      ? lookTarget.height
+      : (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
