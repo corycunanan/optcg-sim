@@ -136,6 +136,10 @@ export function formatEvent(
         accent: "text-gb-text-dim",
       };
     }
+    case "DECK_SHUFFLED": {
+      const whose = event.playerIndex === myIndex ? "Your" : "Opponent's";
+      return { icon: "🔀", text: `${whose} deck was shuffled` };
+    }
     case "MULLIGAN_DECISION": {
       const action = event.payload.redrew ? "redrew" : "kept their hand";
       return { icon: "🃏", text: `${who} ${action}` };
