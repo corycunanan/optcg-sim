@@ -22,7 +22,7 @@ const publicReveal: GameEvent = {
       { cardId: "OP01-030", instanceId: "revealed-event" },
       { cardId: "OP01-025", instanceId: "revealed-character" },
     ],
-    source: "search",
+    source: "DECK_TOP",
     visibility: "BOTH",
   },
 };
@@ -32,7 +32,7 @@ export const publicRevealSpotlightScenario: Scenario = {
   title: "Public Reveal Spotlight",
   category: "effects",
   description:
-    "A public two-card search result stages at board center, then dismisses after the shared one-second reveal dwell.",
+    "A public two-card reveal stages at board center, then dismisses after the shared one-second reveal dwell.",
   inputMode: "spectator",
   cardsUsed: ["OP01-001", "OP01-060", "OP01-030", "OP01-025"],
   initialState: {

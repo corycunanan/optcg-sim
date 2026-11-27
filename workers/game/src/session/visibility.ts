@@ -65,6 +65,7 @@ const SPECTATOR_REDACTED_EVENT_RULES = {
   LIFE_SCRIED: "Preserve Life-scry history with identities hidden.",
   LIFE_REORDERED: "Preserve Life-reorder history with identities hidden.",
   CARD_REMOVED_FROM_LIFE: "Preserve the Life-removal event with identities hidden.",
+  DECK_TOP_LOOKED: "Preserve the deck-look event with identities hidden.",
 } satisfies Record<RedactedGameEventType, string>;
 
 /**

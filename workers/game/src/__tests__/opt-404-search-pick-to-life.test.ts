@@ -113,11 +113,15 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
     // This synthetic action omits `reveal`, so the default public reveal
     // applies; the registered OP16-119 schema sets `reveal: false` (OPT-835,
     // see opt-835-search-reveal-secrecy.test.ts). A Life pick never emits a
-    // draw event.
+    // draw event. The two rest cards going back is public (OPT-1056).
     expect(events).toEqual([
       expect.objectContaining({
         type: "CARDS_REVEALED",
         payload: expect.objectContaining({ visibility: "BOTH" }),
+      }),
+      expect.objectContaining({
+        type: "CARDS_PLACED_IN_DECK",
+        payload: { count: 2, position: "BOTTOM" },
       }),
     ]);
   });
@@ -140,6 +144,7 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
     expect(events).toEqual([
       expect.objectContaining({ type: "CARDS_REVEALED" }),
       expect.objectContaining({ type: "CARD_DRAWN" }),
+      expect.objectContaining({ type: "CARDS_PLACED_IN_DECK" }),
     ]);
   });
 

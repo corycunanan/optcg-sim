@@ -27,6 +27,7 @@ import { isPresent } from "../../type-guards.js";
 import { getSearchAndPlayPickLimit } from "../action-utils.js";
 import { getDeckScryDestination } from "../actions/draw-search.js";
 import { cardCount, promptAutoResolvedEvent } from "../../auto-resolved.js";
+import { pushCardsPlacedInDeck } from "../../deck-look-events.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -296,6 +297,7 @@ export function handleArrangeSearchDeck(
   const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
   pushSingleRestPlacement(nextState, events, controller, arrangedCards.length, restDest, sourceInstanceId);
+  pushCardsPlacedInDeck(events, controller, arrangedCards.length, destination);
 
   const current = nextState.players[controller];
   const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
@@ -379,6 +381,7 @@ export function handleArrangeSearchTrashTheRest(
     const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, remainingCards, destination);
     pushSingleRestPlacement(nextState, events, controller, remainingCards.length, restDest, sourceInstanceId);
+    pushCardsPlacedInDeck(events, controller, remainingCards.length, destination);
   }
 
   const current = nextState.players[controller];
@@ -500,6 +503,16 @@ export function handleArrangeSearchAndPlay(
   }
 
   let newDeck: CardInstance[];
+  // OPT-1056: unplayed looked-at cards go back to the deck (a full-deck
+  // search opened no top-N look).
+  if (!searchFullDeck) {
+    pushCardsPlacedInDeck(
+      events,
+      controller,
+      arrangedCards.length + unplayable.length,
+      resolveRestDestination(restDest, action.destination),
+    );
+  }
   if (searchFullDeck) {
     // restOfDeck excludes every orderedInstanceId, so arranged-but-unkept
     // cards must rejoin the deck here or they vanish from the game.

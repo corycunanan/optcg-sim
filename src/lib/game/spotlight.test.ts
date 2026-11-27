@@ -22,7 +22,7 @@ describe("eventToSpotlight", () => {
             { cardId: "OP01-001", instanceId: "a" },
             { cardId: "OP01-002", instanceId: "b" },
           ],
-          source: "search",
+          source: "DECK_TOP",
           visibility: "BOTH",
         },
       })
@@ -30,9 +30,26 @@ describe("eventToSpotlight", () => {
 
     expect(result).toMatchObject({
       kind: "REVEAL",
-      source: "search",
+      source: "DECK_TOP",
       cards: [{ cardId: "OP01-001" }, { cardId: "OP01-002" }],
     });
+  });
+
+  it("leaves a searched pick to the look fan (OPT-1056)", () => {
+    expect(
+      eventToSpotlight(
+        event({
+          type: "CARDS_REVEALED",
+          playerIndex: 0,
+          timestamp: 1,
+          payload: {
+            cards: [{ cardId: "OP01-001", instanceId: "a" }],
+            source: "search",
+            visibility: "BOTH",
+          },
+        })
+      )
+    ).toBeNull();
   });
 
   it("never presents controller-only or redacted reveals", () => {

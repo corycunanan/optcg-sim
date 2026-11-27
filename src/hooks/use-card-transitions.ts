@@ -12,11 +12,18 @@ import {
 } from "@/lib/game/spotlight";
 import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
 import {
+  FLIP_SECONDS,
   assignPileFlips,
   zoneFaceDown,
   type FlightFlip,
 } from "@/lib/game/card-motion";
 import { cardStagger } from "@/lib/motion";
+import {
+  EMPTY_DECK_LOOK_INDEX,
+  lookReturnLeadMs,
+  lookSlotZoneKey,
+  type DeckLookIndex,
+} from "@/lib/game/deck-look";
 import {
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
@@ -80,6 +87,12 @@ export interface CardTransition {
   /** For `flip: "under"`, seconds after mount when the top card's flip ends
    *  and this card swaps to its destination side. */
   pileFlipAt?: number;
+  /** Stay invisible until `delay` (OPT-1056). A card leaving the look fan
+   *  shows its fan slot until then, and may not have arrived there yet. */
+  hiddenUntilDelay?: boolean;
+  /** The card travels face-up and turns face-down where it lands (a
+   *  revealed pick joining the opponent's hand, OPT-1056). */
+  landFaceDown?: boolean;
 }
 
 export type ReceivedHands = readonly [
@@ -137,7 +150,17 @@ export function eventToTransitions(
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  deckLooks: DeckLookIndex = EMPTY_DECK_LOOK_INDEX,
 ): CardTransition[] {
+  const look = deckLookTransitions(
+    event,
+    bottomPlayerIndex,
+    zoneRegistry,
+    receivedHands,
+    deckLooks,
+  );
+  if (look) return look;
+
   const single = eventToTransition(
     event,
     bottomPlayerIndex,
@@ -285,6 +308,102 @@ export function eventToTransitions(
   }
 
   return [];
+}
+
+/**
+ * OPT-1056: flights into and out of the look fan. The look event deals its
+ * cards from the deck into the fan slots; a departing event leaves from the
+ * slot `deck-look.ts` assigned to it. Returns null for events that do not
+ * touch a fan.
+ */
+function deckLookTransitions(
+  event: GameEvent,
+  bottomPlayerIndex: 0 | 1,
+  zoneRegistry: ZonePositionRegistry | null,
+  receivedHands: ReceivedHands | undefined,
+  deckLooks: DeckLookIndex,
+): CardTransition[] | null {
+  const prefix = boardZonePrefix(event.playerIndex, bottomPlayerIndex);
+  const deckKey = `${prefix}-deck`;
+  const startedAt = Date.now();
+
+  if (event.type === "DECK_TOP_LOOKED") {
+    const look = deckLooks.arrivals.get(event.timestamp);
+    if (!look) return null;
+    return look.cardIds.map((cardId, index) => ({
+      id: nextId(),
+      cardId,
+      instanceId: null,
+      fromZoneKey: deckKey,
+      toZoneKey: lookSlotZoneKey(prefix, look, index),
+      playerIndex: event.playerIndex,
+      startedAt,
+      delay: (index * cardStagger.pileMs) / 1000,
+      // Every card lands face-down; the looking player's row turns face-up
+      // once it is all in place (`useDeckLook`).
+      sourceFaceDown: true,
+      destinationFaceDown: true,
+    }));
+  }
+
+  const source = deckLooks.departures.get(event.timestamp);
+  if (!source) return null;
+  const { look, slots } = source;
+
+  if (event.type === "CARDS_PLACED_IN_DECK") {
+    // The fan closes up behind the pick and turns face-down first.
+    const leadMs = lookReturnLeadMs(look.faceDown, FLIP_SECONDS * 1000);
+    return slots.map((slot, index) => ({
+      id: nextId(),
+      cardId: look.cardIds[slot] ?? null,
+      instanceId: null,
+      fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+      toZoneKey: deckKey,
+      playerIndex: event.playerIndex,
+      startedAt,
+      delay: (leadMs + index * cardStagger.pileMs) / 1000,
+      sourceFaceDown: true,
+      destinationFaceDown: true,
+      hiddenUntilDelay: true,
+    }));
+  }
+
+  const single = eventToTransition(
+    event,
+    bottomPlayerIndex,
+    zoneRegistry,
+    null,
+    receivedHands,
+  );
+  const slot = slots[0];
+  if (!single || slot === undefined) return null;
+  // A pick revealed to both players leaves the fan face-up, travels
+  // face-up and turns face-down only once it is in its owner's hand.
+  const reveal = [...look.reveals.values()].find((r) => r.slot === slot);
+  if (reveal && look.faceDown) {
+    return [
+      {
+        ...single,
+        kind: undefined,
+        cardId: reveal.cardId,
+        fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+        sourceFaceDown: false,
+        destinationFaceDown: false,
+        landFaceDown: true,
+        hiddenUntilDelay: true,
+      },
+    ];
+  }
+  return [
+    {
+      ...single,
+      // A trashed fan card travels to the trash instead of dissolving.
+      kind: undefined,
+      fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+      sourceFaceDown: look.faceDown,
+      hiddenUntilDelay: true,
+    },
+  ];
 }
 
 /** DON!! token flights between the DON!! deck and the field (OPT-1057),
@@ -712,6 +831,7 @@ export function useCardTransitions(
   zoneRegistry?: ZonePositionRegistry | null,
   activeSpotlight: SpotlightPresentation | null = null,
   receivedHands?: ReceivedHands,
+  deckLooks: DeckLookIndex = EMPTY_DECK_LOOK_INDEX,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
   const reducedMotion = useReducedMotion();
@@ -756,8 +876,24 @@ export function useCardTransitions(
     }
   }, [isDragging]);
 
+  // Hand ids seen at the last run, per player: a hand-bound card whose
+  // event cannot name its new hand instance (an opponent's redacted draw)
+  // lands in the hand card that just appeared (OPT-1056).
+  const handIdsRef = useRef<[Set<string>, Set<string>] | null>(null);
+
   // Detect new events and create transitions
   useEffect(() => {
+    const handIds: [Set<string>, Set<string>] = [
+      new Set((receivedHands?.[0] ?? []).map((card) => card.instanceId)),
+      new Set((receivedHands?.[1] ?? []).map((card) => card.instanceId)),
+    ];
+    const previousHandIds = handIdsRef.current ?? handIds;
+    handIdsRef.current = handIds;
+    const newHandIds = ([0, 1] as const).map((player) =>
+      (receivedHands?.[player] ?? [])
+        .map((card) => card.instanceId)
+        .filter((id) => !previousHandIds[player].has(id)),
+    );
     // First run: seed the cursor so historic events don't replay.
     if (lastTimestampRef.current === null) {
       const last = eventLog[eventLog.length - 1];
@@ -808,6 +944,7 @@ export function useCardTransitions(
         zoneRegistry ?? null,
         waitsForSpotlight ? batchSpotlight : null,
         receivedHands,
+        deckLooks,
       );
       for (const transition of produced) {
         newTransitions.push({
@@ -823,6 +960,30 @@ export function useCardTransitions(
               : transition,
         });
       }
+    }
+
+    // Give each unnamed hand arrival the next hand card that just appeared,
+    // in order, so the hand holds that card's slot for the flight and the
+    // card lands in it.
+    const unclaimed = newHandIds.map((ids) => [...ids]);
+    for (const { transition } of newTransitions) {
+      if (transition.kind !== undefined) continue;
+      if (!transition.toZoneKey.endsWith("-hand")) continue;
+      const hand = handIds[transition.playerIndex];
+      if (transition.instanceId && hand.has(transition.instanceId)) {
+        const at = unclaimed[transition.playerIndex].indexOf(transition.instanceId);
+        if (at !== -1) unclaimed[transition.playerIndex].splice(at, 1);
+      }
+    }
+    for (const timed of newTransitions) {
+      const { transition } = timed;
+      if (transition.kind !== undefined) continue;
+      if (!transition.toZoneKey.endsWith("-hand")) continue;
+      if (transition.instanceId && handIds[transition.playerIndex].has(transition.instanceId)) {
+        continue;
+      }
+      const claimed = unclaimed[transition.playerIndex].shift();
+      if (claimed) timed.transition = { ...transition, instanceId: claimed };
     }
 
     // A direct drag already supplies the travel visual, so suppress the
@@ -870,6 +1031,7 @@ export function useCardTransitions(
     activeSpotlight,
     receivedHands,
     reducedMotion,
+    deckLooks,
   ]);
 
   // Auto-expire old transitions

@@ -13,6 +13,7 @@ import {
 } from "../action-utils.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
+import { deckTopLookedEvent, pushCardsPlacedInDeck } from "../../deck-look-events.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 import { deckShuffledEvent } from "../../events.js";
 import { createBlindHandSlots } from "../blind-hand-slots.js";
@@ -415,6 +416,9 @@ export function executeSearchAndPlay(
     });
   }
 
+  // OPT-1056: a top-N search moves the cards out of the deck to look at.
+  if (!searchFullDeck) events.push(deckTopLookedEvent(controller, searchPool));
+
   // Find matching cards
   const matching = searchPool.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));
 
@@ -434,6 +438,7 @@ export function executeSearchAndPlay(
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
       newPlayers[controller] = { ...p, deck: newDeck };
       nextState = { ...nextState, players: newPlayers };
+      pushCardsPlacedInDeck(events, controller, arrangedCards.length, restDest.toUpperCase() === "BOTTOM" ? "BOTTOM" : "TOP");
     }
     if (shuffleAfter) {
       const pp = nextState.players[controller];

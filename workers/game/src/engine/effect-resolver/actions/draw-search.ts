@@ -21,6 +21,7 @@ import {
 import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
+import { deckTopLookedEvent } from "../../deck-look-events.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
 import { deckShuffledEvent } from "../../events.js";
 
@@ -133,6 +134,7 @@ export function executeSearchDeck(
     resumeContext: resumeCtx,
   };
 
+  events.push(deckTopLookedEvent(controller, topCards));
   return { state, events, succeeded: false, pendingPrompt };
 }
 
@@ -193,6 +195,7 @@ export function executeSearchTrashTheRest(
     resumeContext: resumeCtx,
   };
 
+  events.push(deckTopLookedEvent(controller, topCards));
   return { state, events, succeeded: false, pendingPrompt };
 }
 
@@ -372,6 +375,7 @@ export function executeDeckScry(
     resumeContext: resumeCtx,
   };
 
+  events.push(deckTopLookedEvent(controller, topCards));
   return { state, events, succeeded: false, pendingPrompt };
 }
 

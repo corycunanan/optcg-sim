@@ -12,6 +12,7 @@ import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
 import { drawTwoOneUpdateScenario } from "./draws/draw-2-one-update";
+import { lookTopFiveScenario, opponentLookTopFiveScenario } from "./draws/look-top-5";
 import { actionRejectedScenario } from "./effects/action-rejected";
 import { activateMainMenuScenario } from "./effects/activate-main-menu";
 import {
@@ -55,6 +56,8 @@ export const scenarios: Scenario[] = [
   drawTwoScenario,
   drawTwoOneUpdateScenario,
   peekTopThreeScenario,
+  lookTopFiveScenario,
+  opponentLookTopFiveScenario,
   searchThenShuffleScenario,
   playCharacterSummonScenario,
   opponentPlayCharacterScenario,

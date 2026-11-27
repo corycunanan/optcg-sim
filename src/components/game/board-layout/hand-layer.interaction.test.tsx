@@ -257,6 +257,30 @@ describe("HandLayer spectator interaction", () => {
     );
   });
 
+  it("hides an opponent sleeve while a flight that names it lands (OPT-1056)", () => {
+    const hiddenCard = makeHiddenCard("opponent-revealed-pick", 1);
+
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <HandLayer
+            cards={[hiddenCard]}
+            cardDb={{} as CardDb}
+            departures={new Map([[hiddenCard.instanceId, 0]])}
+          />
+        </InteractionModeProvider>
+      );
+    });
+
+    expect(
+      renderer!.root.findAll(
+        (node) =>
+          typeof node.props.className === "string" &&
+          node.props.className.includes("invisible"),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("excludes a defensive hidden card from mixed-hand sorting", () => {
     const hiddenCard = makeHiddenCard("bottom-hand-hidden", 0);
 

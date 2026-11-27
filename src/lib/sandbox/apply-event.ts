@@ -19,7 +19,15 @@ export function applyEvent(
 ): PartialGameState {
   switch (event.type) {
     case "CARD_DRAWN":
-      return mapPlayer(state, event.playerIndex, drawTopOfDeck);
+      return mapPlayer(state, event.playerIndex, (p) =>
+        event.payload.source === "search"
+          ? drawSearchedCard(p, event.payload)
+          : drawTopOfDeck(p),
+      );
+    case "CARDS_PLACED_IN_DECK":
+      return mapPlayer(state, event.playerIndex, (p) =>
+        placeTopCardsInDeck(p, event.payload),
+      );
     case "CARD_PLAYED":
       return mapPlayer(state, event.playerIndex, (p) =>
         playFromHand(p, event.payload, state.turn.number),
@@ -133,6 +141,43 @@ function returnDonToDonDeck(
 }
 
 // ─── per-event handlers ─────────────────────────────────────────────────
+
+/** A searched pick (OPT-1056) is the looked-at card with the event's id or
+ *  face, wherever it sits among the top cards. */
+function drawSearchedCard(
+  p: PartialPlayerState,
+  payload: { cardId?: string; cardInstanceId?: string },
+): PartialPlayerState {
+  const idx = p.deck.findIndex(
+    (c) =>
+      c.instanceId === payload.cardInstanceId ||
+      (payload.cardId !== undefined &&
+        payload.cardId !== "hidden" &&
+        c.cardId === payload.cardId),
+  );
+  if (idx === -1) return drawTopOfDeck(p);
+  const card = p.deck[idx];
+  const instanceId =
+    payload.cardInstanceId && payload.cardInstanceId !== "hidden"
+      ? payload.cardInstanceId
+      : card.instanceId;
+  return {
+    ...p,
+    deck: [...p.deck.slice(0, idx), ...p.deck.slice(idx + 1)],
+    hand: [...p.hand, { ...card, instanceId, zone: "HAND" }],
+  };
+}
+
+/** The looked-at rest goes back (OPT-1056): the top `count` cards move to
+ *  the chosen end of the deck. */
+function placeTopCardsInDeck(
+  p: PartialPlayerState,
+  payload: { count: number; position: "TOP" | "BOTTOM" },
+): PartialPlayerState {
+  if (payload.position === "TOP") return p;
+  const moved = p.deck.slice(0, payload.count);
+  return { ...p, deck: [...p.deck.slice(payload.count), ...moved] };
+}
 
 /** Refresh Phase (rules 6-2-3, 6-2-4): attached DON!! return to the cost
  *  area, then every rested card and DON!! becomes active. */

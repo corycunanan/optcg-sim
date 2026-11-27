@@ -14,6 +14,7 @@ import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import {
+  FLIP_SECONDS,
   flightDurationMs,
   flightPose,
   onNextFrame,
@@ -37,6 +38,7 @@ import {
   DEFAULT_DON_IMG,
 } from "./constants";
 import { donSlotZoneKey, handSlotZoneKey } from "./board-geometry";
+import { isLookSlotZoneKey } from "@/lib/game/deck-look";
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
@@ -55,6 +57,9 @@ interface CardAnimationLayerProps {
   /** Field cards shown rested. A DON!! token hides under the card's real
    *  footprint, which turns sideways when the card is rested (OPT-1058). */
   restedInstanceIds?: ReadonlySet<string>;
+  /** A card leaves a look fan slot (OPT-1056). Keep it stable: the layer
+   *  is memoized. */
+  onLookDeparture?: (zoneKey: string) => void;
 }
 
 interface GhostBox {
@@ -147,6 +152,7 @@ function TravelGhost({
   content,
   endRotate: endRotateOverride,
   lean = true,
+  fromRotate = 0,
 }: {
   transition: CardTransition;
   from: GhostBox;
@@ -165,6 +171,8 @@ function TravelGhost({
   endRotate?: number;
   /** Lean toward the travel direction (off for a token turning rested). */
   lean?: boolean;
+  /** The card's tilt where it starts, in degrees (a look fan card). */
+  fromRotate?: number;
 }) {
   const plan = planFlight(transition);
   const endRotate = endRotateOverride ?? (transition.playedRested ? 90 : 0);
@@ -172,9 +180,17 @@ function TravelGhost({
   const y = useMotionValue(from.y);
   const width = useMotionValue(from.w);
   const height = useMotionValue(from.h);
-  const rotate = useMotionValue(0);
+  const rotate = useMotionValue(fromRotate);
   const scale = useMotionValue(1);
+  // A card leaving the look fan stays invisible until its own start, while
+  // its fan slot still shows it (OPT-1056).
+  const hiddenUntil =
+    transition.hiddenUntilDelay && (transition.delay ?? 0) > 0
+      ? (transition.delay ?? 0)
+      : 0;
 
+  // A revealed pick turns face-down as it lands in the hand (OPT-1056).
+  const [landed, setLanded] = React.useState(false);
   const resolveTargetRef = React.useRef(resolveTarget);
   const onCompleteRef = React.useRef(onComplete);
   React.useEffect(() => {
@@ -195,7 +211,7 @@ function TravelGhost({
         p,
         from,
         target,
-        { from: 0, to: endRotate },
+        { from: fromRotate, to: endRotate },
         false,
         geometry
       );
@@ -210,6 +226,7 @@ function TravelGhost({
     // for the flip), so a long commit cannot swallow the start of the move.
     let controls: { stop: () => void } | null = null;
     let cancelFollow = () => {};
+    let landTimer: ReturnType<typeof setTimeout> | undefined;
     // After landing the ghost fades out over the card; it keeps following
     // the live slot so a hand still settling from its re-fan stays flush.
     const follow = () => {
@@ -217,8 +234,17 @@ function TravelGhost({
       cancelFollow = onNextFrame(follow);
     };
     const cancelStart = onNextFrame(() => {
+      const durationMs = profile?.durationMs ?? flightDurationMs(distance);
+      if (transition.landFaceDown) {
+        // Turn over as it settles into the hand: the flip ends on landing,
+        // so the card is never seen face-up on top of the board's chrome.
+        landTimer = setTimeout(
+          () => setLanded(true),
+          Math.max(0, plan.departAt * 1000 + durationMs - FLIP_SECONDS * 1000),
+        );
+      }
       controls = animate(progress, 1, {
-        duration: (profile?.durationMs ?? flightDurationMs(distance)) / 1000,
+        duration: durationMs / 1000,
         ease: cardTravel.ease,
         delay: plan.departAt,
         onUpdate: apply,
@@ -236,6 +262,7 @@ function TravelGhost({
       cancelStart();
       controls?.stop();
       cancelFollow();
+      clearTimeout(landTimer);
     };
     // The flight is planned once, at mount; later renders only refresh the
     // target resolver through the ref.
@@ -245,6 +272,11 @@ function TravelGhost({
   return (
     <motion.div
       data-flight-id={transition.id}
+      initial={hiddenUntil > 0 ? { opacity: 0 } : false}
+      animate={{
+        opacity: 1,
+        transition: { duration: 0, delay: hiddenUntil },
+      }}
       exit={{ opacity: 0 }}
       transition={cardTransitions.zoneExit}
       style={{
@@ -272,7 +304,7 @@ function TravelGhost({
               ? { cardId: transition.cardId, cardDb }
               : undefined
           }
-          faceDown={plan.faceDown}
+          faceDown={plan.faceDown || landed}
           flipFrom={
             plan.flipAt === null
               ? undefined
@@ -291,16 +323,7 @@ function TravelGhost({
   );
 }
 
-function FlyingCard({
-  transition,
-  cardDb,
-  onComplete,
-  sleeveUrl,
-  donArtUrl,
-  reducedMotion,
-  boardScale,
-  restedInstanceIds,
-}: {
+interface FlyingCardProps {
   transition: CardTransition;
   cardDb: CardDb;
   onComplete: () => void;
@@ -309,7 +332,60 @@ function FlyingCard({
   reducedMotion: boolean;
   boardScale: number;
   restedInstanceIds?: ReadonlySet<string>;
-}) {
+  /** A card leaves a look fan slot (OPT-1056): the slot hides it. */
+  onLookDeparture?: (zoneKey: string) => void;
+}
+
+/**
+ * A card leaving a look fan (OPT-1056) mounts only when its own start
+ * comes: the fan may close up or turn its cards over before then, so the
+ * flight measures its slot (and takes over from it) at that moment.
+ */
+function FlyingCard(props: FlyingCardProps) {
+  const { transition } = props;
+  const delay = transition.delay ?? 0;
+  const deferred =
+    isLookSlotZoneKey(transition.fromZoneKey) &&
+    !!transition.hiddenUntilDelay &&
+    delay > 0;
+  const [started, setStarted] = React.useState(!deferred);
+  React.useEffect(() => {
+    if (started) return;
+    const wait = transition.startedAt + delay * 1000 - Date.now();
+    const timer = setTimeout(() => setStarted(true), Math.max(0, wait));
+    return () => clearTimeout(timer);
+  }, [started, transition.startedAt, delay]);
+  const live = React.useMemo(
+    () =>
+      deferred
+        ? { ...transition, delay: 0, hiddenUntilDelay: false }
+        : transition,
+    [deferred, transition],
+  );
+  if (!started) return null;
+  return <FlyingCardNow {...props} transition={live} />;
+}
+
+/** The tilt a look fan slot shows its card at, read from the slot. */
+function lookSlotRotate(zoneKey: string): number {
+  if (typeof document === "undefined") return 0;
+  const slot = document.querySelector(
+    `[data-look-slot="${CSS.escape(zoneKey)}"]`,
+  );
+  return Number(slot?.getAttribute("data-look-rotate") ?? 0) || 0;
+}
+
+function FlyingCardNow({
+  transition,
+  cardDb,
+  onComplete,
+  sleeveUrl,
+  donArtUrl,
+  reducedMotion,
+  boardScale,
+  restedInstanceIds,
+  onLookDeparture,
+}: FlyingCardProps) {
   const zonePos = useZonePosition();
   const isTransform = transition.kind === "transform";
   const isDonReturn = transition.kind === "don-return";
@@ -317,6 +393,17 @@ function FlyingCard({
   const isDonUnder = transition.kind === "don-attach" || isDonReturn;
   const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
+  // Look fan slots (OPT-1056) are larger than board cards: flights into and
+  // out of them take the slot's own footprint.
+  const isFromLook = isLookSlotZoneKey(transition.fromZoneKey);
+  const isLookBound = isLookSlotZoneKey(transition.toZoneKey);
+  const [fromRotate] = React.useState(() =>
+    isFromLook ? lookSlotRotate(transition.fromZoneKey) : 0,
+  );
+  // The flight takes over from the fan slot in the same frame it appears.
+  React.useLayoutEffect(() => {
+    if (isFromLook) onLookDeparture?.(transition.fromZoneKey);
+  }, [isFromLook, onLookDeparture, transition.fromZoneKey]);
   // A hand card's own slot is registered by `HandLayer`; a card that just
   // left the hand keeps its last measured slot. Prefer it over the hand
   // container so the card departs from (and lands in) its real place.
@@ -489,7 +576,9 @@ function FlyingCard({
   const spotlightSource = transition.spotlightSourceSize
     ? CARD_SIZES[transition.spotlightSourceSize]
     : null;
-  const fromSlot = measured(fromSlotRect) && fromRect === fromSlotRect;
+  const fromSlot =
+    (measured(fromSlotRect) && fromRect === fromSlotRect) ||
+    (isFromLook && measured(fromRect));
   const fromW = spotlightSource
       ? spotlightSource.width
       : fromSlot
@@ -500,8 +589,13 @@ function FlyingCard({
       : fromSlot
         ? fromRect.height
         : (isFromHand ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
-  const toW = (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
-  const toH = (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
+  const lookTarget = isLookBound && measured(toRect) ? toRect : null;
+  const toW = lookTarget
+    ? lookTarget.width
+    : (isHandBound ? HAND_CARD_W : BOARD_CARD_W) * boardScale;
+  const toH = lookTarget
+    ? lookTarget.height
+    : (isHandBound ? HAND_CARD_H : BOARD_CARD_H) * boardScale;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
@@ -548,6 +642,7 @@ function FlyingCard({
         sleeveUrl={sleeveUrl}
         onComplete={onComplete}
         boardScale={boardScale}
+        fromRotate={fromRotate}
       />
     );
   }
@@ -606,6 +701,28 @@ function FlyingCard({
   );
 }
 
+/** The board navbar's bottom edge in viewport px, measured while flights
+ *  run (0 when there is no navbar). */
+function useNavbarBottom(active: boolean): number {
+  const [bottom, setBottom] = React.useState(0);
+  React.useLayoutEffect(() => {
+    if (!active || typeof document === "undefined") return;
+    const measure = () => {
+      const navbar = document.querySelector("[data-board-navbar]");
+      const next = navbar ? Math.max(0, navbar.getBoundingClientRect().bottom) : 0;
+      setBottom((current) => (current === next ? current : next));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [active]);
+  return bottom;
+}
+
 export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   transitions,
   cardDb,
@@ -614,11 +731,13 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   donArtUrls,
   boardScale = 1,
   restedInstanceIds,
+  onLookDeparture,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
   const readyTransitions = transitions.filter(
     (transition) => transition.waitForSpotlightId === undefined
   );
+  const navbarBottom = useNavbarBottom(readyTransitions.length > 0);
   if (readyTransitions.length === 0) return null;
 
   // The layer must escape any transformed parent so `position: fixed` resolves
@@ -627,11 +746,21 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   // `<PortalRoot>` is mounted by the shell (OPT-314/315), portal there;
   // otherwise render in place — the current layout has no transformed
   // ancestor for this layer, so this preserves today's behavior.
+  //
+  // Cards fly beneath the board's navbar, as the cards on the board do (an
+  // opponent's hand tucks under it): the clip box starts at the navbar's
+  // bottom edge, and its transformed inner frame keeps the ghosts' fixed
+  // viewport coordinates while the box clips them (OPT-1056).
   const layer = (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[9999]"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-[9999] overflow-hidden"
+      style={{ top: navbarBottom }}
     >
+      <div
+        className="absolute inset-x-0"
+        style={{ top: -navbarBottom, bottom: 0, transform: "translateZ(0)" }}
+      >
       <AnimatePresence>
         {readyTransitions.map((t) => (
           <FlyingCard
@@ -644,9 +773,11 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             reducedMotion={reducedMotion ?? false}
             boardScale={boardScale}
             restedInstanceIds={restedInstanceIds}
+            onLookDeparture={onLookDeparture}
           />
         ))}
       </AnimatePresence>
+      </div>
     </div>
   );
 

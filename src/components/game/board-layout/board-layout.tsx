@@ -19,6 +19,7 @@ import {
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
+  MID_ZONE_H,
 } from "./constants";
 import {
   boardZoneKey,
@@ -69,6 +70,9 @@ import type {
 import { ActionFeedbackProvider } from "./action-feedback";
 import { useCardSpotlight } from "@/hooks/use-card-spotlight";
 import { useEventPlayback } from "@/hooks/use-event-playback";
+import { useDeckLook } from "@/hooks/use-deck-look";
+import { collectDeckLooks, indexDeckLooks } from "@/lib/game/deck-look";
+import { DeckLookFan } from "./deck-look-fan";
 import { useRefreshWave } from "@/hooks/use-refresh-wave";
 import { SpotlightOverlay } from "../spotlight-overlay";
 import { useBoardDragState } from "./use-board-drag-state";
@@ -259,6 +263,10 @@ function BoardLayoutInner({
     bottomPlayerIndex,
   );
 
+  // OPT-1056: "look at the top N" fans its cards out at board center.
+  const deckLooks = useMemo(() => collectDeckLooks(eventLog), [eventLog]);
+  const deckLookIndex = useMemo(() => indexDeckLooks(deckLooks), [deckLooks]);
+
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
     eventLog,
     bottomPlayerIndex,
@@ -266,6 +274,14 @@ function BoardLayoutInner({
     zoneRegistry,
     spotlight.presentation,
     receivedHands,
+    deckLookIndex,
+  );
+  const deckLook = useDeckLook(
+    deckLooks,
+    cardAnimations,
+    eventLog,
+    bottomPlayerIndex,
+    !!reducedMotion,
   );
 
   // OPT-1058: the Refresh Phase replays as attached DON!! sliding back and
@@ -369,7 +385,8 @@ function BoardLayoutInner({
   // travel or transform presentation completes. Count-only transforms carry
   // an aggregated arrivalCount so one fizzle can still materialize +N cards.
   const pileArrivingCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+    // Cards out in a look fan are not in the deck pile either (OPT-1056).
+    const counts = new Map<string, number>(deckLook.deckOutCounts);
     for (const transition of cardAnimations) {
       if (!/-(deck|trash|life)$/.test(transition.toZoneKey)) continue;
       counts.set(
@@ -378,7 +395,7 @@ function BoardLayoutInner({
       );
     }
     return counts;
-  }, [cardAnimations]);
+  }, [cardAnimations, deckLook.deckOutCounts]);
 
   // Field cards stay hidden in their slot until their flight lands, so a
   // card is never seen twice while it flips at its source or travels
@@ -578,6 +595,13 @@ function BoardLayoutInner({
             onAction={dispatchBoardAction}
           />
 
+          <DeckLookFan
+            looks={deckLook.looks}
+            cardDb={cardDb}
+            top={midTop + MID_ZONE_H / 2}
+            sleeveUrls={sleeveUrls}
+          />
+
           <PlayerField
             me={displayBottomPlayer}
             playerIndex={bottomPlayerIndex}
@@ -726,6 +750,7 @@ function BoardLayoutInner({
       sleeveUrls={sleeveUrls}
       donArtUrls={donArtUrls}
       boardScale={boardScale}
+      onLookDeparture={deckLook.markDeparted}
       restedInstanceIds={restedFieldIds}
     />
 
