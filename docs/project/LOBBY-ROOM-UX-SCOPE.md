@@ -4,7 +4,7 @@ created: 2026-04-29
 owner: Cory Cunanan
 linear-project: Lobby Room UX
 linear-project-url: https://linear.app/optcg-sim/project/lobby-room-ux-7accc6912db3
-handoff-doc: docs/project/handoffs/lobby-room-ux.md
+handoff-doc: docs/project/handoffs/archive/lobby-room-ux.md
 ---
 
 # Lobby Room UX — Scope & Plan

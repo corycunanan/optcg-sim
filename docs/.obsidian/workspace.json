@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "project/handoffs/animation-sandbox.md",
+                "file": "project/handoffs/archive/animation-sandbox.md",
                 "mode": "source",
                 "source": false
               },
@@ -185,9 +185,9 @@
   "lastOpenFiles": [
     "sandbox/clock-determinism.md",
     "sandbox",
-    "project/handoffs/card-animations.md",
+    "project/handoffs/archive/card-animations.md",
     "README.md",
-    "project/handoffs/animation-sandbox.md",
+    "project/handoffs/archive/animation-sandbox.md",
     "game-engine/11-ENCODING-GUIDE.md",
     "encoding/ENCODING-PROMPT.md",
     "Encoding prompt.md",

@@ -4,12 +4,12 @@ created: 2026-07-06
 owner: Cory Cunanan
 linear-project: UX Hardening
 linear-project-url: https://linear.app/optcg-sim/project/ux-hardening-10f1af9ff4a5
-handoff-doc: docs/project/handoffs/ux-hardening.md
+handoff-doc: docs/project/handoffs/archive/ux-hardening.md
 ---
 
 # UX Hardening - Scope & Plan
 
-> This doc is the project source of truth for the UX Hardening Linear project. Ticket-by-ticket execution notes live in the [handoff doc](./handoffs/ux-hardening.md).
+> This doc is the project source of truth for the UX Hardening Linear project. Ticket-by-ticket execution notes live in the [handoff doc](./handoffs/archive/ux-hardening.md).
 
 ---
 
