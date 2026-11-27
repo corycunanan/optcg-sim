@@ -1,5 +1,28 @@
 import type { Instrumentation } from "next";
-import { reportError } from "@/lib/error-reporting";
+import {
+  consoleErrorReporter,
+  reportError,
+  setErrorReporter,
+} from "@/lib/error-reporting";
+import {
+  combineReporters,
+  createSentryReporter,
+  sentryBaseOptions,
+} from "@/lib/sentry";
+
+/**
+ * Starts Sentry on the Node.js and edge runtimes when `SENTRY_DSN` is set
+ * (OPT-1063). Reports keep their `[ERROR_REPORT]` log line as well.
+ */
+export async function register() {
+  const dsn = process.env.SENTRY_DSN;
+  if (!dsn) return;
+  const Sentry = await import("@sentry/nextjs");
+  Sentry.init(sentryBaseOptions(dsn));
+  setErrorReporter(
+    combineReporters(consoleErrorReporter, createSentryReporter(Sentry))
+  );
+}
 
 /**
  * Next.js server instrumentation (OPT-1063). `onRequestError` receives every

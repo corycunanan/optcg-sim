@@ -328,6 +328,26 @@ no call site changes. Errors are reported and then rethrown, so runtime
 behavior is unchanged. Errors a Durable Object already reported reach the
 Worker entry marked `remote` and are not reported twice.
 
+**Sentry.** Every report is also sent to Sentry when a DSN is configured; with
+no DSN, Sentry stays off and nothing changes. App: `register()` in
+`src/instrumentation.ts` (server and edge, `SENTRY_DSN`) and
+`src/instrumentation-client.ts` (browser, `NEXT_PUBLIC_SENTRY_DSN`, loaded as a
+separate chunk with Sentry's own global handlers off). Worker:
+`Sentry.withSentry` on the entry handler and
+`instrumentDurableObjectWithSentry` on `GameSession` (`workers/game/src/index.ts`,
+options in `workers/game/src/lib/sentry.ts`). Every Sentry event and breadcrumb
+passes `scrubProviderEvent()` (request cookies, headers, body and query string
+dropped; user reduced to `id`; strings scrubbed), and `sendDefaultPii` is off.
+
+| Where | Variable | How to set |
+|-------|----------|-----------|
+| Vercel (Production, Preview) | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` | Project Settings → Environment Variables, then redeploy (the public one is inlined at build time) |
+| Game worker | `SENTRY_DSN` | `cd workers/game && npx wrangler secret put SENTRY_DSN` |
+| Game worker (optional) | `SENTRY_ENVIRONMENT` | `[vars]` in `wrangler.toml`; defaults to `production` |
+
+Browser stack traces are minified until source maps are uploaded, which needs
+`withSentryConfig` and a `SENTRY_AUTH_TOKEN`; that is not set up yet.
+
 **Usage counters.** `/admin/usage` shows the last 30 UTC days of games
 started, finished and abandoned, distinct active players per day, end reasons
 and lobby modes. The numbers are aggregates over `game_sessions`
