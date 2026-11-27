@@ -4,7 +4,7 @@ created: 2026-04-28
 owner: Cory Cunanan
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-handoff-doc: docs/project/handoffs/architecture-floor.md
+handoff-doc: docs/project/handoffs/archive/architecture-floor.md
 ---
 
 # Architecture Floor — Scope & Plan

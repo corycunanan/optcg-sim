@@ -4,7 +4,7 @@
 **Created:** 2026-04-24
 **Owner:** Cory Cunanan
 **Linear project:** [Animation Sandbox](https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612)
-**Action Plan + cross-session handoffs:** [`docs/project/handoffs/animation-sandbox.md`](handoffs/animation-sandbox.md)
+**Action Plan + cross-session handoffs:** [`docs/project/handoffs/archive/animation-sandbox.md`](handoffs/archive/animation-sandbox.md)
 
 > This doc is the **architectural source of truth**. Ticket descriptions reference it; the handoff doc tracks ticket-by-ticket execution. Use [`/ticket OPT-XXX`](../../.claude/skills/ticket/SKILL.md) to start any of the tickets below.
 
@@ -212,7 +212,7 @@ Adding a scenario = one new file in `src/lib/sandbox/scenarios/<category>/<id>.t
 
 ## Phased plan
 
-Tickets are tracked in the [Animation Sandbox Linear project](https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612). Execution order, status, and inter-ticket handoffs live in [`handoffs/animation-sandbox.md`](handoffs/animation-sandbox.md).
+Tickets are tracked in the [Animation Sandbox Linear project](https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612). Execution order, status, and inter-ticket handoffs live in [`handoffs/archive/animation-sandbox.md`](handoffs/archive/animation-sandbox.md).
 
 | Tier | Ticket | Title | Estimate |
 |------|--------|-------|----------|

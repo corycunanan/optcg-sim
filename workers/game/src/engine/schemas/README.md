@@ -4,27 +4,14 @@ This directory contains authored effect schemas for OPTCG cards. Each schema def
 
 ## File Organization
 
-Schemas are grouped by set or deck:
-- `op01.ts` — OP01 cards (98 cards)
-- `op02.ts` — OP02 cards (98 cards)
-- `op03/` — OP03 cards (directory with per-color files)
-- `ace-deck.ts` — Ace test deck (18 cards, cross-set)
-- `nami-deck.ts` — Nami test deck (15 cards)
+Schemas are grouped one file per set, named by the lowercase set ID:
+- `op01.ts` … `op18.ts` — main booster sets
+- `eb01.ts` … `eb05.ts` — extra boosters
+- `prb01.ts`, `prb02.ts` — premium boosters
+- `st01.ts` … `st36.ts` — starter decks
+- `p.ts` — promo cards
 
-**New sets should use the per-color directory structure:**
-```
-op03/
-  red.ts      — Red card schemas + OP03_RED_SCHEMAS array
-  green.ts    — Green card schemas + OP03_GREEN_SCHEMAS array
-  blue.ts     — Blue card schemas + OP03_BLUE_SCHEMAS array
-  purple.ts   — Purple card schemas + OP03_PURPLE_SCHEMAS array
-  black.ts    — Black card schemas + OP03_BLACK_SCHEMAS array
-  yellow.ts   — Yellow card schemas + OP03_YELLOW_SCHEMAS array
-  index.ts    — Barrel: imports color arrays, exports OP03_SCHEMAS record + re-exports all constants
-```
-Each color file starts with `import type { EffectSchema } from "../../effect-types.js";` and exports its card constants plus a color array. The barrel `index.ts` builds the `Record<string, EffectSchema>` from all color arrays and re-exports individual constants for backwards compatibility. The registry imports from `./schemas/op03/index.js`.
-
-For smaller sets or test decks, a single `{set-id}.ts` or `{deck-name}-deck.ts` file is still acceptable.
+Each file imports its types from `../effect-types.js`, defines one constant per card (`OP01_006`), and exports a `{SET}_SCHEMAS` record keyed by `card_id` (for example `OP01_SCHEMAS` in `op01.ts`). A new set gets a new `{set-id}.ts` file in the same shape.
 
 ## Registration
 
@@ -1000,7 +987,7 @@ Navy. For a named source, such as OP18-080's "by your [Marshall.D.Teach]
 Leader's effect", add `name` and `card_type`:
 `effect_source: { controller: "SELF", card_type: "LEADER", name: "Marshall.D.Teach" }`
 (OPT-1052; aliases and the all-names Leader rule apply). The OP14 activation-cost interpretation is explicitly flagged in
-[the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
+[the rules handoff](../../../../../docs/project/handoffs/archive/opt-795-hand-trash-watchers.md).
 
 ### `*_THIS_WAY` counts: cost or action
 

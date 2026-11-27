@@ -10,7 +10,7 @@ The checkpoint names scope/permissions, workspaces and owners, current head/base
 
 Scale the record to the run. A run of only Small and Medium tickets needs just the checkpoint, scope and permissions, and the tracks table; add the remaining sections when a Large ticket, a migration or a recovery makes them useful.
 
-Keep the run record as a local scratch file outside the repository (for example `<scratch>/runs/<date>-<scope-slug>.md`); never commit it. The coordinator owns this file; parallel implementers do not edit it. Record its absolute path in progress messages and preserve it until the run is closed out, then report its path. Anything a later session needs beyond this run belongs in Linear: post it as a comment on the affected issue or roll-up parent. `docs/project/handoffs/runs/` holds historical ledgers only.
+Keep the run record as a local scratch file outside the repository (for example `<scratch>/runs/<date>-<scope-slug>.md`); never commit it. The coordinator owns this file; parallel implementers do not edit it. Record its absolute path in progress messages and preserve it until the run is closed out, then report its path. Anything a later session needs beyond this run belongs in Linear: post it as a comment on the affected issue or roll-up parent. `docs/project/handoffs/archive/runs/` holds historical ledgers only.
 
 ```markdown
 # Run: <date / scope>

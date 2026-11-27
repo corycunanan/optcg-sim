@@ -54,8 +54,14 @@ function prng(seed: number) {
   };
 }
 
-function randomState(rand: () => number): { r: Rig; source: CardInstance } {
-  const r = rig();
+/**
+ * Resets the shared rig to a blank snapshot and fills it from `rand`. Building
+ * a fresh rig costs about 50ms (the test card DB and battle-ready state), so
+ * the 500-sequence test builds one and clones its state per sequence, as the
+ * OPT-986 test below does (OPT-1061).
+ */
+function randomState(r: Rig, blank: GameState, rand: () => number): { r: Rig; source: CardInstance } {
+  r.state = structuredClone(blank);
   const n = (max: number) => Math.floor(rand() * (max + 1));
   r.deck(P0, n(4));
   r.life(P0, n(2));
@@ -76,8 +82,10 @@ describe("OPT-961 sequence prune", () => {
     const rand = prng(961);
     let pruned = 0;
     let payable = 0;
+    const base = rig();
+    const blank = structuredClone(base.state);
     for (let i = 0; i < 500; i++) {
-      const { r, source } = randomState(rand);
+      const { r, source } = randomState(base, blank, rand);
       const length = 2 + Math.floor(rand() * 3);
       const costs = Array.from({ length }, () => POOL[Math.floor(rand() * POOL.length)]);
       const state: GameState = r.state;
@@ -93,6 +101,7 @@ describe("OPT-961 sequence prune", () => {
     }
     // The sample exercises both outcomes and the prune itself.
     expect(pruned).toBeGreaterThan(30);
+    process.stderr.write(`OPT961 seed=961 sequences=500 pruned=${pruned} payable=${payable}\n`);
     expect(payable).toBeGreaterThan(30);
   }, 60_000);
 

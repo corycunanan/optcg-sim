@@ -6,16 +6,16 @@ A full-featured web application for playing the **One Piece Trading Card Game** 
 
 | Layer | Technology |
 |-------|------------|
-| **Framework** | Next.js 16 (App Router) |
+| **Framework** | Next.js 16 (App Router), React 19 |
 | **Language** | TypeScript (strict mode) |
 | **Styling** | Tailwind CSS v4, CSS custom properties |
 | **Database** | PostgreSQL via Neon (Prisma 6 ORM) |
 | **Auth** | NextAuth v5 (Google OAuth + email/password) |
 | **Game Server** | Cloudflare Workers (Durable Objects + WebSocket) |
 | **Image CDN** | Cloudflare R2 + Workers |
-| **Card Data** | vegapull v1.2.0 (Rust CLI) → TypeScript ETL pipeline |
+| **Card Data** | vegapull (Rust CLI) → TypeScript ETL pipeline |
 | **Frontend Hosting** | Vercel |
-| **Testing** | Vitest (game engine, 158 tests) |
+| **Testing** | Vitest (app, pipeline, and game worker suites) |
 
 ## Getting Started
 
@@ -23,138 +23,83 @@ A full-featured web application for playing the **One Piece Trading Card Game** 
 
 - Node.js 20+
 - pnpm 10+
-- PostgreSQL database (Neon or Supabase recommended)
+- PostgreSQL database (Neon recommended)
 - Cloudflare account (for game server and image CDN)
 
 ### Setup
 
 ```bash
 # Clone the repo
-git clone https://github.com/cory-cunanan/optcg-sim.git
+git clone https://github.com/corycunanan/optcg-sim.git
 cd optcg-sim
 
-# Install dependencies (root + workers)
+# Install dependencies (root + workers/* pnpm workspace packages)
 pnpm install
-cd workers/game && npm install && cd ../..
-cd workers/images && npm install && cd ../..
 
 # Copy environment variables
 cp .env.example .env
-# Edit .env — you'll need:
-#   DATABASE_URL          (PostgreSQL connection string)
-#   AUTH_SECRET            (openssl rand -hex 32)
-#   AUTH_GOOGLE_ID/SECRET  (Google OAuth credentials)
-#   R2_*                   (Cloudflare R2 for card images)
-#   GAME_WORKER_SECRET     (shared secret for game server auth)
+# Edit .env. The keys are listed in .env.example; the main ones are:
+#   DATABASE_URL / DIRECT_DATABASE_URL  (PostgreSQL connection strings)
+#   AUTH_SECRET                         (openssl rand -hex 32)
+#   AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET (Google OAuth credentials)
+#   NEXT_PUBLIC_CDN_URL                 (images worker URL)
+#   GAME_WORKER_URL / GAME_WORKER_SECRET (game server URL and shared secret)
 
 # Generate Prisma client and run migrations
 pnpm db:generate
 pnpm db:migrate
 
-# Seed card data (requires vegapull output in data/)
+# Import card data (requires vegapull output in data/)
 pnpm pipeline:import
 
 # Start development
-pnpm dev                          # Next.js on :3000
-cd workers/game && npm run dev    # Game server on :8787
+pnpm dev                              # Next.js on :3000
+pnpm --filter optcg-game dev          # Game server (wrangler dev) on :8787
 ```
 
 ### Scripts
+
+`package.json` is the full list. The common ones:
 
 | Script | Description |
 |--------|-------------|
 | `pnpm dev` | Start Next.js dev server |
 | `pnpm build` | Production build |
-| `pnpm verify` | Run the full local/CI verification chain |
-| `pnpm lint` | Run ESLint |
-| `pnpm type-check` | TypeScript type checking |
-| `pnpm test` | Run app test suite |
-| `pnpm test:worker` | Run game worker test suite from the repo root |
-| `pnpm type-check:worker` | Type-check the game worker from the repo root |
+| `pnpm verify` | Full local/CI verification chain (lint, type checks, schema checks, tests, coverage, bundle capacity, build) |
+| `pnpm lint` | ESLint, design-system lint, and token contrast check |
+| `pnpm type-check` / `pnpm type-check:worker` | Type-check the Next.js app / the game worker |
+| `pnpm test` / `pnpm test:worker` | Run the app / game worker test suites |
+| `pnpm schema:check` | Authored card schema gate (generated registry, schema lint, docs drift, tests) |
 | `pnpm format` | Format with Prettier |
-| `pnpm db:generate` | Generate Prisma client |
-| `pnpm db:migrate` | Run Prisma migrations |
-| `pnpm db:push` | Push schema to DB (no migration file) |
+| `pnpm db:generate` / `pnpm db:migrate` | Generate Prisma client / run migrations |
 | `pnpm db:studio` | Open Prisma Studio GUI |
-| `pnpm db:seed` | Seed database |
 | `pnpm pipeline:import` | Import card data from vegapull JSON |
 | `pnpm pipeline:migrate-images` | Upload card images to Cloudflare R2 |
-| `pnpm worker:deploy` | Deploy images worker to Cloudflare |
+| `pnpm worker:deploy` / `pnpm worker:deploy:game` | Deploy the images / game worker to Cloudflare |
 
-### Game Worker
-
-`workers/game` is a pnpm workspace package named `optcg-game`, so day-to-day checks run from the repo root:
-
-| Script | Description |
-|--------|-------------|
-| `pnpm test` | Run app tests |
-| `pnpm test:worker` | Run worker tests |
-| `pnpm type-check` | Type-check the Next.js app |
-| `pnpm type-check:worker` | Type-check the game worker |
-
-`pnpm verify` is the local shipping ritual and mirrors CI: lint, app type-check, worker type-check, app tests, worker tests, then production build.
-
-Game worker scripts are still available from `workers/game/` for focused development:
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Local game server (wrangler dev on :8787) |
-| `npm run deploy` | Deploy to Cloudflare Workers |
-| `npm test` | Run engine test suite (Vitest) |
-| `npm run test:watch` | Run tests in watch mode |
+`workers/game` is the pnpm workspace package `optcg-game`. Its own scripts (`dev`, `deploy`, `test`, `test:watch`, `schema:generate`, and others) run with `pnpm --filter optcg-game <script>` or from inside `workers/game/`.
 
 ## Project Structure
+
+See the codebase map in [`CLAUDE.md`](./CLAUDE.md) for the full directory and key-file tables.
 
 ```
 optcg-sim/
 ├── src/
-│   ├── app/                        # Next.js App Router
-│   │   ├── (auth)/                 # Login, onboarding
-│   │   ├── (dashboard)/            # Dashboard / home
-│   │   ├── admin/                  # Card database admin UI
-│   │   ├── api/                    # REST API (25 endpoints, 8 domains)
-│   │   ├── decks/                  # Deck builder pages
-│   │   ├── game/                   # Game board page
-│   │   ├── lobbies/                # Lobby browser + creation
-│   │   └── globals.css             # Design tokens (source of truth)
-│   ├── components/
-│   │   ├── ui/                     # Base primitives (Button, Dialog, Toast, etc.)
-│   │   ├── admin/                  # Admin card browser, filters, editor
-│   │   ├── deck-builder/           # Deck search, list, stats, validation
-│   │   ├── game/                   # Game board, cards, modals, event log
-│   │   │   └── board-layout/       # Board zones (field, DON, life, trash, mid)
-│   │   ├── lobbies/                # Lobby list, create dialog
-│   │   ├── social/                 # Sidebar, chat, user avatar
-│   │   └── nav/                    # Navbar
-│   ├── hooks/                      # Custom React hooks (useGameSession, etc.)
-│   ├── lib/                        # Shared utilities and business logic
-│   │   ├── deck-builder/           # State machine, validation engine
-│   │   └── utils.ts                # cn(), card ID helpers
-│   └── types/                      # Global TypeScript types
+│   ├── app/              # Next.js App Router: pages and REST API routes (src/app/api)
+│   ├── components/       # UI by feature: ui, cards, deck-builder, game, lobbies, social, admin, nav, sandbox
+│   ├── hooks/            # Game session, WebSocket, lobby, and animation hooks
+│   ├── lib/              # Shared utilities, deck builder logic, validators, API client
+│   └── types/            # Global TypeScript types
 ├── workers/
-│   ├── game/                       # Cloudflare Worker — game engine
-│   │   └── src/engine/             # Pure game logic (20 modules)
-│   │       ├── pipeline.ts         # 7-step action pipeline
-│   │       ├── execute.ts          # Action execution (play, attack, etc.)
-│   │       ├── battle.ts           # Battle sub-phases
-│   │       ├── phases.ts           # Turn phase FSM
-│   │       ├── effect-resolver.ts  # Effect schema resolver
-│   │       ├── effect-types.ts     # Effect schema type definitions
-│   │       ├── schemas/            # Hand-authored card effect schemas
-│   │       ├── keywords.ts         # Rush, Blocker, Double Attack, etc.
-│   │       ├── triggers.ts         # Trigger system
-│   │       ├── modifiers.ts        # Power/attribute modifier layers
-│   │       ├── state.ts            # Immutable state transitions
-│   │       └── ...                 # conditions, defeat, events, etc.
-│   └── images/                     # Cloudflare Worker — CDN image serving
-├── shared/                         # Types shared between Next.js and Workers
-│   └── game-types.ts               # GameState, GameAction, PromptType, etc.
-├── pipeline/                       # Card data ETL (vegapull JSON → PostgreSQL + R2)
-├── prisma/
-│   └── schema.prisma               # Database schema (source of truth)
-├── docs/                           # Full project documentation (see docs/README.md)
-├── vegapull/                       # Card data CLI tool (git submodule)
-└── data/                           # vegapull output (git-ignored)
+│   ├── game/             # Cloudflare Worker + Durable Objects: game engine and card effect schemas
+│   │   └── src/engine/   # Pure engine: pipeline.ts, execute, battle, phases, triggers,
+│   │                     # effect-resolver/, schemas/ (one file per set), modifiers, ...
+│   └── images/           # Cloudflare Worker: CDN image serving
+├── pipeline/             # Card data ETL (vegapull JSON → PostgreSQL + R2)
+├── prisma/               # Database schema (source of truth) and migrations
+├── docs/                 # Project documentation (see docs/README.md)
+└── data/                 # vegapull output (git-ignored)
 ```
 
 ## Architecture Overview
@@ -162,7 +107,7 @@ optcg-sim/
 ```
 ┌─────────────────┐     WebSocket      ┌──────────────────────────┐
 │   Next.js App   │◄──────────────────►│  Cloudflare Worker       │
-│   (Vercel)      │                    │  (Durable Object)        │
+│   (Vercel)      │                    │  (Durable Objects)       │
 │                 │     REST API       │                          │
 │  - App Router   │◄──────────────────►│  - Game engine (pure)    │
 │  - Deck Builder │                    │  - WebSocket sessions    │
@@ -176,61 +121,54 @@ optcg-sim/
 │   PostgreSQL    │     │  Cloudflare R2            │
 │   (Neon)        │     │  + Images Worker          │
 │                 │     │                          │
-│  - Users/Auth   │     │  - Card art (4,300+ imgs) │
+│  - Users/Auth   │     │  - Card art               │
 │  - Decks        │     │  - CDN serving w/ CORS    │
 │  - Card catalog │     │                          │
-│  - Game sessions│     └──────────────────────────┘
+│  - Lobbies/games│     └──────────────────────────┘
 └─────────────────┘
 ```
 
-The game engine is **purely functional** — all logic is `(state, action) → newState` with no side effects. State is persisted only by the Durable Object's storage layer. The frontend communicates via WebSocket for real-time gameplay and REST for everything else.
+The game engine is **purely functional**: all logic is `(state, action) → newState` with no side effects. State is persisted only by the Durable Object's storage layer. The frontend communicates via WebSocket for real-time gameplay and REST for everything else. See [Architecture](./docs/architecture/ARCHITECTURE.md) and [Deployment](./docs/architecture/DEPLOYMENT.md).
 
-## Milestone Timeline
+## Status
 
-### Completed
+What ships today:
 
-| Phase | Title | Scope | Status |
-|-------|-------|-------|--------|
-| **M0** | Foundation | Repo, auth (NextAuth + Google OAuth), PostgreSQL/Prisma schema, vegapull→Prisma card import pipeline (51 sets, 4,346 entries, 2,496 unique cards), admin card browser/editor, Vercel deploy | **Done** |
-| **M2.5** | Design System | CSS token system (`globals.css` + Tailwind v4 `@theme`), UI primitives (Button, Badge, Input, Select, Dialog, Tooltip, Tabs, Toast), deck builder UX cleanup, R2 image migration, images worker CDN | **Done** |
-| **M3** | Simulator Core | Playable game: turn phase FSM, setup/mulligan, battle system (attack→block→counter→damage→trigger), keyword automation (Rush, Double Attack, Banish, Blocker, Trigger, Unblockable), Cloudflare Durable Object + WebSocket, game log, concede | **Done** |
-| **M3.5** | Simulator Tech Debt | Engine decomposition (execute→phases/battle split), `shared/game-types.ts`, Vitest suite (~95 tests), rules fixes (life-out, blocker once-per-battle), M4 prep utilities, design-token migration for game board | **Done** |
-| **M3.75** | Game Board UI Tech Debt | Single visual board path, `useGameSession` hook, board-layout modular extraction (7 zone modules), `CardDb`/`TooltipStat` consolidation, React.memo + error boundary, retire text board | **Done** |
+- **Card database**: the released English sets, imported from the official card list through vegapull, with public card and set browsing and an admin browser/editor. The exact count lives in the database, not here.
+- **Deck builder**: search and filters, real-time OPTCG validation (including format bans), cost curve and color stats, import/export, per-user decks.
+- **Social**: friends, real-time direct messages, notifications, presence, and lobbies with invites, parties, and opt-in spectators.
+- **Simulator**: full turn structure, setup and mulligan, battle, keywords, and automated effect resolution from hand-authored effect schemas for the imported sets (`workers/game/src/engine/schemas/`), with board prompts, an event log, and card motion.
+- **UI**: the M5 design system (tokens, shadcn-based component library, Erode/Public Sans typography, motion).
 
-| **M4** | Effect Engine | Automated effect resolution from `effectSchema`: triggers, resolver, targeting, prohibitions/replacements, durations, modifier layers, scheduled actions. Hand-authored schemas for all 51 sets (~2,500 cards). Interruption modals (arrange cards, select targets, player choices). | **Done** |
-| **M4.5** | Schema QA | Validate, fix, and harden all card effect schemas. TypeScript fixes, low-confidence review, deferred pattern implementation (~480 cards unblocked), 158 integration tests. | **Done** |
+Milestone status, from the [milestone docs](./docs/milestones/):
 
-### Not Started
+| Phase | Title | Status |
+|-------|-------|--------|
+| **M0** | Foundation | Done |
+| **M1** | Deck Builder | Done |
+| **M2** | Social | Done |
+| **M2.5** | Design System | Done |
+| **M3** / **M3.5** / **M3.75** | Simulator Core and tech debt | Done |
+| **M4** / **M4.5** | Effect Engine and Schema QA | Done |
+| **M5** | UI Overhaul | M5.1–M5.3 done; M5.4 Game Board Motion in progress; M5.5 Art Variants phases 1–3 done |
+| **M6** | Scale & Features | Planned |
+| **M7** | Effect Showcase | Planned |
 
-| Phase | Title | Scope |
-|-------|-------|-------|
-| **M1** | Deck Builder | Card search API + UI, deck editor with real-time OPTCG validation, cost curve/color stats, bulk import/export, per-user deck CRUD, mobile-responsive |
-| **M2** | Social | Friends (search/request/list), real-time DMs, lobbies (create/browse/invite/join), WebSocket presence layer |
-| **M5** | Polish & Scale | LLM-assisted effect parsing for full card pool, spectator mode, replay viewer, mobile polish, performance optimization |
-| **M6** | Effect Showcase | Interactive testing harness for card effect executions — scenario catalog, pre-built board states, step-by-step prompt walkthroughs |
-
-> **Note:** M1 (Deck Builder) and M2 (Social) have basic functional implementations already — deck building and lobbies work — but haven't been formally scoped/polished to milestone spec yet. M3 was prioritized ahead of them.
-
-### Post-M6 (Future)
-
-- AI opponents / bots
-- Tournament bracket system
-- Ranked matchmaking
-- Mobile-native app
+Day-to-day work is tracked in Linear (workspace `optcg-sim`, `OPT-###` tickets) rather than in these docs.
 
 ## Game Engine
 
-The engine lives in `workers/game/src/engine/` and processes every game action through a **7-step pipeline**:
+The engine lives in `workers/game/src/engine/`. Every player command enters `runPipeline` in [`pipeline.ts`](./workers/game/src/engine/pipeline.ts), which runs a **7-step pipeline**:
 
-1. **Validate** — check legality (correct phase, valid targets, sufficient resources)
-2. **Execute** — apply the core action (play card, declare attack, etc.)
-3. **Trigger** — fire any triggered effects (On Play, When Attacking, etc.)
-4. **Resolve** — resolve pending effects via the effect resolver
-5. **Check** — check win/loss conditions (life-out, deck-out)
-6. **Advance** — auto-advance phases when possible (refresh, draw, DON)
-7. **Prompt** — if player input is needed, set `activePrompt` and wait
+1. **Validate**: check legality (phase, targets, resources)
+2. **Check Prohibitions**: veto actions blocked by active prohibitions
+3. **Check Replacements**: apply replacement effects to the action
+4. **Execute**: apply the core action (play card, declare attack, and so on), producing a new state snapshot
+5. **Report events and triggers, then drain ready work**: fire triggered effects and resolve pending work, stopping at a player prompt when input is needed
+6. **Recalculate Modifiers**: expire effects and recompute power and modifier layers
+7. **Rule Processing**: defeat and other rule checks
 
-All state is immutable — no mutations, no side effects. 158 tests cover pipeline integration and unit behavior.
+Nested effects and prompt replies use the same pending-work drain. All state is immutable: no mutations, spread-only transitions. See [Engine Architecture](./docs/game-engine/08-ENGINE-ARCHITECTURE.md) for detail.
 
 ## Documentation
 
@@ -248,7 +186,7 @@ Key documents:
 
 ## Contributing
 
-This is a solo project by [Cory Cunanan](https://github.com/cory-cunanan). The codebase follows strict conventions:
+This is a solo project by [Cory Cunanan](https://github.com/corycunanan). The codebase follows strict conventions:
 
 - **Atomic commits** — one logical unit per commit, tests included
 - **Immutable engine** — no mutations, spread-only state transitions
