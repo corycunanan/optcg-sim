@@ -33,8 +33,11 @@ A full-featured web application for playing the **One Piece Trading Card Game** 
 git clone https://github.com/corycunanan/optcg-sim.git
 cd optcg-sim
 
-# Install dependencies (root + workers/* pnpm workspace packages)
+# Install dependencies (root + both workers; one pnpm workspace, one lockfile)
 pnpm install
+
+# Engine tests run without Prisma or a database:
+#   pnpm test:worker [file...]
 
 # Copy environment variables
 cp .env.example .env

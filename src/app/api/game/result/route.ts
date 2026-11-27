@@ -4,6 +4,7 @@
  * Protected by the GAME_WORKER_SECRET shared secret.
  */
 
+import { isAuthorizedBearer } from "@shared/bearer-auth";
 import { after, NextRequest } from "next/server";
 import { apiAction, apiError } from "@/lib/api-response";
 import { finalizeGameResult, notifyRestoredLobby } from "@/lib/game/finalize";
@@ -17,7 +18,7 @@ const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 export async function POST(request: NextRequest) {
   // Auth: verify the request comes from our Cloudflare Worker
   const auth = request.headers.get("Authorization");
-  if (!GAME_WORKER_SECRET || auth !== `Bearer ${GAME_WORKER_SECRET}`) {
+  if (!isAuthorizedBearer(auth, GAME_WORKER_SECRET)) {
     return apiError("Unauthorized", 401);
   }
 

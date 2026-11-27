@@ -1,3 +1,4 @@
+import { isAuthorizedBearer } from "../../../../shared/bearer-auth.js";
 import type { GameState } from "../types.js";
 import { log } from "../lib/log.js";
 
@@ -7,7 +8,7 @@ export async function handleGameStatusRequest(
   readState: () => Promise<GameState | null>
 ): Promise<Response> {
   const auth = request.headers.get("Authorization");
-  if (auth !== `Bearer ${workerSecret}`) {
+  if (!isAuthorizedBearer(auth, workerSecret)) {
     log("auth.failure", { reason: "status_bad_secret" });
     return new Response("Unauthorized", { status: 401 });
   }

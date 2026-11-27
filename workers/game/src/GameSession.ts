@@ -6,6 +6,7 @@
  * incoming actions through the rules engine pipeline.
  */
 
+import { isAuthorizedBearer } from "../../../shared/bearer-auth.js";
 import type {
   CardData,
   ClientMessage,
@@ -233,7 +234,7 @@ export class GameSession implements DurableObject {
   /** Called from Next.js after a game is finished in Postgres (e.g. disconnected concede). */
   private async handleNotifyEnd(request: Request): Promise<Response> {
     const auth = request.headers.get("Authorization");
-    if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+    if (!isAuthorizedBearer(auth, this.env.GAME_WORKER_SECRET)) {
       log("auth.failure", {
         reason: "notify_end_bad_secret",
         gameId: this.gameState?.id,
