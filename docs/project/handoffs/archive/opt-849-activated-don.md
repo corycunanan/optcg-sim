@@ -19,19 +19,19 @@ Inventory walks every object and array in all registered authored schemas, inclu
 
 | Card / printed source | Recursive path / effect | DON!! | Disposition |
 | --- | --- | --- | --- |
-| [OP01-063](../../cards/OP-01.md) | `effects.0` / `OP01-063_activate_reveal_conditional` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP02-093](../../cards/OP-02.md) | `effects.0` / `activate_cost_reduce_buff` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP05-008](../../cards/OP-05.md) | `effects.0` / `activate_give_don` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP08-002](../../cards/OP-08.md) | `effects.0` / `activate_draw_place_debuff` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP08-008](../../cards/OP-08.md) | `effects.1` / `activate_rush` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP08-010](../../cards/OP-08.md) | `effects.0` / `activate_power_boost` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [OP10-022](../../cards/OP-10.md) | `effects.0` / `activate_reveal_life_play` | 1 | Equivalent source-specific `DON_GIVEN >= 1` in `all_of`; retain OPT-809 total-cost gate. |
-| [OP12-020](../../cards/OP-12.md) | `effects.0` / `OP12-020_activate` | 3 | No equivalent block condition; now enforced by common activation gate. |
-| [ST03-007](../../cards/ST-03.md) | `effects.0` / `activate_search_play` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [ST13-001](../../cards/ST-13.md) | `effects.0` / `activate_add_to_life_buff` | 1 | No equivalent block condition; now enforced by common activation gate. |
-| [ST13-002](../../cards/ST-13.md) | `effects.0` / `activate_search_to_life` | 2 | No equivalent block condition; now enforced by common activation gate. |
-| [ST13-003](../../cards/ST-13.md) | `effects.1` / `activate_add_to_life` | 2 | No equivalent block condition; now enforced by common activation gate. |
-| [ST21-001](../../cards/ST-21.md) | `effects.0` / `activate_give_don` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP01-063](../../../cards/OP-01.md) | `effects.0` / `OP01-063_activate_reveal_conditional` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP02-093](../../../cards/OP-02.md) | `effects.0` / `activate_cost_reduce_buff` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP05-008](../../../cards/OP-05.md) | `effects.0` / `activate_give_don` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP08-002](../../../cards/OP-08.md) | `effects.0` / `activate_draw_place_debuff` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP08-008](../../../cards/OP-08.md) | `effects.1` / `activate_rush` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP08-010](../../../cards/OP-08.md) | `effects.0` / `activate_power_boost` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [OP10-022](../../../cards/OP-10.md) | `effects.0` / `activate_reveal_life_play` | 1 | Equivalent source-specific `DON_GIVEN >= 1` in `all_of`; retain OPT-809 total-cost gate. |
+| [OP12-020](../../../cards/OP-12.md) | `effects.0` / `OP12-020_activate` | 3 | No equivalent block condition; now enforced by common activation gate. |
+| [ST03-007](../../../cards/ST-03.md) | `effects.0` / `activate_search_play` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [ST13-001](../../../cards/ST-13.md) | `effects.0` / `activate_add_to_life_buff` | 1 | No equivalent block condition; now enforced by common activation gate. |
+| [ST13-002](../../../cards/ST-13.md) | `effects.0` / `activate_search_to_life` | 2 | No equivalent block condition; now enforced by common activation gate. |
+| [ST13-003](../../../cards/ST-13.md) | `effects.1` / `activate_add_to_life` | 2 | No equivalent block condition; now enforced by common activation gate. |
+| [ST21-001](../../../cards/ST-21.md) | `effects.0` / `activate_give_don` | 1 | No equivalent block condition; now enforced by common activation gate. |
 
 Reproduce the inventory from repository root (Node avoids the tsx CLI's IPC requirement):
 

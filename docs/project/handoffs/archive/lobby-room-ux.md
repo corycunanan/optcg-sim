@@ -6,7 +6,7 @@ last-updated: 2026-04-29 (OPT-344 in review; PR #192 open)
 
 # Lobby Room UX — Handoff Doc
 
-Replace the auto-start-on-join lobby with a real pre-game room: three match-type tabs (PVP / Solitaire / PVComputer-disabled), per-player deck pickers, ready-up, and a host-driven Start button. Subsumes most of OPT-298 and all of OPT-299. Full scope: [`docs/project/LOBBY-ROOM-UX-SCOPE.md`](../LOBBY-ROOM-UX-SCOPE.md).
+Replace the auto-start-on-join lobby with a real pre-game room: three match-type tabs (PVP / Solitaire / PVComputer-disabled), per-player deck pickers, ready-up, and a host-driven Start button. Subsumes most of OPT-298 and all of OPT-299. Full scope: [`docs/project/LOBBY-ROOM-UX-SCOPE.md`](../../LOBBY-ROOM-UX-SCOPE.md).
 
 ---
 
@@ -69,7 +69,7 @@ Architecture Floor substantially complete:
 - PVComputer implementation — disabled tab here; separate project later.
 - Polling → push migration — OPT-88's job.
 
-See [`docs/project/LOBBY-ROOM-UX-SCOPE.md`](../LOBBY-ROOM-UX-SCOPE.md) §"Deferred / tech debt" for full detail.
+See [`docs/project/LOBBY-ROOM-UX-SCOPE.md`](../../LOBBY-ROOM-UX-SCOPE.md) §"Deferred / tech debt" for full detail.
 
 ---
 

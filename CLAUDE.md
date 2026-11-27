@@ -13,7 +13,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `src/app/` | Next.js App Router — pages and API routes |
 | `src/app/(auth)/` | Auth pages: `/login`, `/onboarding` |
 | `src/app/admin/` | Admin UI — card browser, editor, set management |
-| `src/app/api/` | REST API routes — 36 route files; inventory with `find src/app/api -name route.ts` |
+| `src/app/api/` | REST API routes; inventory with `find src/app/api -name route.ts` |
 | `src/app/decks/` | Deck builder pages |
 | `src/app/game/` | Game board pages (dynamic `[id]` route, scaffold, error boundary) |
 | `src/app/lobbies/` | Lobby browser, creation, and dynamic lobby room pages |

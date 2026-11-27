@@ -112,7 +112,7 @@ Two atomic commits:
 
 ## Phase 7 — Handoff doc
 
-`docs/project/handoffs/pre-game-flow.md` (new). Includes:
+`docs/project/handoffs/archive/pre-game-flow.md` (new). Includes:
 
 - Action Plan table for OPT-366/365/367/368 ordered by deps
 - Inbound handoff for OPT-365 with:

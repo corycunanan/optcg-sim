@@ -87,5 +87,5 @@ The project’s existing Claude and Codex workflow documentation was also consul
 
 ## Follow-up documentation gap
 
-At closeout, `docs/project/handoffs/game-engine-correctness.md` still described OPT-439 as In Review and referenced an older commit. It should be refreshed in the next documentation pass, along with the Action Plan’s next-ticket state.
+At closeout, `docs/project/handoffs/archive/game-engine-correctness.md` still described OPT-439 as In Review and referenced an older commit. It should be refreshed in the next documentation pass, along with the Action Plan’s next-ticket state.
 

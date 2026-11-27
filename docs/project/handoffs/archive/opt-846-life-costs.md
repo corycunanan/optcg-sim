@@ -8,24 +8,24 @@ Canonical card text below and official FAQ repository snapshots imported 2026-09
 
 | Card | Canonical text | Official FAQ audit | Disposition |
 | --- | --- | --- | --- |
-| EB01-040 | [EB-01.md](../../cards/EB-01.md) | [qa_eb01.md](../../FAQs/qa_eb01.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
-| EB02-060 | [EB-02.md](../../cards/EB-02.md) | [qa_eb02.md](../../FAQs/qa_eb02.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
-| EB03-053 | [EB-03.md](../../cards/EB-03.md) | [qa_eb03.md](../../FAQs/qa_eb03.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
-| EB03-056 | [EB-03.md](../../cards/EB-03.md) | [qa_eb03.md](../../FAQs/qa_eb03.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
-| EB04-059 | [EB-04.md](../../cards/EB-04.md) | [faq_op15-eb04.md](../../FAQs/faq_op15-eb04.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
-| OP08-058 | [OP-08.md](../../cards/OP-08.md) | [qa_op08.md](../../FAQs/qa_op08.md); card-specific ruling reviewed | TOP, amount 2: both of the first two must be DOWN; FAQ explicitly rejects either already UP. |
-| OP08-063 | [OP-08.md](../../cards/OP-08.md) | [qa_op08.md](../../FAQs/qa_op08.md); card-specific ruling reviewed | TOP, amount 1: UP → DOWN. |
-| OP10-099 | [OP-10.md](../../cards/OP-10.md) | [qa_op10.md](../../FAQs/qa_op10.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
-| OP11-022 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
-| OP11-100 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
-| OP11-103 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
-| OP11-104 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
-| OP11-107 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
-| OP11-108 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
-| OP11-117 | [OP-11.md](../../cards/OP-11.md) | [qa_op11.md](../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
-| P-106 | [UNKNOWN.md](../../cards/UNKNOWN.md) | [qa_promotion-cards.md](../../FAQs/qa_promotion-cards.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
-| ST13-009 | [ST-13.md](../../cards/ST-13.md) | [qa_st-13.md](../../FAQs/qa_st-13.md); card-specific ruling reviewed | Retain unpositioned: any face-up Life card, explicitly confirmed by FAQ. |
-| ST20-001 | [ST-20.md](../../cards/ST-20.md) | [qa_st-15-20.md](../../FAQs/qa_st-15-20.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
+| EB01-040 | [EB-01.md](../../../cards/EB-01.md) | [qa_eb01.md](../../../FAQs/qa_eb01.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
+| EB02-060 | [EB-02.md](../../../cards/EB-02.md) | [qa_eb02.md](../../../FAQs/qa_eb02.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
+| EB03-053 | [EB-03.md](../../../cards/EB-03.md) | [qa_eb03.md](../../../FAQs/qa_eb03.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
+| EB03-056 | [EB-03.md](../../../cards/EB-03.md) | [qa_eb03.md](../../../FAQs/qa_eb03.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
+| EB04-059 | [EB-04.md](../../../cards/EB-04.md) | [faq_op15-eb04.md](../../../FAQs/faq_op15-eb04.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
+| OP08-058 | [OP-08.md](../../../cards/OP-08.md) | [qa_op08.md](../../../FAQs/qa_op08.md); card-specific ruling reviewed | TOP, amount 2: both of the first two must be DOWN; FAQ explicitly rejects either already UP. |
+| OP08-063 | [OP-08.md](../../../cards/OP-08.md) | [qa_op08.md](../../../FAQs/qa_op08.md); card-specific ruling reviewed | TOP, amount 1: UP → DOWN. |
+| OP10-099 | [OP-10.md](../../../cards/OP-10.md) | [qa_op10.md](../../../FAQs/qa_op10.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
+| OP11-022 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
+| OP11-100 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
+| OP11-103 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
+| OP11-104 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
+| OP11-107 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
+| OP11-108 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: UP → DOWN. |
+| OP11-117 | [OP-11.md](../../../cards/OP-11.md) | [qa_op11.md](../../../FAQs/qa_op11.md); no card-specific entry; printed position unambiguous | TOP, amount 1: DOWN → UP. |
+| P-106 | [UNKNOWN.md](../../../cards/UNKNOWN.md) | [qa_promotion-cards.md](../../../FAQs/qa_promotion-cards.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
+| ST13-009 | [ST-13.md](../../../cards/ST-13.md) | [qa_st-13.md](../../../FAQs/qa_st-13.md); card-specific ruling reviewed | Retain unpositioned: any face-up Life card, explicitly confirmed by FAQ. |
+| ST20-001 | [ST-20.md](../../../cards/ST-20.md) | [qa_st-15-20.md](../../../FAQs/qa_st-15-20.md); card-specific ruling reviewed | TOP, amount 1: DOWN → UP. |
 
 All 18 legacy sites accounted for: 17 constrained; Shanks unchanged. Existing two OPT-812 sites stay TOP. Recursive inventory walks every nested object and costs array: `node --import tsx workers/game/scripts/opt846-life-cost-inventory.ts`; committed output `opt-846/consumer-inventory.json` contains 20 costs: 19 TOP and one unpositioned. Existing `TOP` support takes exactly the first amount cards, so Pudding requires no new handler semantics. Generic scanning remains unchanged.
 
