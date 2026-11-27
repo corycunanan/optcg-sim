@@ -292,3 +292,29 @@ The worker uses this secret for three things: (a) Bearer auth on API callbacks (
 **When to rotate:** suspected leak (log exposure, accidental commit, contractor offboarding), at least annually, and any time the secret is known to have been on a developer machine that was lost or decommissioned.
 
 _Last updated: 2026-04-22_
+
+## Error reporting and usage counters (OPT-1063)
+
+**Error reporting.** Both runtimes send errors through one provider-agnostic
+hook. `shared/error-report.ts` builds the report and redacts emails, bearer and
+basic credentials, JWTs, `token=`/`password=`/cookie values and URL
+credentials. The only identity a report may carry is an opaque `userId` that a
+caller passes explicitly.
+
+| Runtime | Hook | Wired into | Default sink |
+|---------|------|------------|--------------|
+| Next.js server | `src/lib/error-reporting.ts` | `onRequestError` in `src/instrumentation.ts` | `[ERROR_REPORT]` line in Vercel runtime logs |
+| Browser | `src/lib/error-reporting.ts` | `src/instrumentation-client.ts` (`error`, `unhandledrejection`) and the `error.tsx` boundaries | `[ERROR_REPORT]` console line |
+| Game worker | `workers/game/src/lib/error-reporting.ts` | Worker entry `fetch`, and `GameSession` `fetch`/`webSocketMessage`/`alarm` through `ReportingGameSession` (`workers/game/src/session/error-boundary.ts`) | `error.reported` structured log (`wrangler tail`, `LOG_URL`) |
+
+A tracking provider plugs in by calling `setErrorReporter()` once at startup;
+no call site changes. Errors are reported and then rethrown, so runtime
+behavior is unchanged. Errors a Durable Object already reported reach the
+Worker entry marked `remote` and are not reported twice.
+
+**Usage counters.** `/admin/usage` shows the last 30 UTC days of games
+started, finished and abandoned, distinct active players per day, end reasons
+and lobby modes. The numbers are aggregates over `game_sessions`
+(`src/lib/metrics/usage.ts`): the lobby start route writes the row and
+`finalizeGameResult` stamps the outcome, so the game path needs no extra
+writes. A start that fails worker init deletes its session and is not counted.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportError } from "@/lib/error-reporting";
 import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
 
 export default function DecksError({
@@ -11,7 +12,7 @@ export default function DecksError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[decks] Unhandled error:", error);
+    reportError(error, { source: "app.boundary", tags: { boundary: "decks" } });
   }, [error]);
 
   return (

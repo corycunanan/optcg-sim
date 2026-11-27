@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { Button } from "@/components/ui";
 import {
   PageHeader,
+  PageHeaderActions,
   PageHeaderContent,
   PageHeaderDescription,
   PageHeaderTitle,
@@ -39,6 +41,11 @@ export default async function AdminPage() {
             Card, variant, and set totals across the database.
           </PageHeaderDescription>
         </PageHeaderContent>
+        <PageHeaderActions>
+          <Button asChild variant="outline">
+            <Link href="/admin/usage">Game usage</Link>
+          </Button>
+        </PageHeaderActions>
       </PageHeader>
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
