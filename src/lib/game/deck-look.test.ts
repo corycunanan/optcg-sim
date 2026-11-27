@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@shared/game-types";
 import { eventToTransitions } from "@/hooks/use-card-transitions";
+import { FLIP_SECONDS } from "./card-motion";
 import { buildEventTimeline } from "./event-timeline";
 import {
   collectDeckLooks,
   fanSlotPoses,
   indexDeckLooks,
+  lookReturnLeadMs,
   lookSlotZoneKey,
 } from "./deck-look";
 
@@ -97,8 +99,31 @@ describe("collectDeckLooks (OPT-1056)", () => {
   });
 });
 
+describe("look picks and returns (OPT-1056)", () => {
+  it("marks the pick, which the fan closes up behind, and the returns", () => {
+    const events: GameEvent[] = [
+      look(0, ["A", "B", "C"]),
+      {
+        type: "CARD_DRAWN",
+        playerIndex: 0,
+        timestamp: 2,
+        payload: { cardId: "B", cardInstanceId: "h-1", source: "search" },
+      },
+      {
+        type: "CARDS_PLACED_IN_DECK",
+        playerIndex: 0,
+        timestamp: 3,
+        payload: { count: 2, position: "BOTTOM" },
+      },
+    ];
+    const [deckLook] = collectDeckLooks(events);
+    expect([...deckLook.picks]).toEqual([1]);
+    expect([...deckLook.returns].sort()).toEqual([0, 2]);
+  });
+});
+
 describe("look fan flights (OPT-1056)", () => {
-  it("deals the looked-at cards from the deck into the fan slots", () => {
+  it("deals the looked-at cards face-down from the deck into the fan slots", () => {
     const events = [look(0, ["A", "B"])];
     const index = indexDeckLooks(collectDeckLooks(events));
     const flights = eventToTransitions(events[0], 0, null, null, undefined, index);
@@ -106,10 +131,11 @@ describe("look fan flights (OPT-1056)", () => {
       ["p-deck", lookSlotZoneKey("p", { timestamp: 1 }, 0)],
       ["p-deck", lookSlotZoneKey("p", { timestamp: 1 }, 1)],
     ]);
-    expect(flights[0]).toMatchObject({ sourceFaceDown: true, destinationFaceDown: false });
+    // The looking player's row turns face-up in the fan once it is all in.
+    expect(flights[0]).toMatchObject({ sourceFaceDown: true, destinationFaceDown: true });
   });
 
-  it("returns the rest from their slots, flipping face-down", () => {
+  it("returns the rest face-down after the fan closes up and turns them over", () => {
     const events: GameEvent[] = [
       look(0, ["A", "B"]),
       {
@@ -125,10 +151,13 @@ describe("look fan flights (OPT-1056)", () => {
     expect(flights[1]).toMatchObject({
       cardId: "B",
       toZoneKey: "p-deck",
-      sourceFaceDown: false,
+      sourceFaceDown: true,
       destinationFaceDown: true,
       hiddenUntilDelay: true,
     });
+    const leadSeconds = lookReturnLeadMs(false, FLIP_SECONDS * 1000) / 1000;
+    expect(flights[0].delay).toBeCloseTo(leadSeconds);
+    expect(flights[1].delay).toBeGreaterThan(leadSeconds);
   });
 
   it("travels a trashed fan card instead of dissolving it", () => {

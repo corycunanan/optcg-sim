@@ -5,7 +5,11 @@ import { AnimatePresence, motion } from "motion/react";
 import type { CardDb } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import type { DeckLookSlotView, DeckLookView } from "@/hooks/use-deck-look";
-import { fanSlotPoses } from "@/lib/game/deck-look";
+import {
+  LOOK_REFLOW_MS,
+  fanSlotPoses,
+  type FanSlotPose,
+} from "@/lib/game/deck-look";
 import { cardTransitions } from "@/lib/motion";
 import { Card } from "../card";
 import { CARD_SIZES } from "../card/sizes";
@@ -15,6 +19,11 @@ import { FIELD_W } from "./constants";
 const FAN_CARD = CARD_SIZES.modal;
 /** Widest the fan may spread, in design px. */
 const FAN_MAX_W = FIELD_W - 2 * FAN_CARD.width;
+/** The fan closing up behind a pick (`LOOK_REFLOW_MS` long). */
+const FAN_REFLOW = {
+  duration: LOOK_REFLOW_MS / 1000,
+  ease: [0.2, 0, 0, 1] as const,
+};
 /** How far a revealed pick rises out of the fan, in design px. */
 const REVEAL_LIFT_PX = 16;
 /** When a revealed pick turns back over, after it starts rising. The flip
@@ -41,14 +50,12 @@ function useRevealPhase(revealAt: number | undefined) {
 
 function FanSlot({
   slot,
-  faceDown,
   pose,
   cardDb,
   sleeveUrl,
 }: {
   slot: DeckLookSlotView;
-  faceDown: boolean;
-  pose: { x: number; y: number; rotate: number };
+  pose: FanSlotPose;
   cardDb: CardDb;
   sleeveUrl?: string | null;
 }) {
@@ -63,30 +70,35 @@ function FanSlot({
   );
   const phase = useRevealPhase(slot.revealAt);
   const revealing = phase !== "rest";
-  const showFace = !faceDown || phase === "face";
+  const showFace = phase === "face" || (!revealing && !slot.faceDown);
   const cardId = slot.cardId ?? (phase === "face" ? slot.revealCardId : null);
+  const rotate = revealing ? 0 : pose.rotate;
 
   return (
-    // The registered box stays unrotated so a flight starts square on it.
-    <div
+    // The registered box stays unrotated so a flight starts square on it;
+    // the flight reads the tilt from `data-look-rotate`. The box slides
+    // when the fan closes up behind a pick.
+    <motion.div
       ref={ref}
       data-testid="deck-look-slot"
+      data-look-slot={zoneKey}
+      data-look-rotate={rotate}
       data-slot-hidden={slot.hidden ? "true" : undefined}
       className={slot.hidden ? "invisible absolute" : "absolute"}
       style={{
         width: FAN_CARD.width,
         height: FAN_CARD.height,
-        left: pose.x - FAN_CARD.width / 2,
-        top: pose.y - FAN_CARD.height / 2,
+        left: -FAN_CARD.width / 2,
+        top: -FAN_CARD.height / 2,
       }}
+      initial={false}
+      animate={{ x: pose.x, y: pose.y }}
+      transition={FAN_REFLOW}
     >
       <motion.div
         className="h-full w-full"
         initial={false}
-        animate={{
-          y: revealing ? -REVEAL_LIFT_PX : 0,
-          rotate: revealing ? 0 : pose.rotate,
-        }}
+        animate={{ y: revealing ? -REVEAL_LIFT_PX : 0, rotate }}
         transition={cardTransitions.handReflow}
       >
         <Card
@@ -98,7 +110,7 @@ function FanSlot({
           style={{ width: "100%", height: "100%" }}
         />
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -127,12 +139,21 @@ export function DeckLookFan({
     >
       <AnimatePresence>
         {looks.map((view) => {
-          const poses = fanSlotPoses(view.slots.length, {
+          const layout = {
             faceDown: view.look.faceDown,
             top: view.prefix === "o",
             cardWidth: FAN_CARD.width,
             maxWidth: FAN_MAX_W,
-          });
+          };
+          // The fan closes up behind a pick: the cards still in it spread
+          // over the room the whole fan had.
+          const open = view.slots.filter((slot) => !slot.collapsed);
+          const openPoses = fanSlotPoses(open.length, layout);
+          const fullPoses = fanSlotPoses(view.slots.length, layout);
+          const poseOf = (slot: DeckLookSlotView) => {
+            const at = open.indexOf(slot);
+            return at === -1 ? fullPoses[slot.index] : openPoses[at];
+          };
           return (
             <motion.div
               key={view.look.id}
@@ -145,8 +166,7 @@ export function DeckLookFan({
                 <FanSlot
                   key={slot.zoneKey}
                   slot={slot}
-                  faceDown={view.look.faceDown}
-                  pose={poses[slot.index]}
+                  pose={poseOf(slot)}
                   cardDb={cardDb}
                   sleeveUrl={sleeveUrls?.[view.look.playerIndex] ?? null}
                 />

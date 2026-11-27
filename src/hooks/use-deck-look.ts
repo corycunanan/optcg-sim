@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { GameEvent } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
+import { FLIP_SECONDS } from "@/lib/game/card-motion";
 import {
   lookSlotZoneKey,
   lookZoneKeyPrefix,
@@ -19,12 +27,29 @@ export const DECK_LOOK_CLOSE_GRACE_MS = 1200;
  *  showing their cards anyway. */
 export const DECK_LOOK_DEAL_FALLBACK_MS = 1500;
 
+/** Gap between the looking player's cards turning face-up, left to right,
+ *  once the whole row is in place. */
+export const DECK_LOOK_FACE_UP_STAGGER_MS = 60;
+
+/** A card going back to the deck turns face-down this long before its
+ *  flight starts: one shared flip, plus a beat at rest. */
+const RETURN_FLIP_LEAD_MS = FLIP_SECONDS * 1000 + 40;
+
+/** A slot whose flight never reported its start counts as gone this long
+ *  after its scheduled start. */
+const DEPARTURE_FALLBACK_MS = 400;
+
 export interface DeckLookSlotView {
   index: number;
   zoneKey: string;
   cardId: string | null;
   /** The card is not in its slot right now: flying in, or gone. */
   hidden: boolean;
+  /** The slot left as a pick: the rest of the fan closes up without it. */
+  collapsed: boolean;
+  /** The card shows its back (before the row turns up, or on its way back
+   *  to the deck). A revealed pick overrides this while it rises. */
+  faceDown: boolean;
   /** Epoch ms when a revealed pick rises and shows its face. */
   revealAt?: number;
   /** The revealed pick's face, for a viewer who sees the fan face-down. */
@@ -42,21 +67,35 @@ export interface DeckLookPresentation {
   /** Cards out of each deck in a fan (resting or flying in), so the deck
    *  count drops while they are away. Keyed by deck zone key. */
   deckOutCounts: ReadonlyMap<string, number>;
+  /** The flight layer reports a card leaving its slot; the slot hides in
+   *  the same frame the flight appears. Stable across renders. */
+  markDeparted: (zoneKey: string) => void;
 }
 
-const EMPTY_PRESENTATION: DeckLookPresentation = {
-  looks: [],
-  deckOutCounts: new Map(),
-};
+const EMPTY_LOOKS: DeckLookView[] = [];
+const EMPTY_COUNTS: ReadonlyMap<string, number> = new Map();
+
+function withoutKeys<K, V>(map: ReadonlyMap<K, V>, keep: (key: K) => boolean) {
+  const next = new Map([...map].filter(([key]) => keep(key)));
+  return next.size === map.size ? map : next;
+}
+
+function withoutItems<T>(set: ReadonlySet<T>, keep: (item: T) => boolean) {
+  const next = new Set([...set].filter(keep));
+  return next.size === set.size ? set : next;
+}
 
 /**
- * OPT-1056: which look fans are on screen and which of their cards show.
+ * OPT-1056: which look fans are on screen and how each of their cards shows.
  *
- * A slot is hidden while a flight into it is running, and from the moment a
- * flight out of it starts (its own delay), after which it stays hidden. A fan
- * shows while its selection is open, while any flight uses it, and for a
- * short grace after it is answered. Looks already answered on mount (history)
- * never show. Reduced motion shows no fan: the board swaps instantly.
+ * Every card deals in face-down. Once the looking player's row is in place
+ * it turns face-up, left to right. A pick leaves and the fan closes up
+ * behind it; the rest turn face-down where they lie and go back to the
+ * deck. A slot is hidden while a flight into it runs, and from the frame
+ * its flight out appears. A fan shows while its selection is open, while
+ * any flight uses it, and for a short grace after it is answered. Looks
+ * already answered on mount (history) never show; one open on mount shows
+ * at rest. Reduced motion shows no fan: the board swaps instantly.
  */
 export function useDeckLook(
   looks: readonly DeckLook[],
@@ -76,32 +115,44 @@ export function useDeckLook(
           .map((look) => [look.id, Number.NEGATIVE_INFINITY]),
       ),
   );
-  /** Slot key → epoch ms its departing flight starts, kept after the
-   *  flight ends so the slot stays empty. */
+  /** Looks on screen at mount: their cards already rest in the fan. */
+  const [mountedLookIds] = useState<ReadonlySet<string>>(
+    () => new Set(looks.map((look) => look.id)),
+  );
+  /** Look id → epoch ms it was first seen open (looks opened after mount). */
+  const [openedAt, setOpenedAt] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
+  /** Slot keys whose deal flight has been seen. Until then a freshly opened
+   *  look's slot stays hidden: the flights are scheduled after the render
+   *  that first shows the look, and no card may flash before it flies in. */
+  const [dealtSeen, setDealtSeen] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  /** Look id → epoch ms its whole row came to rest. */
+  const [settledAt, setSettledAt] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
+  /** Slot key → epoch ms its departing flight is scheduled to start, kept
+   *  after the flight ends. */
   const [departAtSeen, setDepartAtSeen] = useState<ReadonlyMap<string, number>>(
     () => new Map(),
+  );
+  /** Slot keys whose departing flight has appeared. */
+  const [departed, setDeparted] = useState<ReadonlySet<string>>(
+    () => new Set(),
   );
   /** Slot key → epoch ms its reveal starts. */
   const [revealAt, setRevealAt] = useState<ReadonlyMap<string, number>>(
     () => new Map(),
   );
   const lastTimestampRef = useRef<number | null>(null);
-  /** Looks on screen at mount (history or an open selection): their cards
-   *  already rest in the fan, so they never wait for a deal. */
-  const [mountedLookIds] = useState<ReadonlySet<string>>(
-    () => new Set(looks.map((look) => look.id)),
-  );
-  /** Slot keys whose deal flight has been seen. Until then a freshly opened
-   *  look's slot stays hidden: the flights are scheduled after the render
-   *  that first shows the look, and the card must not flash in its slot
-   *  before it flies there. */
-  const [dealtSeen, setDealtSeen] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  /** Look id → epoch ms it was first seen open, for the deal fallback. */
-  const [openedAt, setOpenedAt] = useState<ReadonlyMap<string, number>>(
-    () => new Map(),
-  );
+
+  const markDeparted = useCallback((zoneKey: string) => {
+    setDeparted((current) =>
+      current.has(zoneKey) ? current : new Set([...current, zoneKey]),
+    );
+  }, []);
 
   // Departures of the current flights. A flight still queued behind a
   // spotlight has not been scheduled yet.
@@ -133,41 +184,82 @@ export function useDeckLook(
     setDealtSeen((current) => new Set([...current, ...dealt]));
   }, [transitions, dealtSeen]);
 
+  // Track looks opening, and forget looks gone from the log (a sandbox
+  // Reset replays the same looks, which must deal again).
   useLayoutEffect(() => {
     const fresh = looks.filter(
       (look) => !mountedLookIds.has(look.id) && !openedAt.has(look.id),
     );
     const present = new Set(looks.map((look) => look.id));
-    // A look gone from the log (sandbox Reset) deals again if it returns.
-    const gone = [...openedAt.keys()].filter((id) => !present.has(id));
-    if (fresh.length === 0 && gone.length === 0) return;
+    const gone = [...openedAt.keys()].some((id) => !present.has(id));
+    if (fresh.length === 0 && !gone) return;
     const stamp = Date.now();
     // Mirroring the websocket's event stream into transient fan state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenedAt((current) => {
-      const next = new Map(current);
-      for (const id of gone) next.delete(id);
+      const next = new Map(withoutKeys(current, (id) => present.has(id)));
       for (const look of fresh) next.set(look.id, stamp);
       return next;
     });
-    if (gone.length > 0) {
+    if (gone) {
       const prefixes = looks.map((look) =>
         lookZoneKeyPrefix(
           boardZonePrefix(look.playerIndex, bottomPlayerIndex),
           look,
         ),
       );
-      setDealtSeen(
-        (current) =>
-          new Set(
-            [...current].filter((key) =>
-              prefixes.some((prefix) => key.startsWith(prefix)),
-            ),
-          ),
-      );
+      const keepKey = (key: string) =>
+        prefixes.some((prefix) => key.startsWith(prefix));
+      const keepId = (id: string) => present.has(id);
+      setDealtSeen((current) => withoutItems(current, keepKey));
+      setDeparted((current) => withoutItems(current, keepKey));
+      setDepartAtSeen((current) => withoutKeys(current, keepKey));
+      setRevealAt((current) => withoutKeys(current, keepKey));
+      setSettledAt((current) => withoutKeys(current, keepId));
+      setClosedAt((current) => withoutKeys(current, keepId));
     }
     setNow(stamp);
   }, [looks, mountedLookIds, openedAt, bottomPlayerIndex]);
+
+  // A freshly dealt row comes to rest once every card has landed.
+  useLayoutEffect(() => {
+    const stamp = Date.now();
+    const settled: string[] = [];
+    for (const look of looks) {
+      if (look.faceDown || mountedLookIds.has(look.id)) continue;
+      if (settledAt.has(look.id)) continue;
+      const opened = openedAt.get(look.id);
+      if (opened === undefined) continue;
+      const prefix = boardZonePrefix(look.playerIndex, bottomPlayerIndex);
+      const keyPrefix = lookZoneKeyPrefix(prefix, look);
+      const allDealt = look.cardIds.every((_, index) =>
+        dealtSeen.has(lookSlotZoneKey(prefix, look, index)),
+      );
+      const landing = transitions.some((t) =>
+        t.toZoneKey.startsWith(keyPrefix),
+      );
+      const timedOut = now - opened >= DECK_LOOK_DEAL_FALLBACK_MS;
+      if ((allDealt && !landing) || timedOut) settled.push(look.id);
+    }
+    if (settled.length === 0) return;
+    // Mirroring the flight queue: the row turns face-up once it is all in.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSettledAt((current) => {
+      const next = new Map(current);
+      for (const id of settled) next.set(id, stamp);
+      return next;
+    });
+    setNow(stamp);
+  }, [
+    looks,
+    transitions,
+    dealtSeen,
+    openedAt,
+    settledAt,
+    mountedLookIds,
+    bottomPlayerIndex,
+    now,
+  ]);
 
   useLayoutEffect(() => {
     const newlyClosed = looks.filter(
@@ -216,9 +308,11 @@ export function useDeckLook(
     setRevealAt((current) => new Map([...current, ...next]));
   }, [eventLog, looks, bottomPlayerIndex, reducedMotion]);
 
-  const presentation = useMemo(() => {
-    if (reducedMotion || looks.length === 0) return EMPTY_PRESENTATION;
-    const views: DeckLookView[] = [];
+  const views = useMemo(() => {
+    if (reducedMotion || looks.length === 0) {
+      return { looks: EMPTY_LOOKS, deckOutCounts: EMPTY_COUNTS };
+    }
+    const result: DeckLookView[] = [];
     const deckOutCounts = new Map<string, number>();
     for (const look of looks) {
       const prefix = boardZonePrefix(look.playerIndex, bottomPlayerIndex);
@@ -239,34 +333,58 @@ export function useDeckLook(
       // A card whose move the update already carries has left the deck in
       // the board state (or its flight back is counted as an arrival).
       const leaving = new Set([...look.departures.values()].flat());
+      const atMount = mountedLookIds.has(look.id);
       // A look opened after mount waits for its deal flights. If a flight
       // never comes (dropped by the concurrency cap), the card shows anyway.
       const opened = openedAt.get(look.id) ?? now;
       const awaitsDeal =
-        !mountedLookIds.has(look.id) && now - opened < DECK_LOOK_DEAL_FALLBACK_MS;
-      const slots = look.cardIds.map((cardId, index) => {
+        !atMount && now - opened < DECK_LOOK_DEAL_FALLBACK_MS;
+      const settled = settledAt.get(look.id);
+      const slots = look.cardIds.map((cardId, index): DeckLookSlotView => {
         const zoneKey = lookSlotZoneKey(prefix, look, index);
         const arriving =
           transitions.some((t) => t.toZoneKey === zoneKey) ||
           (awaitsDeal && !dealtSeen.has(zoneKey));
         const startsAt = departAt.get(zoneKey);
-        const departed = startsAt !== undefined && now >= startsAt;
-        if (!departed && !leaving.has(index)) out += 1;
+        const flying = transitions.some((t) => t.fromZoneKey === zoneKey);
+        const gone =
+          departed.has(zoneKey) ||
+          (startsAt !== undefined &&
+            !flying &&
+            now >= startsAt + DEPARTURE_FALLBACK_MS);
+        // Out of the deck: resting in the fan or flying in, and not yet
+        // counted by the board state or a flight back. A card still waiting
+        // for its deal flight stays in the deck until the flight appears.
+        const waitingForDeal = awaitsDeal && !dealtSeen.has(zoneKey);
+        const stillAway = !leaving.has(index) || (look.returns.has(index) && !flying);
+        if (!gone && !waitingForDeal && stillAway) out += 1;
+        const faceUpAt = atMount
+          ? Number.NEGATIVE_INFINITY
+          : settled === undefined
+            ? Number.POSITIVE_INFINITY
+            : settled + index * DECK_LOOK_FACE_UP_STAGGER_MS;
+        const returning =
+          look.returns.has(index) &&
+          startsAt !== undefined &&
+          now >= startsAt - RETURN_FLIP_LEAD_MS;
+        const faceDown = look.faceDown || now < faceUpAt || returning;
         const reveal = [...look.reveals.values()].find((r) => r.slot === index);
         return {
           index,
           zoneKey,
           cardId,
-          hidden: arriving || departed,
+          hidden: arriving || gone,
+          collapsed: gone && look.picks.has(index),
+          faceDown,
           revealAt: revealAt.get(zoneKey),
           revealCardId: reveal?.cardId,
         };
       });
       const deckKey = `${prefix}-deck`;
       deckOutCounts.set(deckKey, (deckOutCounts.get(deckKey) ?? 0) + out);
-      views.push({ look, prefix, slots });
+      result.push({ look, prefix, slots });
     }
-    return { looks: views, deckOutCounts };
+    return { looks: result, deckOutCounts };
   }, [
     looks,
     transitions,
@@ -276,32 +394,41 @@ export function useDeckLook(
     revealAt,
     closedAt,
     departAt,
+    departed,
     mountedLookIds,
     openedAt,
     dealtSeen,
+    settledAt,
   ]);
 
-  // Wake for the next departure start or grace end that changes the view.
+  // Wake for the next moment that changes the view: a card turning over, a
+  // departure's fallback, a deal's fallback or a grace end.
   useEffect(() => {
-    if (presentation.looks.length === 0) return;
+    if (views.looks.length === 0) return;
     const current = Date.now();
     let nextAt = Number.POSITIVE_INFINITY;
-    for (const view of presentation.looks) {
+    const consider = (at: number) => {
+      if (at > now) nextAt = Math.min(nextAt, at);
+    };
+    for (const view of views.looks) {
+      const settled = settledAt.get(view.look.id);
       for (const slot of view.slots) {
         const startsAt = departAt.get(slot.zoneKey);
-        if (startsAt !== undefined && startsAt > now) {
-          nextAt = Math.min(nextAt, startsAt);
+        if (startsAt !== undefined) {
+          consider(startsAt - RETURN_FLIP_LEAD_MS);
+          consider(startsAt + DEPARTURE_FALLBACK_MS);
+        }
+        if (settled !== undefined) {
+          consider(settled + slot.index * DECK_LOOK_FACE_UP_STAGGER_MS);
         }
       }
       const opened = openedAt.get(view.look.id);
       if (opened !== undefined && !mountedLookIds.has(view.look.id)) {
-        const dealEnd = opened + DECK_LOOK_DEAL_FALLBACK_MS;
-        if (dealEnd > now) nextAt = Math.min(nextAt, dealEnd);
+        consider(opened + DECK_LOOK_DEAL_FALLBACK_MS);
       }
       const closedSince = closedAt.get(view.look.id);
       if (closedSince !== undefined && Number.isFinite(closedSince)) {
-        const graceEnd = closedSince + DECK_LOOK_CLOSE_GRACE_MS;
-        if (graceEnd > now) nextAt = Math.min(nextAt, graceEnd);
+        consider(closedSince + DECK_LOOK_CLOSE_GRACE_MS);
       }
     }
     if (!Number.isFinite(nextAt)) return;
@@ -310,7 +437,10 @@ export function useDeckLook(
       Math.max(0, nextAt - current) + 1,
     );
     return () => clearTimeout(timer);
-  }, [presentation, closedAt, departAt, now, openedAt, mountedLookIds]);
+  }, [views, closedAt, departAt, now, openedAt, mountedLookIds, settledAt]);
 
-  return presentation;
+  return useMemo(
+    () => ({ ...views, markDeparted }),
+    [views, markDeparted],
+  );
 }

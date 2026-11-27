@@ -37,6 +37,21 @@ export interface DeckLook {
   departures: ReadonlyMap<number, readonly number[]>;
   /** A pick revealed to both players, keyed by the reveal event's timestamp. */
   reveals: ReadonlyMap<number, { slot: number; cardId: string }>;
+  /** Slots that leave as a pick (to hand or field). The rest of the fan
+   *  closes up behind them. */
+  picks: ReadonlySet<number>;
+  /** Slots placed back in the deck. */
+  returns: ReadonlySet<number>;
+}
+
+/** How long the fan takes to close up behind a pick, in ms. It finishes
+ *  well inside the pick's beat, before the rest move. */
+export const LOOK_REFLOW_MS = 320;
+/** Rest cards going back to the deck wait this long after their event's
+ *  beat: the looking player's face-up cards first turn face-down where
+ *  they lie (one shared flip). */
+export function lookReturnLeadMs(faceDown: boolean, flipMs: number): number {
+  return faceDown ? 0 : flipMs + 40;
 }
 
 /** Zone-registry key of one card in a look's fan. */
@@ -120,6 +135,8 @@ function buildLook(
   const revealed: Array<{ slot: number; cardId: string }> = [];
   const departures = new Map<number, number[]>();
   const reveals = new Map<number, { slot: number; cardId: string }>();
+  const picks = new Set<number>();
+  const returns = new Set<number>();
 
   const freeList = () => [...free].sort((a, b) => a - b);
   // Where the viewer cannot tell which card it was, the middle card goes.
@@ -168,6 +185,7 @@ function buildLook(
         ...freeList().filter((slot) => reserved.has(slot)),
       ];
       const slots = order.slice(0, Math.max(0, event.payload.count)).map(take);
+      for (const slot of slots) returns.add(slot);
       if (slots.length > 0) departures.set(event.timestamp, slots);
       continue;
     }
@@ -193,6 +211,7 @@ function buildLook(
         middleFree();
     }
     if (slot === undefined) continue;
+    if (!isRestTrash) picks.add(slot);
     departures.set(event.timestamp, [take(slot)]);
   }
 
@@ -205,6 +224,8 @@ function buildLook(
     closed: index < events.length - 1,
     departures,
     reveals,
+    picks,
+    returns,
   };
 }
 

@@ -51,6 +51,9 @@ interface CardAnimationLayerProps {
    *  portal), so board-card sizes are scaled to match the cards they leave
    *  and land on. Defaults to 1. */
   boardScale?: number;
+  /** A card leaves a look fan slot (OPT-1056). Keep it stable: the layer
+   *  is memoized. */
+  onLookDeparture?: (zoneKey: string) => void;
 }
 
 interface GhostBox {
@@ -84,6 +87,7 @@ function TravelGhost({
   boardScale,
   profile,
   content,
+  fromRotate = 0,
 }: {
   transition: CardTransition;
   from: GhostBox;
@@ -98,6 +102,8 @@ function TravelGhost({
   profile?: { durationMs: number; arcMaxPx: number };
   /** Replaces the travelling card (a DON!! token). */
   content?: React.ReactNode;
+  /** The card's tilt where it starts, in degrees (a look fan card). */
+  fromRotate?: number;
 }) {
   const plan = planFlight(transition);
   const endRotate = transition.playedRested ? 90 : 0;
@@ -105,7 +111,7 @@ function TravelGhost({
   const y = useMotionValue(from.y);
   const width = useMotionValue(from.w);
   const height = useMotionValue(from.h);
-  const rotate = useMotionValue(0);
+  const rotate = useMotionValue(fromRotate);
   const scale = useMotionValue(1);
   // A card leaving the look fan stays invisible until its own start, while
   // its fan slot still shows it (OPT-1056).
@@ -134,7 +140,7 @@ function TravelGhost({
         p,
         from,
         target,
-        { from: 0, to: endRotate },
+        { from: fromRotate, to: endRotate },
         false,
         geometry
       );
@@ -235,15 +241,7 @@ function TravelGhost({
   );
 }
 
-function FlyingCard({
-  transition,
-  cardDb,
-  onComplete,
-  sleeveUrl,
-  donArtUrl,
-  reducedMotion,
-  boardScale,
-}: {
+interface FlyingCardProps {
   transition: CardTransition;
   cardDb: CardDb;
   onComplete: () => void;
@@ -251,7 +249,59 @@ function FlyingCard({
   donArtUrl?: string | null;
   reducedMotion: boolean;
   boardScale: number;
-}) {
+  /** A card leaves a look fan slot (OPT-1056): the slot hides it. */
+  onLookDeparture?: (zoneKey: string) => void;
+}
+
+/**
+ * A card leaving a look fan (OPT-1056) mounts only when its own start
+ * comes: the fan may close up or turn its cards over before then, so the
+ * flight measures its slot (and takes over from it) at that moment.
+ */
+function FlyingCard(props: FlyingCardProps) {
+  const { transition } = props;
+  const delay = transition.delay ?? 0;
+  const deferred =
+    isLookSlotZoneKey(transition.fromZoneKey) &&
+    !!transition.hiddenUntilDelay &&
+    delay > 0;
+  const [started, setStarted] = React.useState(!deferred);
+  React.useEffect(() => {
+    if (started) return;
+    const wait = transition.startedAt + delay * 1000 - Date.now();
+    const timer = setTimeout(() => setStarted(true), Math.max(0, wait));
+    return () => clearTimeout(timer);
+  }, [started, transition.startedAt, delay]);
+  const live = React.useMemo(
+    () =>
+      deferred
+        ? { ...transition, delay: 0, hiddenUntilDelay: false }
+        : transition,
+    [deferred, transition],
+  );
+  if (!started) return null;
+  return <FlyingCardNow {...props} transition={live} />;
+}
+
+/** The tilt a look fan slot shows its card at, read from the slot. */
+function lookSlotRotate(zoneKey: string): number {
+  if (typeof document === "undefined") return 0;
+  const slot = document.querySelector(
+    `[data-look-slot="${CSS.escape(zoneKey)}"]`,
+  );
+  return Number(slot?.getAttribute("data-look-rotate") ?? 0) || 0;
+}
+
+function FlyingCardNow({
+  transition,
+  cardDb,
+  onComplete,
+  sleeveUrl,
+  donArtUrl,
+  reducedMotion,
+  boardScale,
+  onLookDeparture,
+}: FlyingCardProps) {
   const zonePos = useZonePosition();
   const isTransform = transition.kind === "transform";
   const isDonAttach = transition.kind === "don-attach";
@@ -261,6 +311,13 @@ function FlyingCard({
   // out of them take the slot's own footprint.
   const isFromLook = isLookSlotZoneKey(transition.fromZoneKey);
   const isLookBound = isLookSlotZoneKey(transition.toZoneKey);
+  const [fromRotate] = React.useState(() =>
+    isFromLook ? lookSlotRotate(transition.fromZoneKey) : 0,
+  );
+  // The flight takes over from the fan slot in the same frame it appears.
+  React.useLayoutEffect(() => {
+    if (isFromLook) onLookDeparture?.(transition.fromZoneKey);
+  }, [isFromLook, onLookDeparture, transition.fromZoneKey]);
   // A hand card's own slot is registered by `HandLayer`; a card that just
   // left the hand keeps its last measured slot. Prefer it over the hand
   // container so the card departs from (and lands in) its real place.
@@ -382,6 +439,7 @@ function FlyingCard({
         sleeveUrl={sleeveUrl}
         onComplete={onComplete}
         boardScale={boardScale}
+        fromRotate={fromRotate}
       />
     );
   }
@@ -472,6 +530,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   sleeveUrls,
   donArtUrls,
   boardScale = 1,
+  onLookDeparture,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
   const readyTransitions = transitions.filter(
@@ -501,6 +560,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             donArtUrl={donArtUrls?.[t.playerIndex] ?? null}
             reducedMotion={reducedMotion ?? false}
             boardScale={boardScale}
+            onLookDeparture={onLookDeparture}
           />
         ))}
       </AnimatePresence>

@@ -712,6 +712,7 @@ function BoardLayoutInner({
       sleeveUrls={sleeveUrls}
       donArtUrls={donArtUrls}
       boardScale={boardScale}
+      onLookDeparture={deckLook.markDeparted}
     />
 
     </DndContext>

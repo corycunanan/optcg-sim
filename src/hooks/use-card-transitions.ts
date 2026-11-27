@@ -12,6 +12,7 @@ import {
 } from "@/lib/game/spotlight";
 import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
 import {
+  FLIP_SECONDS,
   assignPileFlips,
   zoneFaceDown,
   type FlightFlip,
@@ -19,6 +20,7 @@ import {
 import { cardStagger } from "@/lib/motion";
 import {
   EMPTY_DECK_LOOK_INDEX,
+  lookReturnLeadMs,
   lookSlotZoneKey,
   type DeckLookIndex,
 } from "@/lib/game/deck-look";
@@ -251,8 +253,10 @@ function deckLookTransitions(
       playerIndex: event.playerIndex,
       startedAt,
       delay: (index * cardStagger.pileMs) / 1000,
+      // Every card lands face-down; the looking player's row turns face-up
+      // once it is all in place (`useDeckLook`).
       sourceFaceDown: true,
-      destinationFaceDown: look.faceDown,
+      destinationFaceDown: true,
     }));
   }
 
@@ -261,6 +265,8 @@ function deckLookTransitions(
   const { look, slots } = source;
 
   if (event.type === "CARDS_PLACED_IN_DECK") {
+    // The fan closes up behind the pick and turns face-down first.
+    const leadMs = lookReturnLeadMs(look.faceDown, FLIP_SECONDS * 1000);
     return slots.map((slot, index) => ({
       id: nextId(),
       cardId: look.cardIds[slot] ?? null,
@@ -269,8 +275,8 @@ function deckLookTransitions(
       toZoneKey: deckKey,
       playerIndex: event.playerIndex,
       startedAt,
-      delay: (index * cardStagger.pileMs) / 1000,
-      sourceFaceDown: look.faceDown,
+      delay: (leadMs + index * cardStagger.pileMs) / 1000,
+      sourceFaceDown: true,
       destinationFaceDown: true,
       hiddenUntilDelay: true,
     }));
