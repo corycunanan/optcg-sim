@@ -1,58 +1,82 @@
 name: Deploy Cloudflare Workers
 
+# Production deploys wait for a green CI run on main (OPT-1062). A push whose
+# CI fails ships neither worker nor the effect-schema sync. Only a run for a
+# green main push carries its CI commit in the run name;
+# worker-deploy-changes.sh reads the newest successful one back as the base of
+# the next diff, so a failed deploy's changes ship with the next green run.
+# Keep this condition in step with the `changes` job's `if`.
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && 'Sync effect schemas (manual)'
+    || (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository)
+      && format('Deploy workers for {0}', github.event.workflow_run.head_sha)
+    || format('Skip workers deploy (CI {0}, {1})', github.event.workflow_run.conclusion, github.event.workflow_run.event) }}
+
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - "workers/game/**"
-      - "workers/images/**"
-      - "src/lib/deck-builder/validation.ts"
-      - "pipeline/sync-effect-schemas.ts"
-      - ".github/workflows/deploy-workers.yml"
-  # Manual runs execute only the schema sync (deploys stay path-gated).
+  # Manual runs execute only the schema sync (deploys stay CI-gated).
   # Useful to verify the sync end-to-end or re-sync after a DB import.
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
-  group: deploy-workers-${{ github.ref }}
+  group: deploy-workers-main
   cancel-in-progress: false
 
 jobs:
   changes:
+    # Only a successful CI run for a push to this repository's main branch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     outputs:
-      game: ${{ steps.filter.outputs.game }}
-      images: ${{ steps.filter.outputs.images }}
-      schemas: ${{ steps.filter.outputs.schemas }}
+      game: ${{ steps.filter.outputs.game || 'false' }}
+      images: ${{ steps.filter.outputs.images || 'false' }}
+      schemas: ${{ steps.filter.outputs.schemas || 'false' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          # Explicit base keeps push behavior unchanged and lets the filter
-          # resolve on workflow_dispatch (empty diff → all outputs false).
-          base: main
-          filters: |
-            game:
-              - 'workers/game/**'
-            images:
-              - 'workers/images/**'
-            schemas:
-              - 'workers/game/src/engine/schemas/**'
-              - 'workers/game/src/engine/schema-registry.ts'
-              - 'src/lib/deck-builder/validation.ts'
-              - 'pipeline/sync-effect-schemas.ts'
+          # workflow_run checks out the default branch tip by default, which
+          # may be newer than the commit CI tested. Pin the tested commit.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - name: Decide what to deploy
+        id: filter
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          CI_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          DEPLOY_WORKFLOW: deploy-workers.yml
+        run: bash .github/scripts/worker-deploy-changes.sh
 
   deploy-game:
     needs: [changes, sync-effect-schemas]
     if: >-
       always() &&
-      github.event_name == 'push' &&
+      github.event_name == 'workflow_run' &&
       needs.changes.outputs.game == 'true' &&
       (needs.changes.outputs.schemas != 'true' || needs.sync-effect-schemas.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -75,8 +99,9 @@ jobs:
   sync-effect-schemas:
     needs: changes
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.schemas == 'true'
+      needs.changes.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.schemas == 'true')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -88,6 +113,8 @@ jobs:
             url-secret: DATABASE_URL_PROD
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -108,10 +135,12 @@ jobs:
 
   deploy-images:
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.images == 'true'
+    if: github.event_name == 'workflow_run' && needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10
