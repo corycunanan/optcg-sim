@@ -18,6 +18,10 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
+import {
+  lobbyNeedsRepair,
+  repairStrandedLobby,
+} from "@/lib/lobbies/repair-stranded";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { revokeSpectatorSocketsForLobby } from "@/lib/realtime/revoke-spectators";
 import {
@@ -51,7 +55,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  const state = await buildLobbyRoomState(id, authResult.userId);
+  let state = await buildLobbyRoomState(id, authResult.userId);
+  // A seated player must never be left in a room with nothing to press.
+  if (state && lobbyNeedsRepair(state) && (await repairStrandedLobby(id))) {
+    state = await buildLobbyRoomState(id, authResult.userId);
+  }
   if (!state) {
     return apiError("Lobby not found", 404);
   }

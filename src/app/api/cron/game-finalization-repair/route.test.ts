@@ -6,6 +6,8 @@ const finalizeGameResultMock = vi.fn();
 const notifyRestoredLobbyMock = vi.fn();
 const notifyGameMock = vi.fn();
 const gameWorkerFetchMock = vi.fn();
+const lobbyFindManyMock = vi.fn();
+const repairStrandedLobbyMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -13,7 +15,13 @@ vi.mock("@/lib/db", () => ({
     gameSession: {
       findMany: (...args: unknown[]) => gameSessionFindManyMock(...args),
     },
+    lobby: {
+      findMany: (...args: unknown[]) => lobbyFindManyMock(...args),
+    },
   },
+}));
+vi.mock("@/lib/lobbies/repair-stranded", () => ({
+  repairStrandedLobby: (...args: unknown[]) => repairStrandedLobbyMock(...args),
 }));
 vi.mock("@/lib/game/finalize", () => ({
   finalizeGameResult: (...args: unknown[]) => finalizeGameResultMock(...args),
@@ -51,6 +59,10 @@ beforeEach(() => {
   notifyGameMock.mockReset();
   gameWorkerFetchMock.mockReset();
   gameSessionFindManyMock.mockResolvedValue([]);
+  lobbyFindManyMock.mockReset();
+  repairStrandedLobbyMock.mockReset();
+  lobbyFindManyMock.mockResolvedValue([]);
+  repairStrandedLobbyMock.mockResolvedValue(true);
   finalizeGameResultMock.mockResolvedValue({
     finalized: true,
     alreadyFinal: false,
@@ -130,6 +142,7 @@ describe("GET /api/cron/game-finalization-repair", () => {
       alreadyFinal: 0,
       skippedLive: 0,
       skippedUnreachable: 0,
+      restoredLobbies: 0,
       errors: 0,
       durationMs: 0,
     });
@@ -157,6 +170,7 @@ describe("GET /api/cron/game-finalization-repair", () => {
       finalized: 0,
       skippedLive: 1,
       skippedUnreachable: 0,
+      restoredLobbies: 0,
       errors: 0,
     });
     expect(finalizeGameResultMock).not.toHaveBeenCalled();
@@ -209,6 +223,7 @@ describe("GET /api/cron/game-finalization-repair", () => {
       finalized: 0,
       skippedLive: 0,
       skippedUnreachable: 1,
+      restoredLobbies: 0,
       errors: 0,
     });
     expect(finalizeGameResultMock).not.toHaveBeenCalled();
@@ -261,6 +276,7 @@ describe("GET /api/cron/game-finalization-repair", () => {
       alreadyFinal: 1,
       skippedLive: 0,
       skippedUnreachable: 0,
+      restoredLobbies: 0,
       errors: 0,
     });
     expect(notifyGameMock).not.toHaveBeenCalled();
@@ -294,6 +310,7 @@ describe("GET /api/cron/game-finalization-repair", () => {
       alreadyFinal: 0,
       skippedLive: 0,
       skippedUnreachable: 0,
+      restoredLobbies: 0,
       errors: 1,
     });
     expect(finalizeGameResultMock).toHaveBeenCalledTimes(2);
@@ -321,10 +338,40 @@ describe("GET /api/cron/game-finalization-repair", () => {
       alreadyFinal: 0,
       skippedLive: 0,
       skippedUnreachable: 0,
+      restoredLobbies: 0,
       errors: 1,
       durationMs: 0,
     });
     expect(JSON.stringify(body)).not.toContain("database unavailable");
     errorSpy.mockRestore();
+  });
+
+  it("restores stranded rooms no stale game can reach", async () => {
+    lobbyFindManyMock.mockResolvedValueOnce([{ id: "lobby-a" }, { id: "lobby-b" }]);
+    repairStrandedLobbyMock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const response = await GET(buildRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.restoredLobbies).toBe(1);
+    expect(lobbyFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            {
+              status: "IN_GAME",
+              gameSessions: { none: { status: "IN_PROGRESS" } },
+            },
+            { status: "WAITING", mode: "PVP", guest: { isNot: null } },
+          ],
+        },
+      })
+    );
+    expect(repairStrandedLobbyMock.mock.calls).toEqual([["lobby-a"], ["lobby-b"]]);
+    infoSpy.mockRestore();
   });
 });

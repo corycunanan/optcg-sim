@@ -84,10 +84,11 @@ describe("finalizeGameResult", () => {
         reasonCode: "LIFE_LOSS",
       }),
     });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1", status: "IN_GAME" },
+      where: { id: "lobby-1", status: "IN_GAME", guest: { isNot: null } },
       data: {
-        status: "WAITING",
+        status: "READY",
         hostReady: false,
         revision: { increment: 1 },
       },
@@ -118,7 +119,9 @@ describe("finalizeGameResult", () => {
   });
 
   it("keeps a host-only lobby waiting when no guest seat remains", async () => {
-    lobbyGuestUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    lobbyUpdateManyMock
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
 
     await expect(
       finalizeGameResult({
@@ -133,11 +136,19 @@ describe("finalizeGameResult", () => {
       restoredLobbyId: "lobby-1",
     });
 
-    expect(lobbyGuestUpdateManyMock).toHaveBeenCalledOnce();
+    expect(lobbyUpdateManyMock).toHaveBeenLastCalledWith({
+      where: { id: "lobby-1", status: "IN_GAME" },
+      data: {
+        status: "WAITING",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
+    });
+    expect(lobbyGuestUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("does not reopen a lobby already closed by leave or disband rules", async () => {
-    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    lobbyUpdateManyMock.mockResolvedValue({ count: 0 });
 
     await expect(
       finalizeGameResult({

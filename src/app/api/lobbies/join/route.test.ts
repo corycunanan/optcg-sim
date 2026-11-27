@@ -358,7 +358,7 @@ describe("POST /api/lobbies/join", () => {
     expect(lobbyUpdateManyMock).toHaveBeenNthCalledWith(1, {
       where: {
         id: "old-lobby",
-        status: "READY",
+        status: { in: ["WAITING", "READY"] },
         mode: "PVP",
         guest: { is: { userId: "joiner" } },
       },

@@ -433,10 +433,12 @@ async function joinLobby({
           if (removed.count !== 1) throw new CurrentLobbyChangedError();
           await releaseActiveLobby(tx, userId, currentLobby.id);
         } else {
+          // WAITING with a seated guest is a legacy post-game shape; the
+          // guest must still be able to switch parties out of it.
           const released = await tx.lobby.updateMany({
             where: {
               id: currentLobby.id,
-              status: "READY",
+              status: { in: ["WAITING", "READY"] },
               mode: "PVP",
               guest: { is: { userId } },
             },
