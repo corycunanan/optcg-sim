@@ -14,6 +14,7 @@ import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import {
+  FLIP_SECONDS,
   flightDurationMs,
   flightPose,
   onNextFrame,
@@ -120,6 +121,9 @@ function TravelGhost({
       ? (transition.delay ?? 0)
       : 0;
 
+  // A revealed pick turns face-down once it lands in the hand (OPT-1056);
+  // the flight ends after that flip.
+  const [landed, setLanded] = React.useState(false);
   const resolveTargetRef = React.useRef(resolveTarget);
   const onCompleteRef = React.useRef(onComplete);
   React.useEffect(() => {
@@ -155,6 +159,7 @@ function TravelGhost({
     // for the flip), so a long commit cannot swallow the start of the move.
     let controls: { stop: () => void } | null = null;
     let cancelFollow = () => {};
+    let landTimer: ReturnType<typeof setTimeout> | undefined;
     // After landing the ghost fades out over the card; it keeps following
     // the live slot so a hand still settling from its re-fan stays flush.
     const follow = () => {
@@ -169,7 +174,15 @@ function TravelGhost({
         onUpdate: apply,
         onComplete: () => {
           apply(1);
-          onCompleteRef.current();
+          if (transition.landFaceDown) {
+            setLanded(true);
+            landTimer = setTimeout(
+              () => onCompleteRef.current(),
+              FLIP_SECONDS * 1000,
+            );
+          } else {
+            onCompleteRef.current();
+          }
           // Without a frame clock (tests) there is nothing to follow.
           if (typeof requestAnimationFrame === "function") {
             cancelFollow = onNextFrame(follow);
@@ -181,6 +194,7 @@ function TravelGhost({
       cancelStart();
       controls?.stop();
       cancelFollow();
+      clearTimeout(landTimer);
     };
     // The flight is planned once, at mount; later renders only refresh the
     // target resolver through the ref.
@@ -222,7 +236,7 @@ function TravelGhost({
               ? { cardId: transition.cardId, cardDb }
               : undefined
           }
-          faceDown={plan.faceDown}
+          faceDown={plan.faceDown || landed}
           flipFrom={
             plan.flipAt === null
               ? undefined

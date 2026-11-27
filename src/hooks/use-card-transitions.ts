@@ -80,6 +80,9 @@ export interface CardTransition {
   /** Stay invisible until `delay` (OPT-1056). A card leaving the look fan
    *  shows its fan slot until then, and may not have arrived there yet. */
   hiddenUntilDelay?: boolean;
+  /** The card travels face-up and turns face-down where it lands (a
+   *  revealed pick joining the opponent's hand, OPT-1056). */
+  landFaceDown?: boolean;
 }
 
 export type ReceivedHands = readonly [
@@ -291,6 +294,23 @@ function deckLookTransitions(
   );
   const slot = slots[0];
   if (!single || slot === undefined) return null;
+  // A pick revealed to both players leaves the fan face-up, travels
+  // face-up and turns face-down only once it is in its owner's hand.
+  const reveal = [...look.reveals.values()].find((r) => r.slot === slot);
+  if (reveal && look.faceDown) {
+    return [
+      {
+        ...single,
+        kind: undefined,
+        cardId: reveal.cardId,
+        fromZoneKey: lookSlotZoneKey(prefix, look, slot),
+        sourceFaceDown: false,
+        destinationFaceDown: false,
+        landFaceDown: true,
+        hiddenUntilDelay: true,
+      },
+    ];
+  }
   return [
     {
       ...single,

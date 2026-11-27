@@ -160,6 +160,33 @@ describe("look fan flights (OPT-1056)", () => {
     expect(flights[1].delay).toBeGreaterThan(leadSeconds);
   });
 
+  it("flies an opponent's revealed pick face-up and turns it over in the hand", () => {
+    const events: GameEvent[] = [
+      look(1, ["hidden", "hidden", "hidden"]),
+      {
+        type: "CARDS_REVEALED",
+        playerIndex: 1,
+        timestamp: 2,
+        payload: { cards: [{ instanceId: "x", cardId: "Z" }], source: "search", visibility: "BOTH" },
+      },
+      {
+        type: "CARD_DRAWN",
+        playerIndex: 1,
+        timestamp: 3,
+        payload: { cardId: "hidden", cardInstanceId: "hidden", source: "search" },
+      },
+    ];
+    const index = indexDeckLooks(collectDeckLooks(events));
+    const [flight] = eventToTransitions(events[2], 0, null, null, undefined, index);
+    expect(flight).toMatchObject({
+      cardId: "Z",
+      toZoneKey: "o-hand",
+      sourceFaceDown: false,
+      destinationFaceDown: false,
+      landFaceDown: true,
+    });
+  });
+
   it("travels a trashed fan card instead of dissolving it", () => {
     const events: GameEvent[] = [
       look(1, ["hidden"]),

@@ -26,24 +26,17 @@ const FAN_REFLOW = {
 };
 /** How far a revealed pick rises out of the fan, in design px. */
 const REVEAL_LIFT_PX = 16;
-/** When a revealed pick turns back over, after it starts rising. The flip
- *  up and back each take the shared 300ms flip, inside one spotlight dwell. */
-const REVEAL_FACE_MS = 650;
-
-/** Steps of a revealed pick: rising (and showing its face), then back down. */
+/** Steps of a revealed pick: at rest, then risen and face-up. It stays
+ *  face-up until it leaves for the hand, where it turns face-down. */
 function useRevealPhase(revealAt: number | undefined) {
-  const [phase, setPhase] = React.useState<"rest" | "face" | "back">("rest");
+  const [phase, setPhase] = React.useState<"rest" | "face">("rest");
   React.useEffect(() => {
     if (revealAt === undefined) return;
-    const now = Date.now();
-    const timers = [
-      setTimeout(() => setPhase("face"), Math.max(0, revealAt - now)),
-      setTimeout(
-        () => setPhase("back"),
-        Math.max(0, revealAt + REVEAL_FACE_MS - now),
-      ),
-    ];
-    return () => timers.forEach(clearTimeout);
+    const timer = setTimeout(
+      () => setPhase("face"),
+      Math.max(0, revealAt - Date.now()),
+    );
+    return () => clearTimeout(timer);
   }, [revealAt]);
   return phase;
 }
@@ -92,13 +85,14 @@ function FanSlot({
         top: -FAN_CARD.height / 2,
       }}
       initial={false}
-      animate={{ x: pose.x, y: pose.y }}
-      transition={FAN_REFLOW}
+      // A revealed pick rises with its box, so its flight starts where it is.
+      animate={{ x: pose.x, y: pose.y - (revealing ? REVEAL_LIFT_PX : 0) }}
+      transition={revealing ? cardTransitions.handReflow : FAN_REFLOW}
     >
       <motion.div
         className="h-full w-full"
         initial={false}
-        animate={{ y: revealing ? -REVEAL_LIFT_PX : 0, rotate }}
+        animate={{ rotate }}
         transition={cardTransitions.handReflow}
       >
         <Card
