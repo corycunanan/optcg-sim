@@ -84,9 +84,22 @@ The pooled `DATABASE_URL` needs different `connection_limit` query params depend
 |--------|---------|---------|
 | Local, authoring a migration | `pnpm db:migrate` (= `prisma migrate dev`) | Dev Neon branch |
 | Local, applying committed migrations (CI-style) | `pnpm db:migrate:deploy` (= `prisma migrate deploy`) | Dev Neon branch |
-| Production | `prisma migrate deploy` runs automatically on every Vercel build (see `vercel.json`) | Prod Neon branch |
+| Production | `prisma migrate deploy` runs on every production Vercel build (see `vercel.json`), which starts only after CI passes | Prod Neon branch |
 
 The Vercel build command is `prisma migrate deploy && next build`. This closes the gap that let migration `20260419120000_add_user_is_admin` sit unapplied for 3 days — every production deploy now applies all pending migrations before the app is built.
+
+### Production deploys wait for green CI (OPT-1062)
+
+`vercel.json` sets `git.deploymentEnabled.main: false`, so Vercel's Git integration no longer builds `main`. Preview deploys for other branches are unchanged. Production goes through `.github/workflows/deploy-app.yml`:
+
+1. `CI` runs `pnpm verify` on the pushed commit.
+2. When CI succeeds for a push to `main`, `deploy-app.yml` checks out the tested commit and runs `vercel deploy --prod`. Vercel builds it remotely with the build command above, so migrations apply exactly as before, only after CI.
+3. A red CI run deploys nothing and applies no migration.
+4. If a newer CI run on `main` has already succeeded, the older run skips, so production never rolls back to an older build after a newer migration.
+
+The workflow needs three repository secrets: `VERCEL_TOKEN` (a Vercel access token scoped to the team), plus `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (from `.vercel/project.json` after `vercel link`, or Project Settings → General). A missing secret fails the run instead of skipping it.
+
+Manual escape hatch: run `Deploy app to Vercel` from the Actions tab (`workflow_dispatch`). It deploys the tip of `main` without waiting for CI.
 
 ### Seeding the dev branch
 
