@@ -11,6 +11,7 @@
  * Best-effort — the worker fires this without retrying.
  */
 
+import { isAuthorizedBearer } from "@shared/bearer-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
@@ -29,7 +30,7 @@ export async function POST(
     );
   }
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${GAME_WORKER_SECRET}`) {
+  if (!isAuthorizedBearer(auth, GAME_WORKER_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

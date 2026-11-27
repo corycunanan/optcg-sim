@@ -124,6 +124,17 @@ describe("GET /game/:gameId/status", () => {
 
     const unauthorized = await worker.fetch(statusRequest("wrong"), env);
     expect(unauthorized.status).toBe(401);
+    // Near misses (prefix, extension, missing header) are rejected by the
+    // constant-time compare too (OPT-1066).
+    for (const secret of ["test-secre", "test-secret-extra", ""]) {
+      const nearMiss = await worker.fetch(statusRequest(secret), env);
+      expect(nearMiss.status).toBe(401);
+    }
+    const noHeader = await worker.fetch(
+      new Request("https://worker.example/game/game-1/status"),
+      env
+    );
+    expect(noHeader.status).toBe(401);
     expect(stubFetch).toHaveBeenCalledOnce();
   });
 });

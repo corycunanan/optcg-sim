@@ -3,6 +3,7 @@
  * Vercel invokes this route daily with CRON_SECRET in the Authorization header.
  */
 
+import { isAuthorizedBearer } from "@shared/bearer-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
@@ -27,7 +28,7 @@ type RetentionMetrics = {
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET ?? "";
   const authorization = request.headers.get("authorization");
-  if (!cronSecret || authorization !== `Bearer ${cronSecret}`) {
+  if (!isAuthorizedBearer(authorization, cronSecret)) {
     return apiError("Unauthorized", 401);
   }
 

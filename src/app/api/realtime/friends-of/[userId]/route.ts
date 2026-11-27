@@ -8,6 +8,7 @@
  * out to. The DO caches the response for 60s to bound friend-add/remove churn.
  */
 
+import { isAuthorizedBearer } from "@shared/bearer-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -21,7 +22,7 @@ export async function GET(
     return NextResponse.json({ error: "Realtime channel not configured" }, { status: 503 });
   }
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${GAME_WORKER_SECRET}`) {
+  if (!isAuthorizedBearer(auth, GAME_WORKER_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
