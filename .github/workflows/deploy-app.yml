@@ -1,0 +1,77 @@
+name: Deploy app to Vercel
+
+# The production app deploy (and the `prisma migrate deploy` in its Vercel
+# build command) waits for a green CI run on main (OPT-1062). vercel.json
+# turns off Vercel's own Git deploys for main, so this workflow is the only
+# automatic path to production. Keep the `deploy` job's `if` in step with
+# deploy-workers.yml.
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && 'Deploy app (manual, tip of main)'
+    || format('Deploy app for {0} (CI {1})', github.event.workflow_run.head_sha, github.event.workflow_run.conclusion) }}
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Manual escape hatch: deploys the tip of main without waiting for CI.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-app-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build the commit CI tested, not a newer tip of main.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Skip if a newer green CI run superseded this one
+        id: superseded
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CI_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          CI_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+        run: |
+          newer=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW_ID/runs?branch=main&event=push&status=success&per_page=100" \
+            --jq "[.workflow_runs[] | select(.run_number > $CI_RUN_NUMBER) | .head_sha] | first // empty")
+          if [ -n "$newer" ]; then
+            echo "A newer green CI run on main ($newer) supersedes this one; skipping so production never rolls back."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check Vercel secrets
+        if: steps.superseded.outputs.skip != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # Fail loudly: a silent skip would leave production behind main.
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Missing repository secret $name"; exit 1; fi
+          done
+      - name: Deploy to production
+        if: steps.superseded.outputs.skip != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        # Vercel builds remotely with vercel.json's buildCommand, so
+        # `prisma migrate deploy` runs exactly as before, only later.
+        run: npx --yes vercel@65.14.0 deploy --prod --yes --token "$VERCEL_TOKEN"
