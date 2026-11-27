@@ -45,10 +45,9 @@ export class ReportingGameSession extends GameSession {
   }
 
   private reportUnhandled(error: unknown, handler: Handler): void {
-    // The loaded game's id is private session state; read it without
-    // widening GameSession's surface. It is absent before load.
-    const gameId = (this as unknown as { gameState?: { id?: string } | null })
-      .gameState?.id;
-    reportError(error, { source: "worker.session", tags: { handler, gameId } });
+    reportError(error, {
+      source: "worker.session",
+      tags: { handler, gameId: this.loadedGameId },
+    });
   }
 }
