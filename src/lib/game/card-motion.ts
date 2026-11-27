@@ -94,12 +94,24 @@ export interface FlipCandidate {
   pileFlipAt?: number;
 }
 
+/** DON!! moving between the DON!! deck and the field (OPT-1057). DON!! have
+ *  no identity to hide, so they flip like public cards despite having no
+ *  cardId. */
+function isDonMove(candidate: Pick<FlipCandidate, "kind">): boolean {
+  return candidate.kind === "don-move";
+}
+
 /** True when the card is public to this viewer and its destination needs the
  *  other side. Hidden cards (no public cardId) never flip; they stay
  *  sleeved for the whole move. */
 export function needsFlip(candidate: FlipCandidate): boolean {
-  if (candidate.kind !== undefined) return false;
-  if (!candidate.cardId || candidate.cardId === "hidden") return false;
+  if (candidate.kind !== undefined && !isDonMove(candidate)) return false;
+  if (
+    !isDonMove(candidate) &&
+    (!candidate.cardId || candidate.cardId === "hidden")
+  ) {
+    return false;
+  }
   if (
     candidate.sourceFaceDown === undefined ||
     candidate.destinationFaceDown === undefined
@@ -171,7 +183,9 @@ export interface FlightPlan {
  *  flip, so it never changes side mid-air. */
 export function planFlight(transition: FlipCandidate): FlightPlan {
   const delay = transition.delay ?? 0;
-  const hidden = !transition.cardId || transition.cardId === "hidden";
+  const hidden =
+    !isDonMove(transition) &&
+    (!transition.cardId || transition.cardId === "hidden");
   const destinationFaceDown = hidden
     ? true
     : (transition.destinationFaceDown ?? false);
@@ -249,6 +263,9 @@ export interface FlightGeometry {
   scale?: number;
   /** Arc cap in design px. Defaults to `cardTravel.arcMaxPx`. */
   arcMaxPx?: number;
+  /** Lean toward the horizontal travel direction. Defaults to true. A
+   *  DON!! returning rested turns 90° instead (OPT-1058). */
+  lean?: boolean;
 }
 
 /**
@@ -281,7 +298,10 @@ export function flightPose(
   const normal = arcNormal(dx, dy);
   const scale = geometry.scale && geometry.scale > 0 ? geometry.scale : 1;
   const arc = arcHeight(distance / scale, geometry.arcMaxPx) * scale * bump;
-  const lean = Math.max(-1, Math.min(1, dx / distance)) * cardTravel.leanMaxDeg;
+  const lean =
+    geometry.lean === false
+      ? 0
+      : Math.max(-1, Math.min(1, dx / distance)) * cardTravel.leanMaxDeg;
   return {
     x: x + normal.x * arc,
     y: y + normal.y * arc,
@@ -316,10 +336,14 @@ interface ArrivalCandidate extends FlipCandidate {
   startedAt: number;
   /** Queued behind a spotlight: it has not been scheduled to depart yet. */
   waitForSpotlightId?: string;
+  /** For `don-move`, the DON!! that travels. */
+  donInstanceId?: string;
 }
 
 /** Field zones a travelling card can land in. */
 const FIELD_ZONE = /^[po]-(char-\d+|leader|stage)$/;
+/** A player's DON!! cost area. */
+const COST_AREA_ZONE = /^[po]-don$/;
 
 /**
  * Instance ids whose flight to a field slot has not landed yet (OPT-1054).
@@ -331,6 +355,16 @@ export function fieldArrivingInstanceIds(
 ): Set<string> {
   const ids = new Set<string>();
   for (const transition of transitions) {
+    // A DON!! flying into the cost area stays hidden in its slot too
+    // (OPT-1057).
+    if (
+      isDonMove(transition) &&
+      transition.donInstanceId &&
+      COST_AREA_ZONE.test(transition.toZoneKey)
+    ) {
+      ids.add(transition.donInstanceId);
+      continue;
+    }
     if (transition.kind !== undefined || !transition.instanceId) continue;
     if (FIELD_ZONE.test(transition.toZoneKey)) ids.add(transition.instanceId);
   }

@@ -25,6 +25,14 @@ export const BOARD_CARD_W = 80;
 export const BOARD_CARD_H = SQUARE;
 export const CARD_OFFSET_X = (SQUARE - BOARD_CARD_W) / 2;
 
+/** How far Life cards may peek out under the top Life card (OPT-1057): the
+ *  DON!! deck sits one row gap below Life, so the stack stays a few px clear
+ *  of it. */
+export const DON_DECK_CLEARANCE = ROW_GAP - 4;
+
+/** DON!! art used when a player has no DON!! art selected. */
+export const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
+
 /* ─── Viewport measurement ────────────────────────────────────────── */
 
 export function getViewportSize() {

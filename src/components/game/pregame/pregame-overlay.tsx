@@ -22,32 +22,44 @@
  */
 
 import type { CardDb, GameAction, GameState, PromptOptions } from "@shared/game-types";
+import type { MulliganRedrawPlayback } from "@/hooks/use-mulligan-redraw";
 import { PriorityRollDisplay } from "./priority-roll-display";
 import { FirstOrSecondChoice } from "./first-or-second-modal";
 import { MulliganModal } from "./mulligan-modal";
 
 interface PregameOverlayProps {
-  pregame: NonNullable<GameState["pregame"]>;
+  /** Null only while a redraw animation outlives the pregame (the viewer
+   *  was the last to decide and the game has started). */
+  pregame: GameState["pregame"];
   myIndex: 0 | 1 | null;
   myHand: GameState["players"][0]["hand"];
+  mySleeveUrl?: string | null;
   cardDb: CardDb;
   activePrompt: PromptOptions | null;
   promptRespondingPlayer: 0 | 1 | null;
   onAction: (action: GameAction) => void;
+  /** OPT-1060 redraw animation; see `useMulliganRedraw`. */
+  mulliganPlayback?: MulliganRedrawPlayback | null;
+  onMulliganRedraw?: () => void;
+  onMulliganPlaybackDone?: () => void;
 }
 
 export function PregameOverlay({
   pregame,
   myIndex,
   myHand,
+  mySleeveUrl,
   cardDb,
   activePrompt,
   promptRespondingPlayer,
   onAction,
+  mulliganPlayback = null,
+  onMulliganRedraw,
+  onMulliganPlaybackDone,
 }: PregameOverlayProps) {
-  const phase = pregame.phase;
+  const phase = pregame?.phase ?? null;
 
-  if (phase === "PRIORITY_ROLLING" || phase === "PRIORITY_CHOICE") {
+  if (pregame && (phase === "PRIORITY_ROLLING" || phase === "PRIORITY_CHOICE")) {
     return (
       <PriorityRollDisplay
         rolls={pregame.priorityRolls}
@@ -65,7 +77,9 @@ export function PregameOverlay({
     );
   }
 
-  if (phase === "MULLIGAN_DECISIONS") {
+  // A redraw animation keeps the Mulligan modal up (same element, so its
+  // stage keeps running) until the new hand has been dealt (OPT-1060).
+  if (phase === "MULLIGAN_DECISIONS" || mulliganPlayback) {
     const isMyTurn =
       activePrompt?.promptType === "PLAYER_CHOICE"
       && activePrompt.effectDescription === "PREGAME_MULLIGAN"
@@ -76,7 +90,11 @@ export function PregameOverlay({
         isResponder={isMyTurn}
         myHand={myHand}
         cardDb={cardDb}
+        sleeveUrl={mySleeveUrl}
         onAction={onAction}
+        onRedraw={onMulliganRedraw}
+        playback={mulliganPlayback}
+        onPlaybackDone={onMulliganPlaybackDone}
       />
     );
   }

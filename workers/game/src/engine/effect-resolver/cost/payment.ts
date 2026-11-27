@@ -8,7 +8,7 @@ import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { CostPaymentResult } from "../types.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { detachDonToCostArea, koCharacter, setCardState, trashCharacter, trashStage } from "../card-mutations.js";
-import { applyFieldDonReturn } from "../actions/don.js";
+import { applyFieldDonReturn, donDeckReturnPayload } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
@@ -93,7 +93,7 @@ function payCostsUnreleased(
             donDeck: [...player.donDeck, ...toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }))],
           };
           nextState = { ...nextState, players: newPlayers };
-          events.push({ type: "DON_DETACHED", playerIndex: controller, payload: { count: amount } });
+          events.push({ type: "DON_DETACHED", playerIndex: controller, payload: donDeckReturnPayload(toReturn) });
           break;
         }
 
@@ -311,7 +311,19 @@ function payCostsUnreleased(
         nextState = moved.state;
         costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "mill", from: "DECK" } });
+        events.push({
+          type: "CARD_TRASHED",
+          playerIndex: controller,
+          payload: {
+            count: moved.transitions.length,
+            reason: "mill",
+            from: "DECK",
+            cards: moved.transitions.map(({ fact }) => ({
+              instanceId: fact.newInstanceId,
+              cardId: fact.cardId,
+            })),
+          },
+        });
         break;
       }
 

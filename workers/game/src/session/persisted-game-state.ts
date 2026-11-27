@@ -604,6 +604,7 @@ const EventPayloadSchemas = {
     count: FiniteNumber.optional(),
     reason: z.string(),
     from: z.string().optional(),
+    cards: z.array(CardRef).optional(),
   }),
   CARD_RETURNED_TO_HAND: z.strictObject({
     sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
@@ -629,6 +630,7 @@ const EventPayloadSchemas = {
     cardId: z.string().optional(),
     cardInstanceId: z.string().optional(),
     count: FiniteNumber.optional(),
+    sourceFace: z.enum(["UP", "DOWN"]).optional(),
   }),
   LIFE_CARD_FACE_CHANGED: z.strictObject({ face: z.enum(["UP", "DOWN"]) }),
   ATTACK_DECLARED: z.strictObject({
@@ -670,8 +672,20 @@ const EventPayloadSchemas = {
     targetInstanceId: z.string().optional(),
     count: FiniteNumber,
   }),
-  DON_DETACHED: z.strictObject({ count: FiniteNumber.optional() }),
-  DON_PLACED_ON_FIELD: z.strictObject({ count: FiniteNumber }),
+  DON_DETACHED: z.strictObject({
+    count: FiniteNumber.optional(),
+    to: z.enum(["DON_DECK", "COST_AREA"]).optional(),
+    fromCostArea: FiniteNumber.optional(),
+    sources: z.array(z.strictObject({
+      cardInstanceId: z.string(),
+      count: FiniteNumber,
+    })).optional(),
+    donInstanceIds: z.array(z.string()).optional(),
+  }),
+  DON_PLACED_ON_FIELD: z.strictObject({
+    count: FiniteNumber,
+    donInstanceIds: z.array(z.string()).optional(),
+  }),
   DON_STATE_CHANGED: EmptyPayload,
   CARD_STATE_CHANGED: z.strictObject({
     cardInstanceId: z.string().optional(),
@@ -775,6 +789,7 @@ const EventPayloadSchemas = {
     count: FiniteNumber,
     position: z.enum(["TOP", "BOTTOM"]),
   }),
+  DECK_SHUFFLED: EmptyPayload,
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {

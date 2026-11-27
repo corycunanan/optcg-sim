@@ -390,7 +390,7 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     expect(f.state.players[1].hand).toHaveLength(5);
   });
 
-  it("field to Life persists provenance while player and spectator events hide identities", () => {
+  it("field to Life persists provenance while player and spectator events hide the new Life id", () => {
     const f = fixture();
     const target = f.put("secret-victim", 1);
     f.play(f.put("OP03-123", 0, "HAND", { type: "Character", cost: 0 }));
@@ -416,10 +416,16 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     const spectator = visibleStateForSpectator(f.state, f.db).eventLog.find(
       (e) => e.type === "CARD_ADDED_TO_LIFE"
     );
+    // OPT-1059: the card was public on the field, so the other player and
+    // spectators see which card left (the board flips it on its way); only
+    // its new Life instance id stays private.
     for (const view of [projected, spectator]) {
       expect(view).toBeDefined();
-      expect(JSON.stringify(view)).not.toContain("secret-victim");
-      expect(view?.payload).toHaveProperty("newCardInstanceId", "hidden");
+      expect(view?.payload).toMatchObject({
+        cardId: "secret-victim",
+        cardInstanceId: target.instanceId,
+        newCardInstanceId: "hidden",
+      });
     }
   });
 

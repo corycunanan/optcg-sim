@@ -525,6 +525,7 @@ function GameSessionView({
         }}
         myIndex={game.myIndex}
         myHand={game.me?.hand ?? []}
+        mySleeveUrl={game.me?.sleeveUrl ?? null}
         cardDb={game.cardDb}
         activePrompt={activePrompt}
         onAction={dispatch.onAction}

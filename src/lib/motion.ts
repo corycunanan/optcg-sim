@@ -164,6 +164,16 @@ const board = {
     },
     /** Attached-DON badge exit (OPT-284). The count pill stays upright outside
      *  the rotating card layer, then scales down slightly as it fades. */
+    /** DON!! badge count change (OPT-1058): a quick 200ms swell as a token
+     *  slides under (or out from under) the card. */
+    donBadgePop: {
+      scale: [1, 1.18, 1] as number[],
+      transition: {
+        duration: 0.2,
+        ease: "easeOut" as const,
+        times: [0, 0.35, 1] as number[],
+      },
+    },
     donBadgeExit: {
       opacity: 0,
       scale: 0.9,
@@ -345,6 +355,10 @@ const board = {
      *  fixed `durationMs`, with the arc capped lower (`arcMaxPx`, design px)
      *  because tokens are small and travel in sets. */
     donAttach: { durationMs: 260, arcMaxPx: 24 },
+    /** Refresh Phase return (OPT-1058): attached DON!! slide out from under
+     *  their cards to the cost area, `staggerMs` apart, and land rested. No
+     *  lean, so the token's turn to rested reads cleanly. */
+    donReturn: { durationMs: 240, arcMaxPx: 24, staggerMs: 30 },
   },
   pile: {
     /** Destination-pile receipt: one quick top-card pulse after a batch has
@@ -388,12 +402,73 @@ const board = {
     /** Debounce window for folding staggered siblings into one +N receipt.
      *  It is slightly longer than the 70ms pile-move stagger. */
     aggregateWindowMs: 80,
+    /** OPT-1055 deck shuffle, played in place on a face-down pile (Card
+     *  Motion Lab "Shuffle deck"). Three slices riffle twice and square up,
+     *  then the pile pops. Offsets are fractions of the pile's own size, so
+     *  the same riffle reads the same on the board and in the mulligan. */
+    riffle: {
+      sliceCount: 3,
+      /** One slice's riffle. Slices start `sliceStaggerMs` apart, so the
+       *  whole riffle takes `totalMs`. */
+      sliceMs: 390,
+      sliceStaggerMs: 30,
+      totalMs: 450,
+      /** The pile pop that closes the shuffle (same shape as `pop`). */
+      popMs: 200,
+      ease: [0.45, 0, 0.55, 1] as const,
+      /** Per-slice keyframes, bottom slice first. `x` is % of pile width,
+       *  `y` % of pile height, `rotate` degrees. The two outer slices swing
+       *  out opposite ways twice; the top slice only lifts. */
+      slices: [
+        {
+          x: ["0%", "27%", "-27%", "0%", "27%", "-27%", "0%"],
+          y: ["0%", "-3.5%", "0%", "-3.5%", "0%", "0%", "0%"],
+          rotate: [0, 2.2, -2.2, 0, 2.2, -2.2, 0],
+        },
+        {
+          x: ["0%", "-27%", "27%", "0%", "-27%", "27%", "0%"],
+          y: ["0%", "0%", "-3.5%", "0%", "-3.5%", "0%", "0%"],
+          rotate: [0, -2.2, 2.2, 0, -2.2, 2.2, 0],
+        },
+        {
+          x: ["0%", "0%", "0%", "0%", "0%", "0%", "0%"],
+          y: ["0%", "-2.4%", "-2.4%", "-2.4%", "-2.4%", "0%", "0%"],
+          rotate: [0, 0, 0, 0, 0, 0, 0],
+        },
+      ],
+    },
   },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */
     rest: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Activating (refresh): slight bounce, feels refreshing */
     activate: { type: "spring" as const, stiffness: 300, damping: 18 },
+    /** Refresh Phase stand-up (OPT-1058): rested cards and DON!! stand up
+     *  left to right, `staggerMs` apart, each a `duration` rotate with no
+     *  bounce. The whole wave fits in `maxSpreadMs` of stagger, so a full
+     *  cost area does not drag the start of the turn out. `gapMs` separates
+     *  the last returning DON!! landing from the first stand-up. */
+    refreshStandUp: {
+      transition: { duration: 0.18, ease: "easeOut" as const },
+      staggerMs: 60,
+      maxSpreadMs: 540,
+      gapMs: 150,
+    },
+  },
+  /** Opening-hand redraw in the Mulligan modal (OPT-1060), per the Card
+   *  Motion Lab "Mulligan" scene: the hand flips face-down left to right
+   *  `flipStaggerMs` apart (the shared `flip`), flies into the deck
+   *  `returnStaggerMs` apart (the shared travel arc), the deck riffles
+   *  (`pile.riffle`, OPT-1055), then the top card flips and five cards are dealt face-up
+   *  `dealStaggerMs` apart. The modal holds `holdMs` on the new hand before
+   *  it moves on, and gives up waiting for the server's new hand after
+   *  `newHandTimeoutMs`. */
+  mulligan: {
+    flipStaggerMs: 40,
+    returnStaggerMs: 50,
+    dealStaggerMs: 90,
+    holdMs: 600,
+    newHandTimeoutMs: 4000,
   },
 } as const;
 
@@ -420,6 +495,7 @@ export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
 export const cardWinnerPulse = board.card.winnerPulse;
 export const donBadgeExit = board.card.donBadgeExit;
+export const donBadgePop = board.card.donBadgePop;
 export const floatingPowerMod = board.card.floatingPowerMod;
 export const powerModifiedFlash = board.card.powerModifiedFlash;
 export const negatedRing = board.card.negatedRing;
@@ -441,5 +517,9 @@ export const pilePop = board.pile.pop;
 export const pileDelta = board.pile.delta;
 export const pileDeltaReduced = board.pile.deltaReduced;
 export const pileReceiptAggregateWindowMs = board.pile.aggregateWindowMs;
+export const deckRiffle = board.pile.riffle;
 export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;
+export const refreshStandUp = board.stateChange.refreshStandUp;
+export const donReturnFlight = board.flight.donReturn;
+export const mulliganMotion = board.mulligan;

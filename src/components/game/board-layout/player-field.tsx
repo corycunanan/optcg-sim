@@ -23,7 +23,7 @@ import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
-  SIDE_ZONE_GAP,
+  DON_DECK_CLEARANCE,
   FIELD_W,
   FIELD_H,
   CHAR_ROW_W,
@@ -43,6 +43,7 @@ import {
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { DeckPile } from "./deck-pile";
+import { DonDeckPile } from "./don-deck-pile";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
 import { PlayerFieldCard } from "./field-card";
@@ -60,7 +61,10 @@ interface PlayerFieldProps {
   prohibitions?: ActiveProhibition[];
   activeDragType: string | null;
   activeDrag: DragPayload | null;
-  refreshWave: boolean;
+  /** Refresh Phase stand-up delays in seconds, by instance id (OPT-1058). */
+  refreshDelays?: ReadonlyMap<string, number> | null;
+  /** Returning DON!! still in flight to the cost area (OPT-1058). */
+  hiddenDonIds?: ReadonlySet<string> | null;
   canInteract: boolean;
   canActivateMain: boolean;
   oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
@@ -85,6 +89,8 @@ interface PlayerFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
+  /** OPT-1055: restarts the deck riffle when this player's deck shuffles. */
+  deckShuffleNonce?: number;
   /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   /** Field cards whose flight has not landed yet; they stay hidden in their
@@ -103,7 +109,8 @@ function PlayerFieldComponent({
   prohibitions = [],
   activeDragType,
   activeDrag,
-  refreshWave,
+  refreshDelays,
+  hiddenDonIds,
   canInteract,
   canActivateMain,
   oncePerTurnUsed,
@@ -128,6 +135,7 @@ function PlayerFieldComponent({
   lifeTriggerPulse,
   lifeDamagePulseNonce,
   lifeScriedPulseNonce,
+  deckShuffleNonce,
   pileArrivingCounts,
   arrivingInstanceIds,
   targetSelectionById,
@@ -229,7 +237,20 @@ function PlayerFieldComponent({
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
         onInspect={me ? handlePreviewLife : undefined}
+        maxStackSpread={DON_DECK_CLEARANCE}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
+      />
+
+      {/* Zone 1 (left), under Life: DON!! deck */}
+      <DonDeckPile
+        count={me?.donDeck.length ?? 0}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("don-deck"))}
+        zoneKey={zoneKey("don-deck")}
+        style={{
+          position: "absolute",
+          left: sideCardOffsetX,
+          top: playerLeaderTop,
+        }}
       />
 
       {/* Zone 2: Character row */}
@@ -289,7 +310,7 @@ function PlayerFieldComponent({
             zoneKey={zoneKey(`char-${i}`)}
             slotIndex={i}
             boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
-            animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
+            animationDelay={refreshDelays?.get(char.instanceId)}
             redistributeSource={redistributeSourceIds?.has(char.instanceId)}
             donArtUrl={me?.donArtUrl}
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
@@ -309,8 +330,10 @@ function PlayerFieldComponent({
         enableDrag={canInteract}
         zoneKey={zoneKey("don")}
         donArtUrl={me?.donArtUrl}
+        arrivingDonIds={arrivingInstanceIds}
         style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
-        animationDelay={refreshWave ? 0.2 : undefined}
+        motionDelayById={refreshDelays}
+        hiddenDonIds={hiddenDonIds}
       />
 
       {me?.leader ? (
@@ -348,7 +371,7 @@ function PlayerFieldComponent({
           onAction={onAction}
           zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
-          animationDelay={refreshWave ? 0 : undefined}
+          animationDelay={refreshDelays?.get(me.leader.instanceId)}
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
           donArtUrl={me?.donArtUrl}
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
@@ -384,7 +407,7 @@ function PlayerFieldComponent({
           me?.stage ? arrivingInstanceIds?.has(me.stage.instanceId) : false
         }
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
-        animationDelay={refreshWave ? 0.18 : undefined}
+        animationDelay={me?.stage ? refreshDelays?.get(me.stage.instanceId) : undefined}
       />
 
       {/* Zone 3 (right): Deck + Trash */}
@@ -394,6 +417,7 @@ function PlayerFieldComponent({
         cardDb={cardDb}
         sleeveUrl={me?.sleeveUrl}
         zoneKey={zoneKey("deck")}
+        shuffleNonce={deckShuffleNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,
@@ -414,7 +438,7 @@ function PlayerFieldComponent({
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,
-          top: playerTop + SQUARE + SIDE_ZONE_GAP,
+          top: playerLeaderTop,
         }}
       />
     </>

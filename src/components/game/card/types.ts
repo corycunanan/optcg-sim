@@ -106,6 +106,9 @@ export interface CardProps {
    */
   flipFrom?: CardFlipFrom;
   sleeveUrl?: string | null;
+  /** Show the DON!! back instead of the sleeve (OPT-1057). DON!! tokens
+   *  (`variant: "don"`) always do; the DON!! deck pile sets it. */
+  donBack?: boolean;
   /**
    * Direct image URL override for the front face — used by DON tokens
    * whose art isn't sourced from the card database. When set, suppresses

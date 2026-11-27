@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   ActiveEffect,
   ActiveProhibition,
@@ -61,6 +61,7 @@ import {
 import { useEffectsNegatedPulse } from "@/hooks/use-effects-negated-pulse";
 import { useAttackRedirectedPulse } from "@/hooks/use-attack-redirected-pulse";
 import { useLifeScriedPulse } from "@/hooks/use-life-scried-pulse";
+import { useDeckShuffledPulse } from "@/hooks/use-deck-shuffled-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type {
   AcceptedGameUpdate,
@@ -72,6 +73,7 @@ import { useEventPlayback } from "@/hooks/use-event-playback";
 import { useDeckLook } from "@/hooks/use-deck-look";
 import { collectDeckLooks, indexDeckLooks } from "@/lib/game/deck-look";
 import { DeckLookFan } from "./deck-look-fan";
+import { useRefreshWave } from "@/hooks/use-refresh-wave";
 import { SpotlightOverlay } from "../spotlight-overlay";
 import { useBoardDragState } from "./use-board-drag-state";
 import { BoardDragOverlay } from "./board-drag-overlay";
@@ -282,6 +284,43 @@ function BoardLayoutInner({
     !!reducedMotion,
   );
 
+  // OPT-1058: the Refresh Phase replays as attached DON!! sliding back and
+  // rested cards standing up left to right. `refreshWave.display` draws the
+  // refreshing player with those cards still rested until their turn comes.
+  const refreshWave = useRefreshWave(
+    eventLog,
+    bottomPlayerIndex === 0
+      ? [bottomPlayer ?? null, topPlayer ?? null]
+      : [topPlayer ?? null, bottomPlayer ?? null],
+    bottomPlayerIndex,
+    zoneRegistry,
+  );
+  const displayBottomPlayer = refreshWave.display(bottomPlayer ?? null);
+  const displayTopPlayer = refreshWave.display(topPlayer ?? null);
+  const boardAnimations = useMemo(
+    () =>
+      refreshWave.transitions.length > 0
+        ? [...cardAnimations, ...refreshWave.transitions]
+        : cardAnimations,
+    [cardAnimations, refreshWave.transitions],
+  );
+  const removeBoardAnimation = useCallback(
+    (id: string) => {
+      if (!refreshWave.removeTransition(id)) removeTransition(id);
+    },
+    [refreshWave, removeTransition],
+  );
+  const restedFieldIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const player of [displayBottomPlayer, displayTopPlayer]) {
+      if (!player) continue;
+      for (const card of [player.leader, ...player.characters]) {
+        if (card?.state === "RESTED") ids.add(card.instanceId);
+      }
+    }
+    return ids;
+  }, [displayBottomPlayer, displayTopPlayer]);
+
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
   const winnerPulseIds = useCombatVictoryPulse(eventLog);
   const triggerPulsePlayerIndexes = useTriggerActivatedPulse(eventLog);
@@ -290,6 +329,7 @@ function BoardLayoutInner({
   const effectsNegatedPulses = useEffectsNegatedPulse(eventLog);
   const attackRedirectedPulses = useAttackRedirectedPulse(eventLog);
   const lifeScriedPulses = useLifeScriedPulse(eventLog);
+  const deckShuffledPulses = useDeckShuffledPulse(eventLog);
   const fieldPulseProps = useMemo(
     () =>
       reducedMotion
@@ -324,6 +364,8 @@ function BoardLayoutInner({
   const opponentLifeDamagePulseNonce = lifeDamagePulseNonces.get(topPlayerIndex);
   const playerLifeScriedPulseNonce = lifeScriedPulses.get(bottomPlayerIndex);
   const opponentLifeScriedPulseNonce = lifeScriedPulses.get(topPlayerIndex);
+  const playerDeckShuffleNonce = deckShuffledPulses.get(bottomPlayerIndex);
+  const opponentDeckShuffleNonce = deckShuffledPulses.get(topPlayerIndex);
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -364,11 +406,19 @@ function BoardLayoutInner({
   );
 
   const mergedDonCountAdjustments = useMemo(() => {
+    const inFlight = mergeDonCountAdjustments(
+      inFlightDonAdjustByCard,
+      refreshWave.donCountAdjustments,
+    );
     return mergeDonCountAdjustments(
       redistribution.donCountAdjustments,
-      inFlightDonAdjustByCard,
+      inFlight,
     );
-  }, [redistribution.donCountAdjustments, inFlightDonAdjustByCard]);
+  }, [
+    redistribution.donCountAdjustments,
+    inFlightDonAdjustByCard,
+    refreshWave.donCountAdjustments,
+  ]);
 
   const bottomOrderedHand = composition.bottomOwner === "me"
     ? playerOrderedHand
@@ -396,22 +446,6 @@ function BoardLayoutInner({
   const donArtUrls: [string | null, string | null] = bottomPlayerIndex === 0
     ? [bottomPlayer?.donArtUrl ?? null, topPlayer?.donArtUrl ?? null]
     : [topPlayer?.donArtUrl ?? null, bottomPlayer?.donArtUrl ?? null];
-
-  /* ── Refresh phase stagger detection ────────────────────────── */
-
-  const prevPhaseRef = useRef(turn?.phase);
-  const [refreshWaveTick, bumpRefreshWaveTick] = useReducer((tick: number) => tick + 1, 0);
-  const refreshWave = refreshWaveTick % 2 === 1;
-
-  useEffect(() => {
-    const prevPhase = prevPhaseRef.current;
-    prevPhaseRef.current = turn?.phase;
-    if (!reducedMotion && prevPhase === "REFRESH" && turn?.phase === "DRAW") {
-      bumpRefreshWaveTick();
-      const timer = setTimeout(() => bumpRefreshWaveTick(), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [turn?.phase, reducedMotion]);
 
   const phaseLabel =
     battlePhase === "BLOCK_STEP"
@@ -483,13 +517,14 @@ function BoardLayoutInner({
           }}
         >
           <OpponentField
-            opp={topPlayer}
+            opp={displayTopPlayer}
             playerIndex={topPlayerIndex}
             bottomPlayerIndex={bottomPlayerIndex}
             owner={composition.topOwner}
             cardDb={cardDb}
             activeDragType={drag.activeDragType}
-            refreshWave={refreshWave}
+            refreshDelays={refreshWave.standDelays}
+            hiddenDonIds={refreshWave.hiddenDonIds}
             onPreviewZone={modalRouting.openZonePreview}
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
@@ -501,6 +536,7 @@ function BoardLayoutInner({
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
+            deckShuffleNonce={opponentDeckShuffleNonce}
             donCountAdjustments={mergedDonCountAdjustments}
             pileArrivingCounts={pileArrivingCounts}
             arrivingInstanceIds={fieldArrivingIds}
@@ -567,7 +603,7 @@ function BoardLayoutInner({
           />
 
           <PlayerField
-            me={bottomPlayer}
+            me={displayBottomPlayer}
             playerIndex={bottomPlayerIndex}
             bottomPlayerIndex={bottomPlayerIndex}
             owner={composition.bottomOwner}
@@ -575,7 +611,8 @@ function BoardLayoutInner({
             prohibitions={prohibitions}
             activeDragType={drag.activeDragType}
             activeDrag={drag.activeDrag}
-            refreshWave={refreshWave}
+            refreshDelays={refreshWave.standDelays}
+            hiddenDonIds={refreshWave.hiddenDonIds}
             canInteract={
               boardInputEnabled &&
               bs.canInteract &&
@@ -615,6 +652,7 @@ function BoardLayoutInner({
             lifeTriggerPulse={playerLifeTriggerPulse}
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             lifeScriedPulseNonce={playerLifeScriedPulseNonce}
+            deckShuffleNonce={playerDeckShuffleNonce}
             pileArrivingCounts={pileArrivingCounts}
             arrivingInstanceIds={fieldArrivingIds}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
@@ -706,13 +744,14 @@ function BoardLayoutInner({
     </div>
 
     <CardAnimationLayer
-      transitions={cardAnimations}
+      transitions={boardAnimations}
       cardDb={cardDb}
-      onComplete={removeTransition}
+      onComplete={removeBoardAnimation}
       sleeveUrls={sleeveUrls}
       donArtUrls={donArtUrls}
       boardScale={boardScale}
       onLookDeparture={deckLook.markDeparted}
+      restedInstanceIds={restedFieldIds}
     />
 
     </DndContext>

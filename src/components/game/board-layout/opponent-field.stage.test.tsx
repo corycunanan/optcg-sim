@@ -13,6 +13,7 @@ vi.mock("../card", () => ({
 }));
 vi.mock("./don-zone", () => ({ DonZone: () => null }));
 vi.mock("./deck-pile", () => ({ DeckPile: () => null }));
+vi.mock("./don-deck-pile", () => ({ DonDeckPile: () => null }));
 vi.mock("./life-zone", () => ({ LifeZone: () => null }));
 vi.mock("./trash-zone", () => ({ DroppableTrashZone: () => null }));
 vi.mock("./empty-slot", () => ({ EmptySlot: () => null }));
@@ -59,7 +60,6 @@ function stageClass(arrivingInstanceIds?: ReadonlySet<string>) {
       owner="opp"
       cardDb={{}}
       activeDragType={null}
-      refreshWave={false}
       onPreviewZone={() => {}}
       arrivingInstanceIds={arrivingInstanceIds}
     />

@@ -87,6 +87,7 @@ export const GAME_EVENT_VISIBILITY = {
   PROMPT_AUTO_RESOLVED: PUBLIC,
   DECK_TOP_LOOKED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
   CARDS_PLACED_IN_DECK: PUBLIC,
+  DECK_SHUFFLED: PUBLIC,
 } satisfies Record<GameEventType, EventVisibilityPolicy>;
 
 type PromptVisibilityPolicy = {
@@ -144,6 +145,24 @@ function redactCardIdentity(card: CardInstance): CardInstance {
     ...redactCardFace(card),
     instanceId: HIDDEN_IDENTITY,
   };
+}
+
+/** Zones whose cards both players can see (OPT-1059). */
+const PUBLIC_SOURCE_ZONES: ReadonlySet<string> = new Set([
+  "LEADER",
+  "CHARACTER",
+  "STAGE",
+  "TRASH",
+]);
+
+/** Keep a public source card's identity; hide only its new instance id. */
+function redactDestinationIdentity(event: GameEvent): GameEvent {
+  const payload = event.payload as Record<string, unknown>;
+  if (!("newCardInstanceId" in payload)) return event;
+  return {
+    ...event,
+    payload: { ...payload, newCardInstanceId: HIDDEN_IDENTITY },
+  } as GameEvent;
 }
 
 function redactEventIdentities(event: GameEvent): GameEvent {
@@ -205,10 +224,24 @@ export function filterEventForRecipient(
     ) {
       return redactEventIdentities(event);
     }
-    return recipient.kind === "PLAYER" &&
+    if (
+      recipient.kind === "PLAYER" &&
       event.playerIndex === recipient.playerIndex
-      ? event
-      : redactEventIdentities(event);
+    ) {
+      return event;
+    }
+    // OPT-1059: a card that leaves the field or the trash for a hand or Life
+    // was public where it stood, so everyone may see which card left (the
+    // board flips it on its way). Only its new hidden-zone id stays private.
+    if (
+      (event.type === "CARD_RETURNED_TO_HAND" ||
+        event.type === "CARD_ADDED_TO_LIFE") &&
+      event.payload.sourceZone !== undefined &&
+      PUBLIC_SOURCE_ZONES.has(event.payload.sourceZone)
+    ) {
+      return redactDestinationIdentity(event);
+    }
+    return redactEventIdentities(event);
   }
 
   if (event.type !== "CARDS_REVEALED") return redactEventIdentities(event);

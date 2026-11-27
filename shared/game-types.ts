@@ -323,11 +323,15 @@ export interface GameEventPayloadMap {
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
   CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; preKO_keywords?: string[]; preKO_negated?: true; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
-  CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
+  /** `cards` lists the cards a count-only deck trash (mill) moved, by their
+   *  new trash instance ids, top card first. Trashed cards are public (OPT-1059). */
+  CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string; cards?: Array<{ instanceId: string; cardId: string }> };
   CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
   /** `face` is the Life face the card entered with; a face-down card from the deck is secret to its owner too (OPT-976). */
   CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string; face?: "UP" | "DOWN" };
-  CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
+  /** `sourceFace` is the side the Life card showed before it left, so the
+   *  client can flip it on the way to the hand (OPT-1059). */
+  CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number; sourceFace?: "UP" | "DOWN" };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
   // OPT-246: emitted at BLOCK_STEP → COUNTER_STEP boundary. Marks the
@@ -368,8 +372,30 @@ export interface GameEventPayloadMap {
   };
   TRIGGER_ACTIVATED: { cardId: string; activated?: boolean };
   DON_GIVEN_TO_CARD: { targetInstanceId?: string; count: number };
-  DON_DETACHED: { count?: number };
-  DON_PLACED_ON_FIELD: { count: number };
+  /**
+   * DON!! left the field area they were in (OPT-1057). Two moves share this
+   * event, told apart by `to`:
+   * - `DON_DECK`: a return to the DON!! deck (DON!! −X, return effects). It
+   *   always carries a positive `count`, which `DON_RETURNED_TO_DON_DECK`
+   *   watchers key on (triggers.ts, OPT-881).
+   * - `COST_AREA`: the Refresh Phase return of attached DON!! (rule 6-2-3).
+   *   It carries no `count`, so it never matches those watchers.
+   * `fromCostArea`, `sources` and `donInstanceIds` say where the DON!! came from: the cost
+   * area, and the cards they were attached to (Leader first, then
+   * Characters in slot order). Older events carry only `count`.
+   */
+  DON_DETACHED: {
+    count?: number;
+    to?: "DON_DECK" | "COST_AREA";
+    fromCostArea?: number;
+    sources?: { cardInstanceId: string; count: number }[];
+    /** The DON!! that moved: the `fromCostArea` cost-area DON!! first, then
+     *  the attached ones in `sources` order. */
+    donInstanceIds?: string[];
+  };
+  /** `donInstanceIds` names the placed DON!! in DON!! deck order (OPT-1057),
+   *  so the board can fly each one to its own cost-area slot. */
+  DON_PLACED_ON_FIELD: { count: number; donInstanceIds?: string[] };
   DON_STATE_CHANGED: Record<string, never>;
   CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string; cause?: "EFFECT" | "EFFECT_COST"; causingController?: 0 | 1; causingSource?: EffectSourceIdentity };
   POWER_MODIFIED: { targetInstanceId: string; amount?: number; value?: number };
@@ -432,6 +458,8 @@ export interface GameEventPayloadMap {
   /** OPT-1056: `count` looked-at cards went back to the `position` end of the
    *  player's deck, without naming them. */
   CARDS_PLACED_IN_DECK: { count: number; position: "TOP" | "BOTTOM" };
+  /** OPT-1055: `playerIndex`'s deck was shuffled (effect, search, mulligan). */
+  DECK_SHUFFLED: Record<string, never>;
 }
 
 /** Union of all event type strings. */
@@ -492,6 +520,7 @@ export const ALL_GAME_EVENT_TYPES = [
   "PROMPT_AUTO_RESOLVED",
   "DECK_TOP_LOOKED",
   "CARDS_PLACED_IN_DECK",
+  "DECK_SHUFFLED",
 ] as const satisfies readonly GameEventType[];
 
 type _AllGameEventTypesCovered =

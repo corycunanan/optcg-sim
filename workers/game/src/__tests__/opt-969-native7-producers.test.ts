@@ -1,5 +1,6 @@
 import { writerSessionEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 /** Actual isolated writer captures; synthetic reachability, never production evidence. */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -15,6 +16,7 @@ import {
   type ProducerScenario,
 } from "./native7-producer-support.js";
 import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
+import { withoutAssertedDeckShuffled } from "./deck-shuffled-support.js";
 const directory = fileURLToPath(
   new URL("./fixtures/opt-969-native7-producers/", import.meta.url)
 );
@@ -70,10 +72,14 @@ describe.each(files)("native7 future producers %s", (file) => {
           assertDonOffer(loaded.state);
           const next = command(rt, loaded.state, loaded.cardDb, step.action);
           const stored = await save(rt, next, loaded.cardDb);
+          const frozen = writerSessionEnvelope(step.stored);
           expect(
-            withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored)),
+            withoutAssertedDonMoveDetail(withoutAssertedDeckShuffled(
+              withoutAssertedEndReasonCode(withoutAssertedCostEvidence(stored)),
+              frozen
+            )),
             `${file} ${context} start${start} after ${step.action.type}`
-          ).toEqual(writerSessionEnvelope(step.stored));
+          ).toEqual(frozen);
           loaded = (await memory(rt, stored).repo.load())!;
         }
         const initial = (await memory(rt, corpus.initial).repo.load())!;
@@ -99,7 +105,7 @@ it("preserves the original reported second meaningful choice from its saved firs
   expect(next.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
   expect(next.players[0].hand).toHaveLength(0);
   expect(
-    withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb))
+    withoutAssertedDonMoveDetail(withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb)))
   ).toEqual(writerSessionEnvelope(corpus.steps[1].stored));
 });
 

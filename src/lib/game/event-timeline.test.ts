@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@shared/game-types";
 import { FLIP_SECONDS } from "@/lib/game/card-motion";
-import { cardFizzle, cardStagger, cardTravel } from "@/lib/motion";
+import { cardFizzle, cardStagger, cardTravel, deckRiffle } from "@/lib/motion";
 import {
   BEAT_GAP_MS,
   MAX_PLAYBACK_MS,
   MIN_BEAT_GAP_MS,
   MULTI_CARD_STAGGER_MS,
   PULSE_READ_MS,
+  REFRESH_READ_MS,
   siblingStaggerMs,
   SPOTLIGHT_DWELL_MS,
   buildEventTimeline,
@@ -90,6 +91,27 @@ describe("classifyEventBeat", () => {
         })
       )
     ).toBe("spotlight");
+  });
+});
+
+describe("Refresh Phase beat (OPT-1058)", () => {
+  const refreshEnd = () =>
+    at({
+      type: "PHASE_CHANGED",
+      playerIndex: 0,
+      payload: { from: "REFRESH", to: "DRAW" },
+    });
+
+  it("gives the end of the Refresh Phase its own beat", () => {
+    expect(classifyEventBeat(refreshEnd())).toBe("refresh");
+  });
+
+  it("plays the draw after the refresh wave's readable portion", () => {
+    const refresh = refreshEnd();
+    const draw = drawn();
+    const timeline = buildEventTimeline([refresh, draw]);
+    expect(eventOffsetMs(timeline, refresh)).toBe(0);
+    expect(eventOffsetMs(timeline, draw)).toBe(REFRESH_READ_MS + BEAT_GAP_MS);
   });
 });
 
@@ -235,7 +257,127 @@ describe("buildEventTimeline", () => {
       playerIndex: 0,
       payload: { cardId: "OP01-006", cardInstanceId: "h-1" },
     });
-    // Life to hand never flips (its source side is unknown).
+    // Life to hand without a Life side never flips (OPT-1059 adds sourceFace).
     expect(buildEventTimeline([lifeToHand]).durationMs).toBe(FLIGHT_MS);
+  });
+
+  it("gives a deck shuffle its own riffle beat (OPT-1055)", () => {
+    const shuffled = (playerIndex: 0 | 1 = 0) =>
+      at({ type: "DECK_SHUFFLED", playerIndex, payload: {} });
+    expect(classifyEventBeat(shuffled())).toBe("shuffle");
+
+    // A search: the pick travels, then the deck riffles, then the next draw.
+    const pick = drawn();
+    const shuffle = shuffled();
+    const after = played();
+    const timeline = buildEventTimeline([pick, shuffle, after]);
+    const shuffleStart = TRAVEL_MS + BEAT_GAP_MS;
+    expect(eventOffsetMs(timeline, shuffle)).toBe(shuffleStart);
+    expect(eventOffsetMs(timeline, after)).toBe(
+      shuffleStart + deckRiffle.totalMs + BEAT_GAP_MS
+    );
+
+    // Each player's deck riffles as its own step.
+    const both = [shuffled(0), shuffled(1)];
+    expect(buildEventTimeline(both).beatCount).toBe(2);
+  });
+});
+
+describe("DON!! deck moves (OPT-1057)", () => {
+  it("make DON!! placement and DON!! deck returns a flipping travel beat with one step per DON!!", () => {
+    const placed = at({
+      type: "DON_PLACED_ON_FIELD",
+      playerIndex: 0,
+      payload: { count: 2 },
+    });
+    const returned = at({
+      type: "DON_DETACHED",
+      playerIndex: 0,
+      payload: { count: 2, to: "DON_DECK", fromCostArea: 2 },
+    });
+    expect(classifyEventBeat(placed)).toBe("travel");
+    expect(classifyEventBeat(returned)).toBe("travel");
+    expect(siblingStaggerMs("DON_PLACED_ON_FIELD")).toBe(cardStagger.drawMs);
+    const timeline = buildEventTimeline([placed, returned]);
+    expect(eventOffsetMs(timeline, returned)).toBe(
+      TRAVEL_MS + cardStagger.drawMs + BEAT_GAP_MS,
+    );
+  });
+
+  it("leaves the Refresh Phase return without a beat of its own", () => {
+    for (const payload of [{}, { to: "COST_AREA" as const }]) {
+      expect(
+        classifyEventBeat(at({ type: "DON_DETACHED", playerIndex: 0, payload })),
+      ).toBeNull();
+    }
+  });
+});
+
+describe("Life, mill and bounce beats (OPT-1059)", () => {
+  const mill = (n: number) =>
+    at({
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      payload: {
+        count: n,
+        reason: "mill",
+        from: "DECK",
+        cards: Array.from({ length: n }, (_, i) => ({
+          instanceId: `t-${i}`,
+          cardId: `OP01-00${i}`,
+        })),
+      },
+    } as Omit<GameEvent, "timestamp">);
+
+  it("plays a named mill as one travel beat that flips its top card", () => {
+    const event = mill(3);
+    expect(classifyEventBeat(event)).toBe("travel");
+    const timeline = buildEventTimeline([event]);
+    expect(timeline.durationMs).toBe(
+      FLIP_MS + 2 * cardStagger.pileMs + FLIGHT_MS
+    );
+  });
+
+  it("keeps a count-only mill a dissolve", () => {
+    const event = at({
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      payload: { count: 2, reason: "mill", from: "DECK" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(event)).toBe("transform");
+  });
+
+  it("holds an add-to-Life beat for its flip", () => {
+    const event = at({
+      type: "CARD_ADDED_TO_LIFE",
+      playerIndex: 0,
+      payload: {
+        cardId: "OP01-010",
+        cardInstanceId: "f-1",
+        newCardInstanceId: "l-1",
+        face: "DOWN",
+      },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(event)).toBe("travel");
+    expect(buildEventTimeline([event]).durationMs).toBe(TRAVEL_MS);
+    expect(siblingStaggerMs("CARD_ADDED_TO_LIFE")).toBe(cardStagger.pileMs);
+  });
+
+  it("holds a public Life-to-hand beat for its flip", () => {
+    const event = at({
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: 0,
+      payload: { cardId: "OP01-010", cardInstanceId: "h-1", sourceFace: "DOWN" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(buildEventTimeline([event]).durationMs).toBe(TRAVEL_MS);
+  });
+
+  it("gives a Life card turning over its own beat", () => {
+    const turn = at({
+      type: "LIFE_CARD_FACE_CHANGED",
+      playerIndex: 0,
+      payload: { face: "UP" },
+    } as Omit<GameEvent, "timestamp">);
+    expect(classifyEventBeat(turn)).toBe("pulse");
   });
 });

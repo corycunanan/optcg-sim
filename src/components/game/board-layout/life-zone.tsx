@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, LifeCard } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import {
+  cardFlip,
   lifeDamageImpact,
   lifeScriedFlash,
   lifeTriggerPulse,
@@ -17,6 +18,58 @@ import { PileReceipt } from "./pile-receipt";
 
 const LIFE_STACK_OFFSET = 20;
 
+interface LifeStack {
+  /** Each visible card's face, top first ("U"/"D"). */
+  faces: string;
+  /** Each visible card's public cardId, top first (face-up cards only). */
+  cardIds: readonly (string | undefined)[];
+  /** Bumped whenever the visible count changes, which re-keys the stack. */
+  epoch: number;
+  /** Art kept on a card that just turned face-down, so its front still
+   *  shows while it turns away. Cleared once the flip ends. */
+  turningDown: ReadonlyMap<number, string>;
+}
+
+/**
+ * OPT-1059: Life cards have no stable identity to key on (face-down ids are
+ * positional), so a turn is read off the faces. While the count holds, each
+ * position keeps its card element and a face that changed plays the shared
+ * flip in place (`CardFaces`). A count change (a card added, taken or still
+ * arriving) re-keys the whole stack, so the cards that shift position swap
+ * without a spurious flip.
+ */
+export function nextLifeStack(
+  previous: LifeStack,
+  life: readonly LifeCard[],
+): LifeStack {
+  const faces = life.map((card) => (card.face === "UP" ? "U" : "D")).join("");
+  const cardIds = life.map((card) =>
+    card.face === "UP" ? card.cardId : undefined,
+  );
+  if (faces.length !== previous.faces.length) {
+    return { faces, cardIds, epoch: previous.epoch + 1, turningDown: new Map() };
+  }
+  const turningDown = new Map<number, string>();
+  for (let i = 0; i < faces.length; i++) {
+    const art = previous.cardIds[i] ?? previous.turningDown.get(i);
+    if (faces[i] === "D" && previous.faces[i] === "U" && art) {
+      turningDown.set(i, art);
+    }
+  }
+  return { faces, cardIds, epoch: previous.epoch, turningDown };
+}
+
+function sameStack(a: LifeStack, life: readonly LifeCard[]): boolean {
+  return (
+    a.faces.length === life.length &&
+    life.every(
+      (card, i) =>
+        a.faces[i] === (card.face === "UP" ? "U" : "D") &&
+        a.cardIds[i] === (card.face === "UP" ? card.cardId : undefined),
+    )
+  );
+}
+
 export const LifeZone = React.memo(function LifeZone({
   life,
   cardDb,
@@ -28,6 +81,7 @@ export const LifeZone = React.memo(function LifeZone({
   damagePulseNonce,
   scryPulseNonce,
   onInspect,
+  maxStackSpread,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
@@ -39,6 +93,10 @@ export const LifeZone = React.memo(function LifeZone({
   damagePulseNonce?: number;
   scryPulseNonce?: number;
   onInspect?: () => void;
+  /** Most the cards under the top one may peek out below it, in board px.
+   *  The DON!! deck sits right under Life (OPT-1057), so the stack tightens
+   *  to stay clear of it. */
+  maxStackSpread?: number;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -54,6 +112,38 @@ export const LifeZone = React.memo(function LifeZone({
   const visibleLife = arrivingCount > 0 ? life.slice(arrivingCount) : life;
   const count = visibleLife.length;
   const topCard = visibleLife[0];
+  // Derived during render, so a turn and its flip land in the same commit.
+  const [stack, setStack] = useState<LifeStack>(() =>
+    nextLifeStack(
+      { faces: "", cardIds: [], epoch: 0, turningDown: new Map() },
+      visibleLife,
+    ),
+  );
+  let currentStack = stack;
+  if (!sameStack(stack, visibleLife)) {
+    currentStack = nextLifeStack(stack, visibleLife);
+    setStack(currentStack);
+  }
+  const { epoch, turningDown } = currentStack;
+  useEffect(() => {
+    if (turningDown.size === 0) return;
+    const timer = setTimeout(
+      () =>
+        setStack((current) =>
+          current.turningDown === turningDown
+            ? { ...current, turningDown: new Map() }
+            : current,
+        ),
+      cardFlip.duration * 1000 + 100,
+    );
+    return () => clearTimeout(timer);
+  }, [turningDown]);
+  const lifeCardId = (card: LifeCard, index: number) =>
+    card.face === "UP" ? card.cardId : turningDown.get(index);
+  const stackOffset =
+    maxStackSpread !== undefined && count > 1
+      ? Math.min(LIFE_STACK_OFFSET, maxStackSpread / (count - 1))
+      : LIFE_STACK_OFFSET;
   const triggerFeedbackActive = triggerPulse && !reducedMotion;
   const damageFeedbackActive =
     damagePulseNonce !== undefined && !reducedMotion;
@@ -150,13 +240,14 @@ export const LifeZone = React.memo(function LifeZone({
         className="absolute top-0 left-0"
         style={{ zIndex: Math.max(1, count) }}
       >
-        <PileReceipt visibleCount={count}>
+        <PileReceipt visibleCount={count} showRemovals>
           {topCard ? (
             <Card
+              key={`life:${epoch}:0`}
               variant="life"
               data={{
                 cardDb,
-                cardId: topCard.face === "UP" ? topCard.cardId : undefined,
+                cardId: lifeCardId(topCard, 0),
               }}
               faceDown={topCard.face === "DOWN"}
               sleeveUrl={sleeveUrl}
@@ -172,11 +263,11 @@ export const LifeZone = React.memo(function LifeZone({
         const stackIndex = index + 1;
         return (
           <div
-            key={card.instanceId}
+            key={`life:${epoch}:${stackIndex}`}
             style={{
               position: "absolute",
               left: 0,
-              top: stackIndex * LIFE_STACK_OFFSET,
+              top: stackIndex * stackOffset,
               zIndex: count - stackIndex,
             }}
           >
@@ -184,7 +275,7 @@ export const LifeZone = React.memo(function LifeZone({
               variant="life"
               data={{
                 cardDb,
-                cardId: card.face === "UP" ? card.cardId : undefined,
+                cardId: lifeCardId(card, stackIndex),
               }}
               faceDown={card.face === "DOWN"}
               sleeveUrl={sleeveUrl}

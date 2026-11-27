@@ -10,6 +10,7 @@ import {
 } from "motion/react";
 import {
   donBadgeExit,
+  donBadgePop,
   floatingPowerMod,
   powerModifiedFlash,
 } from "@/lib/motion";
@@ -57,6 +58,7 @@ export const Card = React.memo(function Card({
   faceDown,
   flipFrom,
   sleeveUrl,
+  donBack,
   artUrl,
   interaction,
   overlays,
@@ -246,7 +248,11 @@ export const Card = React.memo(function Card({
               fallbackLabel={overlays?.label}
               imageUrlOverride={artUrl}
             />
-            <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
+            <CardBack
+              sleeveUrl={sleeveUrl}
+              label={overlays?.label}
+              donBack={donBack ?? variant === "don"}
+            />
           </CardFaces>
 
           {/* Highlight ring follows the card outline, so it sits inside the
@@ -320,7 +326,9 @@ export const Card = React.memo(function Card({
             }
             transition={motionConfig.transition}
           >
-            <CardDonBadge count={overlays.donCount} />
+            <DonBadgePop count={overlays.donCount} reducedMotion={!!reducedMotion}>
+              <CardDonBadge count={overlays.donCount} />
+            </DonBadgePop>
           </motion.div>
         )}
       </AnimatePresence>
@@ -389,3 +397,36 @@ export const Card = React.memo(function Card({
     </CardTooltip>
   );
 });
+
+/**
+ * Swells the DON!! badge for 200ms whenever its count changes after mount
+ * (OPT-1058), so each token sliding under (or out from under) the card
+ * reads as one tick of the count. A badge that mounts with a count does
+ * not pop.
+ */
+function DonBadgePop({
+  count,
+  reducedMotion,
+  children,
+}: {
+  count: number;
+  reducedMotion: boolean;
+  children: React.ReactNode;
+}) {
+  // Derived from the count prop: each change after mount bumps the pop.
+  const [seen, setSeen] = React.useState({ count, pops: 0 });
+  if (seen.count !== count) {
+    setSeen({ count, pops: seen.pops + 1 });
+  }
+  if (seen.pops === 0 || reducedMotion) return <div>{children}</div>;
+  return (
+    <motion.div
+      key={seen.pops}
+      initial={{ scale: 1 }}
+      animate={{ scale: donBadgePop.scale }}
+      transition={donBadgePop.transition}
+    >
+      {children}
+    </motion.div>
+  );
+}

@@ -1,3 +1,4 @@
+import { withoutAssertedMotionPayloads } from "./motion-payload-support.js";
 import { chooseFirstObligation, orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
@@ -12,6 +13,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import manifest from "./fixtures/opt-966-final-writer-corpus.manifest.json";
 import { withoutAssertedEndReasonCode } from "./end-reason-code-support.js";
+import { withoutAssertedDonMoveDetail } from "./don-move-detail-support.js";
 
 type Corpus = { writerBase: string; cases: { index: number; stored: Record<string, unknown>; replies: GameAction[];
   }[]; expected: GameState;
@@ -62,7 +64,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
         const storage = new MemorySessionStorage();
         await new Repository(storage, config).save({ ...loaded, state: actual, undoHistory: [actual] });
         actual = (await new Repository(storage, config).load())!.state;
-        expect(actual).toEqual(
+        expect(withoutAssertedMotionPayloads(actual)).toEqual(
             root
               ? expected
               : historicalBattle ? candidateExpected(`final/${name}/${item.index}/pause/${offset}`)
@@ -72,7 +74,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
         expect(result.responseRejected).toBeFalsy();
         actual = result.state;
       }
-      expect(withoutAssertedEndReasonCode(actual)).toEqual(
+      expect(withoutAssertedDonMoveDetail(withoutAssertedEndReasonCode(actual))).toEqual(
           root
             ? entry.expected
             : historicalBattle ? candidateExpected(`final/${name}/${item.index}/final`)

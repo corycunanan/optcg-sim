@@ -23,6 +23,7 @@ import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { deckTopLookedEvent } from "../../deck-look-events.js";
 import { deckRandomStream, shuffleWithEngineContext } from "../../execution-context.js";
+import { deckShuffledEvent } from "../../events.js";
 
 export function executeDraw(
   state: GameState,
@@ -227,7 +228,20 @@ export function executeMill(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill", from: "DECK" } });
+  events.push({
+    type: "CARD_TRASHED",
+    playerIndex: controller,
+    payload: {
+      count: millCount,
+      reason: "mill",
+      from: "DECK",
+      // OPT-1059: trashed cards are public; the board shows their faces.
+      cards: moved.transitions.map(({ fact }) => ({
+        instanceId: fact.newInstanceId,
+        cardId: fact.cardId,
+      })),
+    },
+  });
 
   // Record the cards actually moved: new trash instance ids plus a snapshot
   // of each printed card, so a later "if the trashed card ..." condition
@@ -276,6 +290,7 @@ export function executeFullDeckSearch(
       const shuffled = shuffleWithEngineContext(state, p.deck, deckRandomStream(controller));
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, deck: shuffled.values };
+      events.push(deckShuffledEvent(controller));
       return { state: { ...shuffled.state, players: newPlayers }, events, succeeded: false };
     }
     return { state, events, succeeded: false };
