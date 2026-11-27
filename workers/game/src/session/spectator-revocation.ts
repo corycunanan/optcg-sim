@@ -1,3 +1,4 @@
+import { isAuthorizedBearer } from "../../../../shared/bearer-auth.js";
 import { log } from "../lib/log.js";
 import { validateRevokeSpectatorsPayload } from "../util/validate.js";
 import type { SessionTransport } from "./transport.js";
@@ -17,7 +18,7 @@ export async function handleSpectatorRevocationRequest(
   transport: SessionTransport,
   syncAlarm: () => Promise<void>
 ): Promise<Response> {
-  if (request.headers.get("Authorization") !== `Bearer ${secret}`) {
+  if (!isAuthorizedBearer(request.headers.get("Authorization"), secret)) {
     log("auth.failure", { reason: "revoke_spectators_bad_secret" });
     return new Response("Unauthorized", { status: 401 });
   }

@@ -5,6 +5,7 @@ Cloudflare game worker, and (for card parsing) the data pipeline.
 
 | File                           | Contract                                                                                  |
 | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `bearer-auth.ts`               | Constant-time `Authorization: Bearer <secret>` check for server-to-server routes.         |
 | `card-parsing.ts`              | Card ID and effect-text parsing shared by the app/pipeline.                               |
 | `game-end-reason.ts`           | Legacy text inference for game end reason codes, for results written before OPT-978.      |
 | `game-init.ts`                 | Serialized Next.js-to-worker initialization payloads and pregame mode normalization.      |

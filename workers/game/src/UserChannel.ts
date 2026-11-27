@@ -14,6 +14,7 @@
  * before friends see any flicker.
  */
 
+import { isAuthorizedBearer } from "../../../shared/bearer-auth.js";
 import type { Env } from "./types.js";
 import { verifyUserToken } from "./util/auth.js";
 import { consumeTokenJti } from "./util/token-replay.js";
@@ -215,7 +216,7 @@ export class UserChannel implements DurableObject {
 
   private async handleNotify(request: Request, userId: string): Promise<Response> {
     const auth = request.headers.get("Authorization");
-    if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+    if (!isAuthorizedBearer(auth, this.env.GAME_WORKER_SECRET)) {
       log("auth.failure", { reason: "user_notify_bad_secret", userId });
       return new Response("Unauthorized", { status: 401 });
     }
@@ -239,7 +240,7 @@ export class UserChannel implements DurableObject {
     // The worker entrypoint already gates this route, but the DO checks too —
     // defense-in-depth, matches GameSession.handleNotifyEnd's pattern.
     const auth = request.headers.get("Authorization");
-    if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+    if (!isAuthorizedBearer(auth, this.env.GAME_WORKER_SECRET)) {
       log("auth.failure", { reason: "user_health_bad_secret", userId });
       return new Response("Unauthorized", { status: 401 });
     }

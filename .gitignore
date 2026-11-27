@@ -70,3 +70,6 @@ next-env.d.ts
 workers/game/.wrangler/
 workers/game/coverage/
 .env*
+
+# Local test credentials (never commit; see prisma/seed.ts)
+.test-accounts.txt

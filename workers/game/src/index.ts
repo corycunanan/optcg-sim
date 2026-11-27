@@ -18,6 +18,7 @@
 // OPT-1063: the binding exports the error-reporting subclass under its name.
 export { ReportingGameSession as GameSession } from "./session/error-boundary.js";
 export { UserChannel } from "./UserChannel.js";
+import { isAuthorizedBearer } from "../../../shared/bearer-auth.js";
 import { authorizeSessionExport } from "./session/export.js";
 import { reportError } from "./lib/error-reporting.js";
 import { configureLogger } from "./lib/log.js";
@@ -98,7 +99,7 @@ async function routeRequest(request: Request, env: Env): Promise<Response> {
         return new Response("Method not allowed", { status: 405 });
       }
       const auth = request.headers.get("Authorization");
-      if (auth !== `Bearer ${env.GAME_WORKER_SECRET}`) {
+      if (!isAuthorizedBearer(auth, env.GAME_WORKER_SECRET)) {
         return new Response("Unauthorized", { status: 401 });
       }
     }
@@ -119,7 +120,7 @@ async function routeRequest(request: Request, env: Env): Promise<Response> {
     // The WS upgrade authenticates per-token inside the DO.
     if (route === "notify" || route === "health") {
       const auth = request.headers.get("Authorization");
-      if (auth !== `Bearer ${env.GAME_WORKER_SECRET}`) {
+      if (!isAuthorizedBearer(auth, env.GAME_WORKER_SECRET)) {
         return new Response("Unauthorized", { status: 401 });
       }
     }
