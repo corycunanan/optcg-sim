@@ -74,6 +74,7 @@ export function BoardNavbar({
   return (
     <nav
       aria-label="Game board status and controls"
+      data-board-navbar=""
       className="bg-gb-navbar absolute inset-x-0 top-0 z-30 flex items-center px-4"
       style={{ height: NAVBAR_H }}
     >

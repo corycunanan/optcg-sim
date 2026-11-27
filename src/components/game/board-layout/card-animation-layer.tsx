@@ -121,8 +121,7 @@ function TravelGhost({
       ? (transition.delay ?? 0)
       : 0;
 
-  // A revealed pick turns face-down once it lands in the hand (OPT-1056);
-  // the flight ends after that flip.
+  // A revealed pick turns face-down as it lands in the hand (OPT-1056).
   const [landed, setLanded] = React.useState(false);
   const resolveTargetRef = React.useRef(resolveTarget);
   const onCompleteRef = React.useRef(onComplete);
@@ -167,22 +166,23 @@ function TravelGhost({
       cancelFollow = onNextFrame(follow);
     };
     const cancelStart = onNextFrame(() => {
+      const durationMs = profile?.durationMs ?? flightDurationMs(distance);
+      if (transition.landFaceDown) {
+        // Turn over as it settles into the hand: the flip ends on landing,
+        // so the card is never seen face-up on top of the board's chrome.
+        landTimer = setTimeout(
+          () => setLanded(true),
+          Math.max(0, plan.departAt * 1000 + durationMs - FLIP_SECONDS * 1000),
+        );
+      }
       controls = animate(progress, 1, {
-        duration: (profile?.durationMs ?? flightDurationMs(distance)) / 1000,
+        duration: durationMs / 1000,
         ease: cardTravel.ease,
         delay: plan.departAt,
         onUpdate: apply,
         onComplete: () => {
           apply(1);
-          if (transition.landFaceDown) {
-            setLanded(true);
-            landTimer = setTimeout(
-              () => onCompleteRef.current(),
-              FLIP_SECONDS * 1000,
-            );
-          } else {
-            onCompleteRef.current();
-          }
+          onCompleteRef.current();
           // Without a frame clock (tests) there is nothing to follow.
           if (typeof requestAnimationFrame === "function") {
             cancelFollow = onNextFrame(follow);
@@ -537,6 +537,28 @@ function FlyingCardNow({
   );
 }
 
+/** The board navbar's bottom edge in viewport px, measured while flights
+ *  run (0 when there is no navbar). */
+function useNavbarBottom(active: boolean): number {
+  const [bottom, setBottom] = React.useState(0);
+  React.useLayoutEffect(() => {
+    if (!active || typeof document === "undefined") return;
+    const measure = () => {
+      const navbar = document.querySelector("[data-board-navbar]");
+      const next = navbar ? Math.max(0, navbar.getBoundingClientRect().bottom) : 0;
+      setBottom((current) => (current === next ? current : next));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [active]);
+  return bottom;
+}
+
 export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   transitions,
   cardDb,
@@ -550,6 +572,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   const readyTransitions = transitions.filter(
     (transition) => transition.waitForSpotlightId === undefined
   );
+  const navbarBottom = useNavbarBottom(readyTransitions.length > 0);
   if (readyTransitions.length === 0) return null;
 
   // The layer must escape any transformed parent so `position: fixed` resolves
@@ -558,11 +581,21 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   // `<PortalRoot>` is mounted by the shell (OPT-314/315), portal there;
   // otherwise render in place — the current layout has no transformed
   // ancestor for this layer, so this preserves today's behavior.
+  //
+  // Cards fly beneath the board's navbar, as the cards on the board do (an
+  // opponent's hand tucks under it): the clip box starts at the navbar's
+  // bottom edge, and its transformed inner frame keeps the ghosts' fixed
+  // viewport coordinates while the box clips them (OPT-1056).
   const layer = (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[9999]"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-[9999] overflow-hidden"
+      style={{ top: navbarBottom }}
     >
+      <div
+        className="absolute inset-x-0"
+        style={{ top: -navbarBottom, bottom: 0, transform: "translateZ(0)" }}
+      >
       <AnimatePresence>
         {readyTransitions.map((t) => (
           <FlyingCard
@@ -578,6 +611,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
           />
         ))}
       </AnimatePresence>
+      </div>
     </div>
   );
 

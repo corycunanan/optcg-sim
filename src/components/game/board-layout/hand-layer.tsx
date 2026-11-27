@@ -435,7 +435,11 @@ export const HandLayer = React.memo(function HandLayer({
           layoutDependency={reducedMotion ? undefined : layoutKey}
           transition={handReflow}
           style={marginStyle}
-          className={cn(held && "invisible")}
+          // A sleeve hides only for a flight that names it (OPT-1056): a
+          // redacted card cannot be matched to a flight by its face.
+          className={cn(
+            (held || departures?.has(card.instanceId) === true) && "invisible",
+          )}
         >
           <Card
             data={{ card, cardDb }}

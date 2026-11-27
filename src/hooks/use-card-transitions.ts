@@ -708,8 +708,24 @@ export function useCardTransitions(
     }
   }, [isDragging]);
 
+  // Hand ids seen at the last run, per player: a hand-bound card whose
+  // event cannot name its new hand instance (an opponent's redacted draw)
+  // lands in the hand card that just appeared (OPT-1056).
+  const handIdsRef = useRef<[Set<string>, Set<string>] | null>(null);
+
   // Detect new events and create transitions
   useEffect(() => {
+    const handIds: [Set<string>, Set<string>] = [
+      new Set((receivedHands?.[0] ?? []).map((card) => card.instanceId)),
+      new Set((receivedHands?.[1] ?? []).map((card) => card.instanceId)),
+    ];
+    const previousHandIds = handIdsRef.current ?? handIds;
+    handIdsRef.current = handIds;
+    const newHandIds = ([0, 1] as const).map((player) =>
+      (receivedHands?.[player] ?? [])
+        .map((card) => card.instanceId)
+        .filter((id) => !previousHandIds[player].has(id)),
+    );
     // First run: seed the cursor so historic events don't replay.
     if (lastTimestampRef.current === null) {
       const last = eventLog[eventLog.length - 1];
@@ -776,6 +792,30 @@ export function useCardTransitions(
               : transition,
         });
       }
+    }
+
+    // Give each unnamed hand arrival the next hand card that just appeared,
+    // in order, so the hand holds that card's slot for the flight and the
+    // card lands in it.
+    const unclaimed = newHandIds.map((ids) => [...ids]);
+    for (const { transition } of newTransitions) {
+      if (transition.kind !== undefined) continue;
+      if (!transition.toZoneKey.endsWith("-hand")) continue;
+      const hand = handIds[transition.playerIndex];
+      if (transition.instanceId && hand.has(transition.instanceId)) {
+        const at = unclaimed[transition.playerIndex].indexOf(transition.instanceId);
+        if (at !== -1) unclaimed[transition.playerIndex].splice(at, 1);
+      }
+    }
+    for (const timed of newTransitions) {
+      const { transition } = timed;
+      if (transition.kind !== undefined) continue;
+      if (!transition.toZoneKey.endsWith("-hand")) continue;
+      if (transition.instanceId && handIds[transition.playerIndex].has(transition.instanceId)) {
+        continue;
+      }
+      const claimed = unclaimed[transition.playerIndex].shift();
+      if (claimed) timed.transition = { ...transition, instanceId: claimed };
     }
 
     // A direct drag already supplies the travel visual, so suppress the
