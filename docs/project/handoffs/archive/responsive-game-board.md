@@ -6,7 +6,7 @@ last-updated: 2026-04-30 (OPT-348 in review; OPT-349 merged)
 
 # Responsive Game Board — Handoff Doc
 
-Make the game board fully responsive on desktop (1280×720+) by authoring it once at a fixed design resolution (1920×1080) and applying a uniform CSS `transform: scale()` to fit the viewport. Same pattern Hearthstone, Legends of Runeterra, TFT, and Master Duel use — translated from Unity's `CanvasScaler` to CSS/React. Full scope: [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../RESPONSIVE-GAME-BOARD-SCOPE.md).
+Make the game board fully responsive on desktop (1280×720+) by authoring it once at a fixed design resolution (1920×1080) and applying a uniform CSS `transform: scale()` to fit the viewport. Same pattern Hearthstone, Legends of Runeterra, TFT, and Master Duel use — translated from Unity's `CanvasScaler` to CSS/React. Full scope: [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../../RESPONSIVE-GAME-BOARD-SCOPE.md).
 
 ---
 
@@ -244,7 +244,7 @@ Copy this block when writing a new handoff:
 
 - **Primer:** Exact-viewport QA verified the lowered gate (`1280×640` passes; `1280×639` and `1279×640` block), no document scroll, all board zones visible, readable inside-board labels/counters/phase controls, readable card hover/zoom text, and portaled prompt modals at chrome scale for ARRANGE_TOP_CARDS, SELECT_TARGET, PLAYER_CHOICE, OPTIONAL_EFFECT, and REVEAL_TRIGGER.
 - **Failure:** At `1280×640` on `/sandbox/play-character`, dragging the hand card to the lower C1 character slot starts and follows the pointer, but the drop does not resolve over the droppable. The same normalized pointer path at `1920×1080` resolves over `char-slot-0` and plays the card. Follow-up filed as [OPT-348](https://linear.app/optcg-sim/issue/OPT-348/fix-scaled-board-dnd-kit-droppable-hit-testing-at-1280640).
-- **Evidence:** `docs/project/handoffs/assets/opt-347-drag-1280x640-fail.png`, `docs/project/handoffs/assets/opt-347-drag-1920x1080-control.png`, and `docs/project/handoffs/assets/opt-347-reveal-trigger-1280x640.png`.
+- **Evidence:** `docs/project/handoffs/archive/assets/opt-347-drag-1280x640-fail.png`, `docs/project/handoffs/archive/assets/opt-347-drag-1920x1080-control.png`, and `docs/project/handoffs/archive/assets/opt-347-reveal-trigger-1280x640.png`.
 - **Gotchas / do NOT touch:** Do not change min-viewport constants or chrome typography/rings while fixing OPT-348. Focus on dnd-kit collision/hit-testing under the scaled board at the floor; the gate and inside-board legibility floor held.
 - **Unresolved:** Match-end dialog was not reached in sandbox and the live route requires auth/game setup; verify it with OPT-348 or a live-shell QA follow-up once drag is fixed.
 

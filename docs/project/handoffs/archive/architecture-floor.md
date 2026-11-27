@@ -6,7 +6,7 @@ last-updated: 2026-04-29 (OPT-324 in review)
 
 # Architecture Floor — Handoff Doc
 
-Tighten the runtime safety floor around the game engine, the app↔worker boundary, deck legality, CI, board correctness, and worker WebSocket security. Original floor first; audit follow-ups before new features. Full scope: [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../ARCHITECTURE-FLOOR-SCOPE.md).
+Tighten the runtime safety floor around the game engine, the app↔worker boundary, deck legality, CI, board correctness, and worker WebSocket security. Original floor first; audit follow-ups before new features. Full scope: [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../../ARCHITECTURE-FLOOR-SCOPE.md).
 
 ---
 
@@ -74,7 +74,7 @@ None — this initiative starts on a clean main. CI is green for app tests; work
 - Request IDs / end-to-end observability — defer until after WS security follow-ups.
 - Lint cleanup beyond correctness class (~400 remaining warnings) — separate ticket after OPT-332.
 
-See [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../ARCHITECTURE-FLOOR-SCOPE.md) §"Deferred / tech debt" for full detail.
+See [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../../ARCHITECTURE-FLOOR-SCOPE.md) §"Deferred / tech debt" for full detail.
 
 ---
 

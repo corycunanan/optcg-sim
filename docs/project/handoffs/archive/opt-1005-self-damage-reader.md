@@ -20,4 +20,4 @@ Focused tests: exact explicit collection followed by run from workers/game, cove
 
 Reader must pass independent review, exact-head required CI and deployment verification before the self-damage producer can land. Original writer remains frozen on its separate branch; no merge performed. After reader deployment, merge main into producer branch, run OP14-115 accept/decline/reload, cannot-add destination negative, OPT-996 full prefix order and existing OPT-960/963/926/925/984 regressions, and complete the Large-tier full gate. The original PR title and two-issue scope remain unchanged.
 
-Historical review path `docs/project/handoffs/runs/reviews/2026-10-17-opt963-pr758-opus.md` was absent at this base; the full ticket reproduced D-F2b and coordinator obtained PR758 body.
+Historical review path `docs/project/handoffs/archive/runs/reviews/2026-10-17-opt963-pr758-opus.md` was absent at this base; the full ticket reproduced D-F2b and coordinator obtained PR758 body.

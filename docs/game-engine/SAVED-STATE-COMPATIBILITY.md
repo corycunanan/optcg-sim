@@ -4,7 +4,7 @@
 
 **Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6). From PR 5a (OPT-963) the reader also reads version 3 (typed replacement and damage continuation frames, §8) and lowers it to the version 2 runtime (§1.7); PR 5b raises the runtime and the writer to version 3 (§1.8). PR 6a reads version 4 by strict lowering while runtime and writer remain version 3 (§9). PR 6b executes and writes version 4 after the verified 6a deployment (§10).
 
-**Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
+**Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/archive/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
 
 ---
 
@@ -649,7 +649,7 @@ Loading a native7 prompt also commits the reader to its future native7 producers
 
 The bounded amendment keeps ordinary creation/execution/writing at6. Only explicit7 cost orchestration uses identity plans for positive DON_MINUS/VARIABLE_DON_RETURN: execute a proven sole semantic plan through the real identity executor, otherwise emit the existing COST/PLAYER_CHOICE shape. Positive active/rested flags and exact state intersect; false flags are unrestricted, and state restrictions exclude attached donors. Numeric0 emits no positive-bound DON picker. Generic zero field payment skips removal scanning/capture rather than broadening the closed replay grammar. Setup, legacy promotion, writer constants, ordinary6 semantics and shared feasibility remain separate rollout work.
 
-The separately named `opt-969-native7-producers` corpus pins the isolated actual producer, a complete eight-file production patch from reachable485, source/generator/payload hashes,82 synthetic scenarios and every later pause. Mock-free public replay covers live/undo, suffix/branch/nested continuation and completion, including independent identity/power/events/terminal/rollback assertions. It is not a production capture or proof of authored multi-DON/zero prevalence. Historical corpora remain immutable. See [the source/acceptance handoff](../project/handoffs/opt969-native7-producers.md) for counts, negative controls and scope limits.
+The separately named `opt-969-native7-producers` corpus pins the isolated actual producer, a complete eight-file production patch from reachable485, source/generator/payload hashes,82 synthetic scenarios and every later pause. Mock-free public replay covers live/undo, suffix/branch/nested continuation and completion, including independent identity/power/events/terminal/rollback assertions. It is not a production capture or proof of authored multi-DON/zero prevalence. Historical corpora remain immutable. See [the source/acceptance handoff](../project/handoffs/archive/opt969-native7-producers.md) for counts, negative controls and scope limits.
 
 After ordinary7 rollout, the verified amendment is the semantic rollback floor;485 is known unsafe for these future producers. Decision10 rollback remains an explicit known rules deviation. Deferred feasibility, forced-shuffle replacement, hand-TOP and authored DON-domain corrections are not resolved by this amendment.
 
@@ -760,7 +760,7 @@ of OP15-002's base-cost3 condition. Twelve additional synthetic producer recipes
 cover first/subsequent pauses and reader-generated successor completion. These
 are synthetic compatibility evidence, with independent resource/history checks;
 no production capture, UI geometry, rules migration or parent closure is claimed.
-See [the bounded handoff](../project/handoffs/opt969-history-reader.md).
+See [the bounded handoff](../project/handoffs/archive/opt969-history-reader.md).
 
 ## Native8 battle completion reader (OPT-1007)
 
@@ -826,7 +826,7 @@ Historical corpus bytes remain immutable. Evidence is synthetic under the
 explicit accepted exception; no production capture, repair or retirement is
 claimed. Final OPT921/948 domains/feasibility and the
 Decision10 policy decision are outside this rollout. See
-[the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
+[the writer handoff](../project/handoffs/archive/opt969-native7-writer.md) for ownership,
 reader selection, validation and remaining parent work. Earlier ordinary6
 statements above describe the prerequisite releases, superseded by this rollout.
 

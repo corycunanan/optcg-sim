@@ -13,4 +13,4 @@ OPT969_CAPTURE=1 OPT969_PRODUCER_ROOT=/path/to/rebuilt-producer pnpm --filter op
 
 Run capture in isolated scratch and compare every payload hash. Default tests replay only. `OPT969_REPLAY_ROOT` selects an external immutable runtime; absent it uses the amendment. Both builds use real repository/coordinator/lifecycle. The optional pinned diagnostic enumerates negative controls against original485 and must not be described as compatibility success.
 
-The complete source/acceptance map and limitations are in `docs/project/handoffs/opt969-native7-producers.md`. There are no fixture adapters or production opt-outs.
+The complete source/acceptance map and limitations are in `docs/project/handoffs/archive/opt969-native7-producers.md`. There are no fixture adapters or production opt-outs.
