@@ -16,6 +16,10 @@ NEXTJS_URL = "https://optcg-sim.vercel.app"
 # unset, logging is a no-op for the HTTP sink but events are still printed
 # to stdout (visible in `wrangler tail`). Set per environment via:
 #   wrangler secret put LOG_URL
+#
+# SENTRY_DSN (optional, OPT-1063): Sentry project DSN. When unset, Sentry is
+# disabled and errors only reach the structured log. Set via:
+#   wrangler secret put SENTRY_DSN
 
 [[durable_objects.bindings]]
 name = "GAME_SESSION"

@@ -15,9 +15,23 @@
  *   GET  /user/:userId/health      — Internal connection-count probe
  */
 
-// OPT-1063: the binding exports the error-reporting subclass under its name.
-export { ReportingGameSession as GameSession } from "./session/error-boundary.js";
+import * as Sentry from "@sentry/cloudflare";
+import { ReportingGameSession } from "./session/error-boundary.js";
+import { sentryOptions } from "./lib/sentry.js";
 export { UserChannel } from "./UserChannel.js";
+
+// OPT-1063: the binding exports the error-reporting subclass under its name,
+// wrapped for Sentry (disabled unless SENTRY_DSN is set).
+// GameSession implements the classic `DurableObject` interface rather than
+// extending the `cloudflare:workers` base class the SDK's types name; the
+// wrapper only proxies construction and the handler methods, so both work.
+type InstrumentableDurableObject = Parameters<
+  typeof Sentry.instrumentDurableObjectWithSentry
+>[1];
+export const GameSession = Sentry.instrumentDurableObjectWithSentry(
+  sentryOptions,
+  ReportingGameSession as unknown as InstrumentableDurableObject
+);
 import { isAuthorizedBearer } from "../../../shared/bearer-auth.js";
 import { authorizeSessionExport } from "./session/export.js";
 import { reportError } from "./lib/error-reporting.js";
@@ -28,7 +42,7 @@ const GAME_ROUTE_PATTERN =
   /^\/game\/([^/]+)\/(init|ws|cards|notify-end|revoke-spectators|status)$/;
 const USER_ROUTE_PATTERN = /^\/user\/([^/]+)\/(ws|notify|health)$/;
 
-export default {
+const handler = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       return await routeRequest(request, env);
@@ -46,7 +60,9 @@ export default {
       throw error;
     }
   },
-};
+} satisfies ExportedHandler<Env>;
+
+export default Sentry.withSentry(sentryOptions, handler);
 
 function isRemoteDurableObjectError(error: unknown): boolean {
   return (
@@ -62,7 +78,10 @@ async function routeRequest(request: Request, env: Env): Promise<Response> {
   // Operator export is deliberately outside browser CORS and bearer routes.
   const exportMatch = url.pathname.match(/^\/game\/([^/]+)\/export$/);
   if (exportMatch) {
-    const rejected = await authorizeSessionExport(request, env.GAME_WORKER_SECRET);
+    const rejected = await authorizeSessionExport(
+      request,
+      env.GAME_WORKER_SECRET
+    );
     if (rejected) return rejected;
     const id = env.GAME_SESSION.idFromName(exportMatch[1]);
     return env.GAME_SESSION.get(id).fetch(request);
@@ -74,8 +93,7 @@ async function routeRequest(request: Request, env: Env): Promise<Response> {
       headers: {
         "Access-Control-Allow-Origin": env.NEXTJS_URL,
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers":
-          "Content-Type, Authorization, Upgrade",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade",
       },
     });
   }
