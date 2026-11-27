@@ -700,7 +700,7 @@ PRB02-009 Mr.3(Galdino) uses this host-scoped form. Effect-rest events carry `ca
 
 `BY_EFFECT`, `BY_YOUR_EFFECT`, `BY_OPPONENT_EFFECT`, and `ANY` work independently of host scope. OP07-031 Bartolomeo and OP10-036 Perona intentionally omit `target: "SELF"` to watch any Character rested by their controller's effect. OP14-070 Buffalo combines `target: "SELF"`, `cause: "BY_OPPONENT_EFFECT"`, and `source_card_type: "CHARACTER"`. The causing source identity is derived from the canonical pre-payment source snapshot and survives source departure, ordinary rest, batch replacement prompts, durable save/load, and replacement decline. Missing legacy source identity does not satisfy a Character-source filter.
 
-The recursive disposition and pipeline scenarios for all ten authored consumers are recorded in [OPT-847](../project/handoffs/OPT-847.md).
+The recursive disposition and pipeline scenarios for all ten authored consumers are recorded in [OPT-847](../project/handoffs/archive/OPT-847.md).
 
 ---
 

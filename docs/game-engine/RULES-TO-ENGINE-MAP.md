@@ -551,7 +551,7 @@ Known residuals and follow-ups for the merged rows (commit messages and
 - OPT-814: PRB02-006 rest-source follow-up OPT-847 (merged, #669), per `OPT-814.md`.
 - OPT-807: successor OPT-845 (merged, #671).
 
-OPT-804 was a tracking parent (`docs/project/handoffs/runs/2026-09-26-opt798-827-824-828-857.md`:
+OPT-804 was a tracking parent (`docs/project/handoffs/archive/runs/2026-09-26-opt798-827-824-828-857.md`:
 "Parent OPT-804 out of scope (tracking only)"); its split-out gaps merged as
 OPT-824 (#683), OPT-825 (#688), OPT-826 (#706), OPT-827 (#682) and OPT-828 (#684),
 so it is an umbrella with merged children rather than an open defect. OPT-803

@@ -6,7 +6,7 @@ last-updated: 2026-04-26 (OPT-306 in review — playground mode + first scenario
 
 # Animation Sandbox — Handoff Doc
 
-A `/sandbox` surface for showcasing and validating atomic game-state animations in isolation. Each scenario is a declarative TS file that drives the real `BoardLayout` via a fake session provider, with per-scenario input gating (spectator vs interactive). Full scope: [`docs/project/ANIMATION-SANDBOX-SCOPE.md`](../ANIMATION-SANDBOX-SCOPE.md).
+A `/sandbox` surface for showcasing and validating atomic game-state animations in isolation. Each scenario is a declarative TS file that drives the real `BoardLayout` via a fake session provider, with per-scenario input gating (spectator vs interactive). Full scope: [`docs/project/ANIMATION-SANDBOX-SCOPE.md`](../../ANIMATION-SANDBOX-SCOPE.md).
 
 ---
 

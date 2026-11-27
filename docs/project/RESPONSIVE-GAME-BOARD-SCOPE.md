@@ -4,7 +4,7 @@ created: 2026-04-27
 owner: Cory Cunanan
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-handoff-doc: docs/project/handoffs/responsive-game-board.md
+handoff-doc: docs/project/handoffs/archive/responsive-game-board.md
 ---
 
 # Responsive Game Board — Scope & Plan

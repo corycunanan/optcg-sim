@@ -25,4 +25,4 @@
 - Remove the OPT-198 PUT compatibility shim after the next release.
 - Deduplicate the `assertNever` helpers introduced across OPT-193 cost modules.
 
-See `docs/project/handoffs/tech-debt.md` for per-issue outcomes.
+See `docs/project/handoffs/archive/tech-debt.md` for per-issue outcomes.

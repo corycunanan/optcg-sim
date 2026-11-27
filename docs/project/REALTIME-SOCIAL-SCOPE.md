@@ -2,7 +2,7 @@
 
 > **Architectural source of truth** for the project that replaces every cross-player polling loop with a push channel.
 > **Linear project:** [Realtime Social](https://linear.app/optcg-sim/project/realtime-social-bf3d7344f863).
-> **Handoff doc + Action Plan:** `docs/project/handoffs/realtime-social.md`.
+> **Handoff doc + Action Plan:** `docs/project/handoffs/archive/realtime-social.md`.
 > **Origin:** [OPT-88](https://linear.app/optcg-sim/issue/OPT-88) — promoted to a project on 2026-05-01.
 
 ---
