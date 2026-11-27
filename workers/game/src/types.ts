@@ -623,4 +623,8 @@ export interface Env {
   NEXTJS_URL: string;
   GAME_WORKER_SECRET: string;
   LOG_URL?: string;
+  /** OPT-1063: Sentry project DSN. Unset leaves Sentry disabled. */
+  SENTRY_DSN?: string;
+  /** OPT-1063: Sentry environment label; defaults to "production". */
+  SENTRY_ENVIRONMENT?: string;
 }

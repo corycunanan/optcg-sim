@@ -31,7 +31,7 @@ export function resetErrorReporter(): void {
 /** Reports a caught or unhandled error. Never throws. */
 export function reportError(error: unknown, context: ErrorReportContext): void {
   try {
-    reporter(buildErrorReport(error, context));
+    reporter(buildErrorReport(error, context), error);
   } catch {
     /* Reporting must never break the caller. */
   }

@@ -43,7 +43,12 @@ export type ErrorReport = {
   timestamp: string;
 };
 
-export type ErrorReporter = (report: ErrorReport) => void;
+/**
+ * Receives the scrubbed report and the original thrown value. Providers that
+ * parse stack frames (Sentry) need the original; they must scrub their own
+ * event payload before sending it (see `scrubText`).
+ */
+export type ErrorReporter = (report: ErrorReport, error: unknown) => void;
 
 export const REDACTED = "[redacted]";
 
@@ -131,4 +136,61 @@ export function buildErrorReport(
     tags,
     timestamp: now.toISOString(),
   };
+}
+
+/** Report tags as Sentry tags: string values, plus the report source. */
+export function toProviderTags(report: ErrorReport): Record<string, string> {
+  const tags: Record<string, string> = { source: report.source };
+  for (const [key, value] of Object.entries(report.tags)) {
+    if (value !== null) tags[key] = String(value);
+  }
+  if (report.digest) tags.digest = report.digest;
+  return tags;
+}
+
+const DROPPED_REQUEST_FIELDS = [
+  "cookies",
+  "headers",
+  "data",
+  "query_string",
+  "env",
+];
+
+function scrubDeep(value: unknown, depth: number): unknown {
+  if (typeof value === "string") return scrubText(value);
+  if (depth > 12 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      value[index] = scrubDeep(value[index], depth + 1);
+    }
+    return value;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    record[key] = scrubDeep(record[key], depth + 1);
+  }
+  return record;
+}
+
+/**
+ * Scrubs a provider event (Sentry event or breadcrumb) in place before it is
+ * sent: drops request cookies, headers, body and query string, keeps only an
+ * opaque user id, and redacts every remaining string with `scrubText`.
+ */
+export function scrubProviderEvent<T>(event: T): T {
+  if (event === null || typeof event !== "object") return event;
+  const record = event as Record<string, unknown>;
+  const request = record.request;
+  if (request && typeof request === "object") {
+    const fields = request as Record<string, unknown>;
+    for (const field of DROPPED_REQUEST_FIELDS) delete fields[field];
+    if (typeof fields.url === "string") fields.url = fields.url.split("?")[0];
+  }
+  const user = record.user;
+  if (user && typeof user === "object") {
+    const id = (user as Record<string, unknown>).id;
+    record.user =
+      typeof id === "string" || typeof id === "number" ? { id } : undefined;
+  }
+  return scrubDeep(event, 0) as T;
 }
