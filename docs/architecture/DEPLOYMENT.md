@@ -210,14 +210,30 @@ This rollback reapplies every pre-promotion `Card`, `CardSet`, and `ArtVariant` 
 
 ## Cloudflare Workers: deploying on merge
 
-Both workers (`workers/game/` and `workers/images/`) are deployed by GitHub Actions on pushes to `main` when their respective directories change — see `.github/workflows/deploy-workers.yml`. This closes the same class of gap that OPT-278 closed for Prisma migrations: worker code merged to `main` now lands on Cloudflare automatically instead of relying on someone to remember to run `wrangler deploy`.
+Both workers (`workers/game/` and `workers/images/`) are deployed by GitHub Actions after a green CI run on `main`, when their respective directories changed — see `.github/workflows/deploy-workers.yml`. This closes the same class of gap that OPT-278 closed for Prisma migrations: worker code merged to `main` now lands on Cloudflare automatically instead of relying on someone to remember to run `wrangler deploy`.
+
+### Deploys wait for green CI (OPT-1062)
+
+`deploy-workers.yml` triggers on `workflow_run` of the `CI` workflow, not on `push`. The order for each push to `main` is:
+
+1. `CI` (`.github/workflows/ci.yml`) runs `pnpm verify` on the pushed commit.
+2. When CI completes, the deploy workflow starts. Its `changes` job runs only if that CI run succeeded for a push to this repository's `main`. A red CI run deploys nothing and does not sync effect schemas.
+3. `.github/scripts/worker-deploy-changes.sh` picks what to ship:
+   * If a newer CI run on `main` has already succeeded, this run deploys nothing. Shipping the older commit would roll the worker back; the newer run ships both commits.
+   * Otherwise it diffs the tested commit against the commit of the newest successful deploy run (each green-main deploy run is named `Deploy workers for <sha>`). A failed or cancelled deploy never becomes that base, so its changes ship with the next green run. With no earlier deploy run it diffs against the parent commit.
+   * `workers/game/**` deploys the game worker, `workers/images/**` deploys the images worker, and the schema paths (`workers/game/src/engine/schemas/**`, `schema-registry.ts`, `src/lib/deck-builder/validation.ts`, `pipeline/sync-effect-schemas.ts`) sync effect schemas to both Neon branches before the game worker deploys.
+4. Every job checks out the commit CI tested (`workflow_run.head_sha`), never the newer tip of `main`.
+
+`workflow_dispatch` still runs only the schema sync, from the tip of `main`.
+
+The worker rollback floor rules still apply. A green CI run does not make an older commit a safe rollback target: before redeploying or reverting the game worker to an earlier commit, check that it is at or above the current rollback floor in `docs/game-engine/SAVED-STATE-COMPATIBILITY.md` (as of OPT-958 cost mode 9, `c3a4907` or newer). The "newer green run supersedes" rule above exists so the automatic path never rolls back on its own.
 
 | Context | Command | Targets |
 |--------|---------|---------|
 | Local, iterating on a worker | `pnpm --filter optcg-game dev` / `pnpm --filter optcg-images-worker dev` | Local miniflare |
 | Manual deploy (game worker) | `pnpm worker:deploy:game` | Cloudflare |
 | Manual deploy (images worker) | `pnpm worker:deploy` | Cloudflare |
-| CI/CD | Push to `main` with changes under `workers/game/**` or `workers/images/**` | Cloudflare (auto) |
+| CI/CD | Green CI run on a push to `main` with changes under `workers/game/**` or `workers/images/**` | Cloudflare (auto) |
 
 ### Required GitHub secret
 

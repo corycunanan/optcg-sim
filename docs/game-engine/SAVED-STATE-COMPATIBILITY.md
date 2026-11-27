@@ -253,7 +253,7 @@ Nothing else is filled; strict validation still rejects every other omission or 
 * **After PR 1 deploys and is verified**, the PR 1 build is the **reader-capable rollback baseline**. Every later PR that enables a writer for version N must have the version-N reader already deployed and verified live, and must name the oldest build that can read N in its PR body. Rolling back past that build is not a rollback; it is data loss for every in-flight game written at N.
 * The strict base build is **never** a rollback target once a version-2 writer has run in production; the PR 4a / 4b builds are never rollback targets once a version-3 writer has run (PR 5b). The PR 5a squash merge `c972f14e2a34e701d319806974c5c3868b3eae66` (deployed 2026-10-18) is the oldest build that reads version 3 (by lowering to version 2 semantics, §1.7: a degraded but loadable resume for games paused inside a Trigger window or a replacement offer at the moment of rollback, every other state lossless).
 
-Deploy verification: merging to `main` auto-deploys the game worker (`.github/workflows/deploy-workers.yml`). Confirm with `gh api repos/<owner>/<repo>/commits/<sha>/status` before merging the next writer PR.
+Deploy verification: merging to `main` auto-deploys the game worker once CI on the merged commit passes (`.github/workflows/deploy-workers.yml`, OPT-1062). Confirm with `gh api repos/<owner>/<repo>/commits/<sha>/status` before merging the next writer PR.
 
 ### 5.2 When a session fails to load
 
