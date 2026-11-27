@@ -1,7 +1,8 @@
 /**
  * GET /api/cron/game-finalization-repair — Abandon stale active games in a
  * bounded batch so exhausted worker and browser callbacks cannot strand their
- * lobbies in IN_GAME permanently.
+ * lobbies in IN_GAME permanently, then restore stranded rooms that no game
+ * can unstick (IN_GAME with no live game, PVP WAITING with a seated guest).
  */
 
 import { isAuthorizedBearer } from "@shared/bearer-auth";
@@ -9,28 +10,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { finalizeGameResult, notifyRestoredLobby } from "@/lib/game/finalize";
-import { gameWorkerFetch } from "@/lib/game-worker/client";
+import { probeWorkerStatus } from "@/lib/game-worker/probe-status";
 import { notifyGame } from "@/lib/realtime/fanout-game";
+import { repairStrandedLobby } from "@/lib/lobbies/repair-stranded";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const STALE_GAME_HOURS = 24;
 const STALE_GAME_BATCH_SIZE = 20;
-const WORKER_STATUS_TIMEOUT_MS = 1_500;
+const STRANDED_LOBBY_BATCH_SIZE = 50;
 const STALE_GAME_REASON =
   "Game worker session absent after the 24-hour recovery threshold";
-
-type WorkerProbe =
-  | { kind: "LIVE" }
-  | { kind: "ABSENT" }
-  | {
-      kind: "TERMINAL";
-      status: "FINISHED" | "ABANDONED";
-      winnerId: string | null;
-      winReason: string | null;
-    }
-  | { kind: "UNREACHABLE"; reason: string };
 
 type RepairMetrics = {
   success: boolean;
@@ -40,6 +31,7 @@ type RepairMetrics = {
   alreadyFinal: number;
   skippedLive: number;
   skippedUnreachable: number;
+  restoredLobbies: number;
   errors: number;
   durationMs: number;
 };
@@ -59,6 +51,7 @@ export async function GET(request: NextRequest) {
   let alreadyFinal = 0;
   let skippedLive = 0;
   let skippedUnreachable = 0;
+  let restoredLobbies = 0;
   let errors = 0;
 
   try {
@@ -135,6 +128,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Rooms the game pass cannot reach: their latest game is already
+    // terminal (or gone), or an older restore left a seated guest in WAITING.
+    const stranded = await prisma.lobby.findMany({
+      where: {
+        OR: [
+          {
+            status: "IN_GAME",
+            gameSessions: { none: { status: "IN_PROGRESS" } },
+          },
+          { status: "WAITING", mode: "PVP", guest: { isNot: null } },
+        ],
+      },
+      orderBy: { id: "asc" },
+      take: STRANDED_LOBBY_BATCH_SIZE,
+      select: { id: true },
+    });
+    for (const lobby of stranded) {
+      if (await repairStrandedLobby(lobby.id)) restoredLobbies += 1;
+    }
+
     const metrics: RepairMetrics = {
       success: errors === 0,
       cutoff,
@@ -143,6 +156,7 @@ export async function GET(request: NextRequest) {
       alreadyFinal,
       skippedLive,
       skippedUnreachable,
+      restoredLobbies,
       errors,
       durationMs: Date.now() - startedAt,
     };
@@ -159,6 +173,7 @@ export async function GET(request: NextRequest) {
       alreadyFinal,
       skippedLive,
       skippedUnreachable,
+      restoredLobbies,
       errors: errors + 1,
       durationMs: Date.now() - startedAt,
     };
@@ -171,62 +186,4 @@ export async function GET(request: NextRequest) {
     );
     return NextResponse.json(metrics, { status: 500 });
   }
-}
-
-async function probeWorkerStatus(gameId: string): Promise<WorkerProbe> {
-  let response: Response;
-  try {
-    response = await gameWorkerFetch(`/game/${gameId}/status`, {
-      method: "GET",
-      timeoutMs: WORKER_STATUS_TIMEOUT_MS,
-    });
-  } catch (error) {
-    return {
-      kind: "UNREACHABLE",
-      reason: error instanceof Error ? error.name : "transport_error",
-    };
-  }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return { kind: "UNREACHABLE", reason: "invalid_response" };
-  }
-
-  if (!isRecord(body) || typeof body.status !== "string") {
-    return { kind: "UNREACHABLE", reason: "invalid_response" };
-  }
-  if (response.status === 404 && body.status === "ABSENT") {
-    return { kind: "ABSENT" };
-  }
-  if (!response.ok) {
-    return { kind: "UNREACHABLE", reason: `http_${response.status}` };
-  }
-  if (body.status === "IN_PROGRESS") {
-    return { kind: "LIVE" };
-  }
-  if (body.status !== "FINISHED" && body.status !== "ABANDONED") {
-    return { kind: "UNREACHABLE", reason: "invalid_response" };
-  }
-
-  const winnerId = body.winnerId;
-  const winReason = body.winReason;
-  if (
-    (winnerId !== null && typeof winnerId !== "string") ||
-    (winReason !== null && typeof winReason !== "string")
-  ) {
-    return { kind: "UNREACHABLE", reason: "invalid_response" };
-  }
-
-  return {
-    kind: "TERMINAL",
-    status: body.status,
-    winnerId,
-    winReason,
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -114,7 +114,7 @@ describe("POST /api/lobbies/[id]/leave", () => {
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: {
         id: "lobby-1",
-        status: "READY",
+        status: { in: ["WAITING", "READY"] },
         mode: "PVP",
         guest: { is: { userId: "guest-user" } },
       },
