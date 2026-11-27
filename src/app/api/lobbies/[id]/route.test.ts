@@ -24,6 +24,7 @@ const revokeSpectatorSocketsMock = vi.fn();
 const notifyUserMock = vi.fn();
 const cancelPendingLobbyInvitesMock = vi.fn();
 const releaseActiveLobbyCallMock = vi.fn();
+const repairStrandedLobbyMock = vi.fn(async () => false);
 
 // Track `after()` callbacks so tests can deterministically wait for them
 // before asserting on fanout side effects. The cb chain has multiple awaits
@@ -50,6 +51,11 @@ vi.mock("next/server", async (importActual) => {
 });
 
 vi.mock("@/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/lobbies/repair-stranded", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/lobbies/repair-stranded")>()),
+  repairStrandedLobby: (...args: unknown[]) =>
+    repairStrandedLobbyMock(...(args as [])),
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     lobby: {
@@ -174,6 +180,8 @@ function createTransactionClient() {
 }
 
 beforeEach(() => {
+  repairStrandedLobbyMock.mockReset();
+  repairStrandedLobbyMock.mockResolvedValue(false);
   authMock.mockReset();
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
@@ -267,6 +275,49 @@ describe("GET /api/lobbies/[id]", () => {
     expect(await res.json()).toMatchObject({
       data: { status: "WAITING", viewerRole: "spectator" },
     });
+  });
+
+  it("repairs a stranded IN_GAME room for a seated player and returns the fresh snapshot", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
+    const stranded = {
+      id: "lobby-1",
+      status: "IN_GAME",
+      mode: "PVP",
+      hostUserId: "host-user",
+      guest: { user: { id: "guest-user" } },
+      viewerRole: "guest",
+      gameStatus: "ABANDONED",
+    };
+    buildLobbyRoomStateMock
+      .mockResolvedValueOnce(stranded)
+      .mockResolvedValueOnce({ ...stranded, status: "READY" });
+    repairStrandedLobbyMock.mockResolvedValueOnce(true);
+
+    const res = await GET(
+      new NextRequest("http://localhost/api/lobbies/lobby-1"),
+      params,
+    );
+
+    expect(repairStrandedLobbyMock).toHaveBeenCalledWith("lobby-1");
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledTimes(2);
+    expect(await res.json()).toMatchObject({ data: { status: "READY" } });
+  });
+
+  it("never repairs on a spectator's read", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "spectator-user" } });
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "IN_GAME",
+      mode: "PVP",
+      hostUserId: "host-user",
+      guest: null,
+      viewerRole: "spectator",
+      gameStatus: "FINISHED",
+    });
+
+    await GET(new NextRequest("http://localhost/api/lobbies/lobby-1"), params);
+
+    expect(repairStrandedLobbyMock).not.toHaveBeenCalled();
   });
 });
 

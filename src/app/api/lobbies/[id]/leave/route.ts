@@ -38,10 +38,13 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
     const result = await prisma.$transaction(async (tx) => {
       // This conditional status transition is the concurrency lock shared
       // with POST /start. Start and leave cannot both win a READY room.
+      // WAITING is accepted too: rooms restored after a game before the
+      // READY-restore fix keep a seated guest in WAITING, and that guest must
+      // still be able to leave.
       const lobbyUpdate = await tx.lobby.updateMany({
         where: {
           id,
-          status: "READY",
+          status: { in: ["WAITING", "READY"] },
           mode: "PVP",
           guest: { is: { userId } },
         },

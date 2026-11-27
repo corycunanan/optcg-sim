@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { inferLegacyGameEndReasonCode } from "@shared/game-end-reason";
 import { prisma } from "@/lib/db";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
@@ -60,28 +61,55 @@ export async function finalizeGameResult(
       where: { id: input.gameId },
       select: { lobbyId: true },
     });
-    const restoredLobby = await tx.lobby.updateMany({
-      where: { id: game.lobbyId, status: "IN_GAME" },
-      data: {
-        status: "WAITING",
-        hostReady: false,
-        revision: { increment: 1 },
-      },
-    });
-
-    if (restoredLobby.count === 1) {
-      await tx.lobbyGuest.updateMany({
-        where: { lobbyId: game.lobbyId },
-        data: { guestReady: false },
-      });
-    }
+    const restored = await restoreLobbyAfterGame(tx, game.lobbyId);
 
     return {
       finalized: true,
       alreadyFinal: false,
-      restoredLobbyId: restoredLobby.count === 1 ? game.lobbyId : null,
+      restoredLobbyId: restored ? game.lobbyId : null,
     };
   });
+}
+
+/**
+ * Return an IN_GAME lobby to its pre-game state once its match is over.
+ *
+ * A seated guest keeps the room READY: PVP `READY` is the "guest seated"
+ * state that leave, join-switch and start all lock on, and Solitaire rooms
+ * are always READY. Restoring a seated room to WAITING stranded the guest —
+ * leave answered 403 and a rematch start answered 409. Only an empty seat
+ * returns the room to WAITING. Readiness resets either way.
+ */
+export async function restoreLobbyAfterGame(
+  tx: Prisma.TransactionClient,
+  lobbyId: string
+): Promise<boolean> {
+  const seated = await tx.lobby.updateMany({
+    where: { id: lobbyId, status: "IN_GAME", guest: { isNot: null } },
+    data: {
+      status: "READY",
+      hostReady: false,
+      revision: { increment: 1 },
+    },
+  });
+
+  if (seated.count === 1) {
+    await tx.lobbyGuest.updateMany({
+      where: { lobbyId },
+      data: { guestReady: false },
+    });
+    return true;
+  }
+
+  const empty = await tx.lobby.updateMany({
+    where: { id: lobbyId, status: "IN_GAME" },
+    data: {
+      status: "WAITING",
+      hostReady: false,
+      revision: { increment: 1 },
+    },
+  });
+  return empty.count === 1;
 }
 
 export async function notifyRestoredLobby(lobbyId: string): Promise<void> {
