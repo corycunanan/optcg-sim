@@ -130,6 +130,9 @@ export class GameSession implements DurableObject {
     configureLogger(env.LOG_URL);
   }
 
+  /** Loaded game id for error reports (OPT-1063); absent before load. */
+  protected get loadedGameId(): string | undefined { return this.gameState?.id; }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
